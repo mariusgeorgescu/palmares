@@ -12,10 +12,19 @@ edit that did not re-render, which is exactly what that instruction exists to pr
 had said a lineage attestation "stays Pending for ever" — it is now refused at the mint by `Mg`, and
 an edit to a diagram's PROSE that is not re-rendered is exactly the drift this file exists to catch.
 
-The earlier staleness note said six `system-overview-*.svg` were behind their source after the
-2026-10-23 reconciliation. That is unchanged and still true — `system-overview.md` was not touched by
-ADR 0006, so its six remain to be re-rendered. The manifest below — file, type and section for all
-26 — is unchanged: no block was added, removed or renumbered.
+**Re-rendered 2026-10-24 (second pass)** for `system-overview.md`: all 10 blocks render, 0 failures —
+and **exactly one SVG changed**, `system-overview-04` (§4, the governance read path), whose only diff
+is `drep_metrics`/`vote_partition` where it had named one materialized view. The other nine came out
+byte-identical.
+
+So the earlier staleness note was wrong, and wrong in the direction that matters: it said **six**
+`system-overview-*.svg` were behind their source, which would have read as six diagrams a reader
+should not trust. One was. The five others had been re-rendered or had never drifted, and nothing in
+this file could tell the difference — a count asserted without re-running the renderer. Running it is
+cheap (`render.py`, below, ~20 s for ten blocks) and is the only way to know.
+
+The manifest below — file, type and section for all 26 — is unchanged: no block was added, removed
+or renumbered.
 
 ## The three diagrams the owner asked for
 

@@ -23,8 +23,10 @@ Output order in skeleton `mconcat` must match on-chain redeemer indices. Documen
   `isInvalidBefore`/`isInvalidAfter`, `mustMint`. Compose with `mconcat`.
 - **Scripts**: `scriptFromPlutus` → `GYScript v`. Reference: `GYBuildPlutusScriptReference refScript script`.
   Inlined: `GYBuildPlutusScriptInlined script`.
-- **Lookups**: `utxoDatum'` for one UTxO's datum. `utxosDatums` when filtering invalid datums at an address
-  where anyone can create UTxOs.
+- **Lookups**: `getInlineDatumAndValue` for one UTxO's datum (`…OrThrow` to raise `DatumParseError`
+  instead of returning `Nothing`), both in `TxBuilding/Utils.hs`. Per protocol state use the typed
+  readers in `TxBuilding/Lookups.hs` — `getProfileStateDatumAndValue`, `getAttestationDatumAndValue`,
+  `getDisputeDatumAndValue` — which locate the UTxO by asset class and parse the CIP-68 datum in one step.
 - **Authenticate before you trust**: a UTxO found at a protocol address is not proof of anything. Check that
   it carries the NFT its datum names (`authenticateStateUTxO`) before reading it. The Belt System's
   unguarded lookups are inherited fix #3.
@@ -33,7 +35,8 @@ Output order in skeleton `mconcat` must match on-chain redeemer indices. Documen
 
 - **DeployedScriptsContext**: Validator refs + oracle. `MonadReader` in Operations/Lookups/Interactions.
 - **TxBuildingContext**: Deployed scripts + provider. For `runTx`, `interactionToTxBody`,
-  `runPalmaresActionWithPK`.
+  `runActionWithPK` (`TxBuilding/Transactions.hs:130` — the signing path the admin CLI and the tests use;
+  `interactionToTxBody` is the unsigned one the HTTP API uses).
 - New validator → new field in Context, JSON config, `deployReferenceScripts`, and
   `config_palmares_validators.json` after deploy.
 - **OracleNFTPolicy is NOT in DeployedScriptsContext** — inlined in oracle-mint tx only.

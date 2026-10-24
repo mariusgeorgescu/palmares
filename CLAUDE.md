@@ -35,8 +35,9 @@ Dependencies only point inward. `webapi-lib` has **no** project-library dependen
 CSV only). `onchain-lib` must never import off-chain deps (no Aeson, Servant, Swagger).
 
 **Executables**: `admin` (CLI), `interaction-api` (8082), `query-api` (8083), `attest-sync` (8084).
-Sources in `src/exe/<name>/`. Executables depend on `offchain-lib` + `webapi-lib`; `attest-sync` also
-depends on `chainsync-lib`.
+Sources in `src/exe/<name>/`. The three HTTP services depend on `offchain-lib` + `webapi-lib`;
+`attest-sync` also depends on `chainsync-lib`. **`admin` does not depend on `webapi-lib`** — it serves
+nothing, so it carries no HTTP, auth or CORS, which is also why its image is the only one with no port.
 
 **Three conceptual flows**:
 1. **Type hierarchy**: Transfer (API DTOs) → Domain (`Core/Types.hs`, `Core/Actions.hs`) → Onchain

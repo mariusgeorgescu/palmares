@@ -22,8 +22,12 @@ Sources in `src/exe/<name>/`.
   Hoist with `hoistServerWithContext`.
 - **RestAPI module**: API types with `Summary`/`Description`. Include `ProbeAPI` + Swagger UI. Full server =
   swagger :<|> probe :<|> private (auth-protected).
-- **WAI app**: `mkPalmaresApp corsCfg ctx = mkCorsMiddleware corsCfg . provideOptions proxyPublicAPI $ serveWithContext ... basicCtx ...`
-  with `basicAuthServerContext`.
+- **WAI app**: `mkWebApp`, one per service, as a middleware stack outside `serveWithContext`. query-api:
+  `mkCorsMiddleware` → `freshnessMiddleware` → `provideOptions proxyPublicAPI` → `refusedRequestMiddleware`
+  → `serveWithContext proxyFullAPI (palmaresErrorFormatters :. EmptyContext)` (`RestAPI.hs:2349`).
+  interaction-api adds `basicAuthServerContext` to that context. ORDER matters: CORS outermost so a
+  refusal still carries its headers, `refusedRequestMiddleware` inside `provideOptions` so a genuine 405
+  is reshaped and a preflight is not.
 - **Error handling**: Map `TxBuildingException` to HTTP status. Use `throwError (err404 { errBody = ... })`.
 - **New endpoint**: Route type in RestAPI → handler in app monad → wire in server → `ToSchema` for Swagger sync.
 
@@ -54,8 +58,12 @@ Sources in `src/exe/<name>/`.
   - Shared helpers in `Query/Common.hs`. There is no `liveprojection` flag and no `Query.Live`: governance
     data has no "live" alternative to a view, and attestation reads come from projections only.
 - **`Query/Views.hs`**: embeds `sql/*.sql` with `file-embed` and applies it at boot, so a fresh database is
-  brought to the current view set by starting the service. Idempotent — every statement is
-  `CREATE OR REPLACE` / `CREATE ... IF NOT EXISTS`.
+  brought to the current view set by starting the service. Idempotent **as a whole, not per statement** —
+  `sql/000_schema.sql` opens with `DROP SCHEMA palmares CASCADE`, which takes an ACCESS EXCLUSIVE lock on
+  every view in it. What makes a restart safe is the md5 `palmares.schema_fingerprint` gate under
+  `pg_advisory_xact_lock` (`GV-01`): an unchanged checkout does **no DDL at all**, so a second replica
+  booting does not drop the schema the first is serving from. The fingerprint row is written LAST, so a
+  bootstrap that dies half way leaves none and the next boot rebuilds.
 - **`Query/Refresh.hs`**: the two matviews' `REFRESH ... CONCURRENTLY` loop — `drep_metrics` then
   `vote_partition`, one tick for both (`:105`) — interval from
   `PALMARES_VIEW_REFRESH_SECONDS`.

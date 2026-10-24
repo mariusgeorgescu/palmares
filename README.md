@@ -205,7 +205,7 @@ exits rather than starting with an unsafe default.
 | `ATTEST_SYNC_CONFIRM_WIPE` | no default — a schema-version bump drops every chain-sync table and re-indexes from the chain, and attest-sync refuses to do that unless this names the **stored** version being destroyed (the refusal prints the number). Gated on the wipe and not on the boot, so an ordinary restart never needs it; a stored version NEWER than the binary's is refused outright and this is not an override for that | attest-sync |
 | `POSTGRES_PASSWORD` | required by `compose.yaml`, **no default** — the superuser password `initdb` bakes into the volume on first boot. Read by compose, never by the Haskell | compose |
 | `PALMARES_VIEW_REFRESH_SECONDS` | default `300` | query-api |
-| `PALMARES_READY_MAX_LAG_SECONDS` | default `300` — `/ready` red above this | query-api |
+| `PALMARES_READY_MAX_LAG_SECONDS` | default `300` — `/ready` red above this. **Read by `admin reconcile-koios` too** (`Reconcile.hs:93`), where the same number is the parity gate's ceiling on how stale our side may be before a divergence counts; `--max-lag-seconds` overrides it there | query-api, admin |
 | `PALMARES_AMBER_LAG_SECONDS` | default `120` — UI amber above this | query-api |
 | `PALMARES_NETWORK_NAME` | default `preprod` — the value `/ready` compares `meta.network_name` against | query-api |
 | `PALMARES_FRESHNESS_POLL_MS` | default `5000` | query-api |

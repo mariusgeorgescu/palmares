@@ -47,9 +47,10 @@ Reconciliation also found claims in these documents that were **already false at
 than drift — the component diagram putting `onchain-lib` behind a node labelled with off-chain
 dependencies is the one that mattered, since "no off-chain deps in `onchain-lib`" is a load-bearing
 claim of this set. Each is listed in the commit that fixed it.
-Several `system-overview-*.svg` files are behind their Mermaid source — see that file. The data-path
-diagram joined them on 2026-10-24 (it named one materialized view where the schema has two). The
-Mermaid block is always the authority; `diagrams/README.md` has the renderer.
+All `system-overview-*.svg` files are current as of 2026-10-24: re-rendering all ten blocks changed
+exactly one, the data-path diagram (§4), which had named one materialized view where the schema has
+two. The note that said six were behind their source was itself wrong — see `diagrams/README.md`. The
+Mermaid block is always the authority, and that file has the renderer.
 
 | Document | Question it answers | Diagrams |
 |---|---|---|

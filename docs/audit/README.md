@@ -151,9 +151,13 @@ each report.
   missing names, ADR 0001 says fourteen views where there are nineteen, and the interaction Swagger
   declares GPL-3.0. Report 06 §7.1 lists the exact edits.
 - **Coverage is good where it was deliberate and absent where it was recent.** Inherited fixes #1–#5
-  each have a test that fails on the old behaviour; `failedWithTrace` really matches the code; but 22
-  of 63 trace codes have no validator-level test, privnet and balance checks are unused, and the
-  determinism job runs on zero rows (`TD-04`, `TD-20`, `GV-25`, `CS-17`).
+  each have a test that fails on the old behaviour; `failedWithTrace` really matches the code; but a
+  fifth of the trace codes have no validator-level test, privnet and balance checks are unused, and the
+  determinism job runs on zero rows (`TD-04`, `TD-20`, `GV-25`, `CS-17`). **No count here**, on purpose:
+  the denominator was published as 63 by this line and as 70 in §10, and at `f72af4e` the two methods
+  give 74 (short string literals on non-comment lines) and 67 (the `traceIfFalse`/`traceError` call
+  shape — re-measured 2026-10-24, still 67). A count that does not name its method is not a count, so
+  §10 arbitrates it in one place and this summary cites the shape of the gap instead of a number.
 
 ## 5. Per-report summaries
 
@@ -549,3 +553,28 @@ green in CI. Every document says one materialized view where there are two. The 
 (`docs/deployment/attest-flow-smoke.md:93-97`) still apologises for a `GYAddress` description that was
 corrected. `README.md:185` attributes `PALMARES_READY_MAX_LAG_SECONDS` to query-api, while
 `admin/Reconcile.hs:93` reads it as the parity gate's ceiling.
+
+### Closed since this pass (2026-10-24)
+
+All four of those, the three rows that "fail something", and the `CLAUDE.md` half of the 25:
+
+| What | Where it stood | Now |
+|---|---|---|
+| write Swagger `info.version` ungated | `NEW-DC-3` stayed green in CI | `icheck "version is 3.6.0"`, and the read document's own `check "version is 1.10.0"` beside it |
+| `NEW-DC-3` — smoke asserted `3.3.0` | three MINOR versions behind the served document | `assert /swagger-api.json '.info.version' '"3.6.0"'` |
+| one materialized view in four documents | `src/exe/CLAUDE.md:59`, `QueryAppMonad.hs:9`, `docs/spec/decisions.md:20`, ADR 0001 | all four say two; `smoke_views.sh` asserts 2 and `vote_partition is populated` |
+| the `GYAddress` apology | the runbook apologised for a corrected description | the paragraph now says the document and the page agree |
+| `PALMARES_READY_MAX_LAG_SECONDS` | attributed to query-api alone | `query-api, admin`, with `--max-lag-seconds` named as the parity gate's override |
+| `NEW-DC-17`/`NEW-DC-18` — the step table | predated `/claim-credential` and said "six" over five rows | six rows including `/claim-credential`, with the per-endpoint counts measured off the script |
+| four function names that do not exist | `mkPalmaresApp`, `runPalmaresActionWithPK`, `utxoDatum'`, `utxosDatums` — **0 hits in `src/`** | `mkWebApp` (with the middleware order, which is load-bearing), `runActionWithPK`, `getInlineDatumAndValue` and the three typed `get*DatumAndValue` |
+| the `CREATE OR REPLACE` idempotence claim | `src/exe/CLAUDE.md:58` | the `GV-01` md5 fingerprint gate under `pg_advisory_xact_lock`; `sql/000_schema.sql` opens with `DROP SCHEMA … CASCADE`, so it is idempotent as a whole and not per statement |
+| the ~80-line validator bound | "two of four validators exceed it by 35 and 57" | measured per lambda: `attestationsLambda` 115, `disputesLambda` 137, the other four 19–66. Not being split — the four published script hashes are frozen on preprod and restructuring a lambda is not hash-neutral |
+| "every executable depends on webapi-lib" | root `CLAUDE.md:37` | the three HTTP services do; `admin` does not, and the reason is named |
+
+**A fifth wrong claim, and it was this file's.** `diagrams/README.md` said six `system-overview-*.svg`
+were behind their Mermaid source. Re-rendering all ten blocks at HEAD changed **exactly one**
+(`-04`, the governance read path, the matview count). The other nine came out byte-identical. A
+staleness count asserted without re-running the renderer, which reads as six diagrams not to trust.
+
+What remains of the 25 is the product gaps that were always F2: no explorer, no CIP-95 wallet flow
+exercised, no rate limiting, no Prometheus endpoint, no `dispute_count` on list rows.

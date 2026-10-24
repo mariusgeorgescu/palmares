@@ -11,17 +11,24 @@ Every write route on the interaction API returns an **unsigned** transaction and
 service. So the script cannot complete a transaction on its own.
 
 The `admin` CLI does build-and-sign in one step — but only for the commands it has, and it has
-none of the three this flow needs:
+none of the four this flow needs:
 
 | flow step | admin CLI command | over HTTP |
 |---|---|---|
 | claim a profile | **none** | `/claim-profile` |
+| claim a credential onto a profile | **none** | `/claim-credential` |
 | issue an attestation | `issue-attestation` | `/issue-attestation` |
 | accept an attestation | `accept-attestation` | `/accept-attestation` |
 | open a dispute | **none** | `/open-dispute` |
 | resolve a dispute | **none** | `/resolve-dispute` |
 
-So the script goes over HTTP for all six, uniformly, and takes the signature as a command.
+So the script goes over HTTP for all six, uniformly, and takes the signature as a command. Measured
+against the script: `/issue-attestation` five times (step 7 issues three more), `/claim-profile`
+twice, and `/claim-credential`, `/accept-attestation`, `/open-dispute`, `/resolve-dispute` once each,
+with `/submit-tx` three times. `claim-credential` is step 2's second half — a DRep proving control of
+its own governance credential — and had no row here at all; the CLI's 25 commands still do not
+include it, nor `claim-profile`, `withdraw-credential`, `open-dispute`, `resolve-dispute` or
+`expire-dispute`.
 
 `resolve-dispute` being on HTTP is deliberate and not an oversight: the oracle validator requires
 the admin's signature on chain, so the service can only ever return an unsigned transaction, and

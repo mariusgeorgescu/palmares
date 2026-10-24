@@ -6,7 +6,13 @@ PlutusTx on-chain code. No off-chain imports (no Aeson, Servant, Swagger). Plutu
 
 - **INLINEABLE**: `{-# INLINEABLE fn #-}` **before** type signature for every cross-module function.
 - **Trace messages**: Short unique codes: `traceIfFalse "M0" condition -- Description (M0)`. Same for `traceError`.
-- **Validators**: Keep lambdas under ~80 lines. Extract per-redeemer logic into named helpers.
+- **Validators**: Keep lambdas under ~80 lines by extracting per-redeemer logic into named helpers —
+  that extraction is the rule, the line count is how you notice you need it. Measured 2026-10-24:
+  `mintingPolicyLambda` 41 lines over four `handle*` helpers, `profilesLambda` 66, `oracleLambda` 65,
+  `oracleNFTPolicyLambda` 19 — and **two exceed it**: `attestationsLambda` 115 and `disputesLambda` 137.
+  Those two are NOT being split: the protocol is deployed on preprod with the four published script
+  hashes frozen, and restructuring a lambda is not hash-neutral the way deleting a dead binding is. Write
+  a NEW validator to the rule; leave those two until a redeploy is happening for another reason.
 - **Output checks**: Use output-index checks only (no O(n) search). Redeemers carry expected output index.
   - **Min-value** (`checkTxOutAtIndexWithDatumMinValueAndAddress`): the only shape. For continuing outputs
     (value ≥ spent value) and newly created state outputs (value ≥ minLv + NFT). Balancer may add lovelace.
