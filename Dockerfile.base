@@ -89,3 +89,8 @@ ENV LD=musl-gcc
 COPY *.cabal cabal.project cabal.project.freeze ./
 RUN cabal update
 RUN cabal build --only-dependencies --enable-tests
+
+# NO `USER` HERE, DELIBERATELY — TD-11 covers the four images that are RUN; this one is only ever a
+# `FROM` target. It has no entrypoint, nothing starts it as a container, and its whole purpose is the
+# root-owned cabal store at `/root/.cabal` that the two lines above populate and that each service's
+# `cabal install` then reads and writes. A `USER` here breaks all four builds and secures nothing.

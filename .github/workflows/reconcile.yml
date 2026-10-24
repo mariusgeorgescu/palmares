@@ -52,11 +52,19 @@ jobs:
           #
           # Worth keeping in mind rather than relying on: if this ever regresses to `pull access
           # denied`, the fix is one visibility flip in the package settings UI, not a credential.
-          PALMARES_ADMIN_CMD: >-
-            docker run --rm -e PALMARES_API -e KOIOS_API -e KOIOS_API_TOKEN
-            -v ${{ github.workspace }}:/w -w /w
-            ghcr.io/mariusgeorgescu/palmares-admin:latest
-        run: ./scripts/reconcile_koios.sh
+          PALMARES_ADMIN_IMAGE: ghcr.io/mariusgeorgescu/palmares-admin:latest
+        # TD-11: the admin image now ends `USER nobody`, and `reconcile_koios.sh` writes
+        # `out/divergences.json` into the bind-mounted workspace — a directory that belongs to the
+        # runner's own uid, which is nobody's by definition, so without `--user` the report is an
+        # EACCES and the parity gate reads as a transport failure.
+        #
+        # `$(id -u)` has to be resolved HERE and not in an `env:` value, which is why the command
+        # moved out of the block above: the script expands `${PALMARES_ADMIN_CMD}` unquoted, which
+        # word-splits but never runs a command substitution, so a `$(…)` in an env value would be
+        # passed to docker as the literal eight characters.
+        run: |
+          PALMARES_ADMIN_CMD="docker run --rm --user $(id -u):$(id -g) -e PALMARES_API -e KOIOS_API -e KOIOS_API_TOKEN -v ${{ github.workspace }}:/w -w /w ${PALMARES_ADMIN_IMAGE}" \
+            ./scripts/reconcile_koios.sh
 
       # `if: always()`, because the run worth keeping is the one that diverged.
       - uses: actions/upload-artifact@v4

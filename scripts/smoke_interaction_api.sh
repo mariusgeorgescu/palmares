@@ -54,9 +54,11 @@ post_body() {
 echo "== probes and status"
 assert /health '.status' '"healthy"'
 assert /health '.service' '"interaction-api"'
-# The five fields /status exists for. Asserted as a SET, because the whole point is that an operator
-# can see the provider and the pause flag at all — /health reports healthy without either.
-assert /status '[keys[]]|sort|join(",")' '"deployed_scripts,network,oracle_paused,provider,version"'
+# The six fields /status exists for. Asserted as a SET, because the whole point is that an operator
+# can see the provider and the pause flag at all — /health reports healthy without either. `oracle`
+# joined the five when /status began publishing the oracle's own parameters (fees, deposits, the two
+# credentials), so a client no longer has to read the chain to learn what a transaction will cost.
+assert /status '[keys[]]|sort|join(",")' '"deployed_scripts,network,oracle,oracle_paused,provider,version"'
 assert /status '.provider|type' '"string"'
 # The provider family only: a token is Confidential and a socket path or Kupo URL is not, and this
 # route is unauthenticated.
@@ -69,7 +71,12 @@ assert /status '.deployed_scripts' 'true'
 
 echo "== the published document"
 assert /swagger-api.json '.info.title' '"Palmares Interaction API"'
-assert /swagger-api.json '.info.version' '"3.3.0"'
+# 3.3.0 -> 3.6.0. This literal was three MINOR versions behind the served document and CI was green
+# throughout: this script is not run by CI, and the only other assertion of the write document's
+# version was a unit test over the Haskell value, which cannot see a stale number in a shell script.
+# `scripts/check_swagger.sh` now pins it too, on the committed document, on every pull request —
+# which is where a bump gets caught, so this line and that one move together.
+assert /swagger-api.json '.info.version' '"3.6.0"'
 assert /swagger-api.json '[.paths|keys[]]|length' '15'
 for p in /claim-profile /update-profile /issue-attestation /accept-attestation /open-dispute \
   /resolve-dispute /expire-dispute /claim-credential /withdraw-credential /build-tx /submit-tx /status; do

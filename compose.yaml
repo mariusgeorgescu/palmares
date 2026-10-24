@@ -1,5 +1,13 @@
 # compose.yaml — the preprod governance stack, re-derivable from scratch.
-# Minimum host: 4 cores, 12 GB RAM, 60 GB free SSD. arm64 and amd64 both work.
+# Minimum host: 4 cores, 12 GB RAM, 60 GB free SSD.
+#
+# ARCHITECTURE, and the line above used to claim "arm64 and amd64 both work" for the whole file.
+# Half right. The `chain` profile does: node, Postgres, db-sync and Kupo all publish both. The four
+# images THIS project builds do not — `.github/workflows/images.yml` pushes `platforms: linux/arm64`
+# only — so on an amd64 host `--profile app` and `--profile write` have to be fed by
+# `scripts/build-images.sh`, which builds for the host architecture. Adding amd64 to that matrix is
+# not a one-line change and is deliberately not done: the arm64 run already has a 350-minute timeout
+# for four static musl GHC builds, and the alternative is QEMU across a Haskell link step.
 #
 #   docker compose --profile chain up -d        # node + db-sync + postgres
 #   docker compose --profile app   up -d        # + the public query API (reads Postgres only)
@@ -20,9 +28,26 @@
 # FOOTPRINT (same measurement): node 20.2 GB + db-sync state 2.9 GB + Postgres 10.4 GB = ~34 GB.
 # Peak memory: db-sync 5.90 GiB anonymous, node 2.74 GiB, Postgres 0.86 GiB.
 #
-# This file is the promoted Experiment A rig, not a fresh draft: every image is pinned by its
-# multi-arch INDEX digest (each verified 2026-10-19 to carry a linux/arm64 manifest), and the two
-# config directories under deploy/ are the exact bytes that produced the measurements above.
+# ONLY db-sync CARRIES A MEMORY CAP, and that is a decision rather than an omission. Its 6144M is the
+# limit the cluster runs, so a local OOM there is a real signal. The node's and Postgres's peaks above
+# are SINGLE observations at tip, and Postgres's in particular is not an upper bound: with
+# shared_buffers=768MB and two maintenance workers at maintenance_work_mem=512MB, a matview refresh or
+# an index build can legitimately go well past 0.86 GiB. A cap derived from one reading and never
+# exercised converts a slow query into an OOM kill of the only synced preprod database on the host, so
+# the number has to be measured under that load before it is written here.
+#
+# This file is the promoted Experiment A rig, not a fresh draft: the two config directories under
+# deploy/ are the exact bytes that produced the measurements above.
+#
+# IMAGE PINNING — the real arithmetic, because the header used to claim all of it was pinned and it
+# was not. Eight image references, two groups:
+#   * FOUR third-party, each pinned by its multi-arch INDEX digest: cardano-node, Postgres, db-sync
+#     (verified 2026-10-19 to carry linux/arm64) and Kupo (added 2026-10-24).
+#   * FOUR of this project's own, which are `ghcr.io/${GH_OWNER}/palmares-*:${TAG:-latest}` and are
+#     NOT digest-pinnable here: both the namespace and the tag are deployment inputs, and the digest
+#     changes on every `images.yml` run. The pin for these is the TAG — set `TAG` to a release tag
+#     rather than taking `latest` — and a digest belongs in the GitOps manifests, which name one
+#     deployment, not in the file that has to work for every one of them.
 #
 # `deploy/dbsync/db-sync-config.yaml` is the SINGLE source for db-sync's config. The Kubernetes
 # ConfigMap is generated from it by one `sed` repointing NodeConfigFile. Do not fork it.
@@ -77,7 +102,16 @@ services:
     environment:
       POSTGRES_DB: cexplorer
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devonly}
+      # TD-09. NO DEFAULT, for the same reason BASIC_USER has none: a password written into a
+      # committed file is a credential that ships, and `devonly` was that credential at three points
+      # in this file plus five more for the two palmares roles. The name was the whole mitigation,
+      # and a name is not one — it sets the superuser password of a database that `initdb` then bakes
+      # into the volume on first boot, where nothing later re-reads this line to correct it.
+      #
+      # `:?` and not `:-`: compose refuses the whole `up` and names the variable, so the failure is
+      # one line at the start instead of a stack that comes up reachable with a guessable password.
+      # Ports bind 127.0.0.1 and that is not a substitute — it is why this was Medium and not High.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD — no default, a shipped password is a shipped credential}
       PGDATA: /var/lib/postgresql/data/pgdata
     # synchronous_commit=off is safe here: on a crash db-sync rolls back to its last stored block
     # and re-reads from the node. This is the same tuning the cluster runs, so local numbers transfer.
@@ -124,7 +158,10 @@ services:
       POSTGRES_PORT: "5432"
       POSTGRES_DB: cexplorer
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devonly}
+      # Same variable, same contract as the postgres service above: no default. It has to MATCH what
+      # initdb baked into the volume, which is the other half of why a default here was dangerous —
+      # a stale `devonly` reads as "db-sync cannot authenticate" rather than as "wrong password".
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD — it must match the value the postgres volume was initialised with}
       # RESTORE_SNAPSHOT is DELIBERATELY UNSET for db-sync. See the node comment above and ADR 0001.
     # The entrypoint's snapshot path does `curl -LOC -` and `touch "${__base}.restored"` in the CWD
     # and the image sets no WORKDIR. Harmless while RESTORE_SNAPSHOT is unset, correct the moment it
@@ -178,7 +215,12 @@ services:
   # this line.
   kupo:
     profiles: [write]
-    image: cardanosolutions/kupo:v2.12.0
+    # Digest added 2026-10-24: this was the one third-party image still floating on a tag. It is the
+    # multi-arch INDEX digest, resolved with `docker buildx imagetools inspect
+    # cardanosolutions/kupo:v2.12.0` and cross-checked against the `RepoDigests` of the copy already
+    # pulled on this host — the index carries linux/amd64 and linux/arm64, so pinning it costs the
+    # amd64 host nothing.
+    image: cardanosolutions/kupo:v2.12.0@sha256:7d3c62368a4a5a609f5cf0ee6949eb8d491ed8f5a4d05b38da3213d95735f03b
     command:
       - --node-socket
       - /ipc/node.socket
@@ -243,6 +285,19 @@ services:
   interaction-api:
     profiles: [write]
     image: ghcr.io/${GH_OWNER:-mariusgeorgescu}/palmares-interaction-api:${TAG:-latest}
+    # TD-11, AND THE ONE EXCEPTION TO IT. The image ends `USER nobody`; this service puts uid 0 back,
+    # visibly, because of the provider shape configured below and nothing else.
+    #
+    # cardano-node creates `/ipc/node.socket` as `srwxr-xr-x root:root` (measured on the running
+    # preprod node), and `connect()` on a UNIX socket requires the WRITE bit — so `nobody` cannot
+    # reach it and Atlas dies at provider init, before the service has served anything. No
+    # supplementary group closes it: the group bits are `r-x`, and the node has no umask knob to make
+    # the socket group-writable. The `:ro` on the mount below is NOT the cause; a read-only
+    # superblock still permits connecting to a socket on it.
+    #
+    # The image stays non-root for the deployment that does not need the socket — a cluster running
+    # `{"blockfrostKey": …}` — which is the shape this line should be deleted for.
+    user: "0:0"
     environment:
       # Inline JSON, not a baked file: `decodeConfigEnvOrFile` reads this env var first and falls
       # back to config/config_atlas.json. Keeping it here means the image carries no provider
@@ -289,9 +344,15 @@ services:
     image: ghcr.io/${GH_OWNER:-mariusgeorgescu}/palmares-admin:${TAG:-latest}
     command: ["apply-roles"]
     environment:
-      PG_CONN_STR: "host=postgres user=postgres password=${POSTGRES_PASSWORD:-devonly} dbname=cexplorer port=5432"
-      PALMARES_OWNER_PASSWORD: "${PALMARES_OWNER_PASSWORD:-devonly}"
-      PALMARES_RO_PASSWORD: "${PALMARES_RO_PASSWORD:-devonly}"
+      # TD-09, all three. `apply-roles` is `die`-on-unset in the binary (README §11 calls both role
+      # passwords fail-closed), and this file was handing it `devonly` so that fail-closed check
+      # never fired — the same shape as the `attest-sync` defaults the image dropped: a fail-closed
+      # check whose value is supplied by the deployment is not fail-closed. These two passwords are
+      # what `palmares_owner` and `palmares_ro` are CREATED with, so a default here is the password
+      # of two roles that then serve the public read path.
+      PG_CONN_STR: "host=postgres user=postgres password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD — no default} dbname=cexplorer port=5432"
+      PALMARES_OWNER_PASSWORD: "${PALMARES_OWNER_PASSWORD:?set PALMARES_OWNER_PASSWORD — apply-roles creates palmares_owner with it and never invents one}"
+      PALMARES_RO_PASSWORD: "${PALMARES_RO_PASSWORD:?set PALMARES_RO_PASSWORD — apply-roles creates palmares_ro with it and never invents one}"
     depends_on:
       postgres: {condition: service_healthy}
     restart: "no"
@@ -312,7 +373,9 @@ services:
     profiles: [write]
     image: ghcr.io/${GH_OWNER:-mariusgeorgescu}/palmares-attest-sync:${TAG:-latest}
     environment:
-      PG_CONN_STR: "host=postgres user=palmares_owner password=${PALMARES_OWNER_PASSWORD:-devonly} dbname=cexplorer port=5432"
+      # TD-09: no default. It has to be the same value `palmares-roles` created the role with, and a
+      # default that silently disagrees with it is an authentication failure dressed up as a bad DSN.
+      PG_CONN_STR: "host=postgres user=palmares_owner password=${PALMARES_OWNER_PASSWORD:?set PALMARES_OWNER_PASSWORD — no default} dbname=cexplorer port=5432"
       KUPO_URL: "http://kupo:1442"
       PORT: "8084"
       CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-}"
@@ -322,6 +385,12 @@ services:
       # not name here, so without this line an operator setting it would see no effect. The default
       # is the binary's own, so this changes no behaviour.
       READY_MAX_LAG_SLOTS: "${READY_MAX_LAG_SLOTS:-1200}"
+      # `CS-06`: a schema-version bump makes this service DROP every chain-sync table and re-index
+      # from the chain, and it now REFUSES to do that unless this names the stored version being
+      # destroyed. Declared for the reason above — compose passes through nothing it does not name —
+      # and left empty on purpose: a value here would authorise the next wipe silently, which is the
+      # defect the guard exists to prevent.
+      ATTEST_SYNC_CONFIRM_WIPE: "${ATTEST_SYNC_CONFIRM_WIPE:-}"
     volumes:
       # The deployed-validators config, for the minting policy hash it follows. Same mount and same
       # reason as interaction-api's: written by `admin deploy-reference-scripts`, absent until then.
@@ -356,8 +425,11 @@ services:
       # connection served both the DDL and every unauthenticated request — the comment above
       # described a separation the configuration did not make. Two DSNs, two pools: requests on
       # `palmares_ro`, the boot DDL and the matview refresh on `palmares_owner`.
-      PG_CONN_STR: "host=postgres user=palmares_ro password=${PALMARES_RO_PASSWORD:-devonly} dbname=cexplorer port=5432"
-      PALMARES_PG_OWNER_CONN_STR: "host=postgres user=palmares_owner password=${PALMARES_OWNER_PASSWORD:-devonly} dbname=cexplorer port=5432"
+      #
+      # TD-09: neither password has a default. This is the PUBLIC read service, so `devonly` here was
+      # the guessable password of the two roles behind an unauthenticated API.
+      PG_CONN_STR: "host=postgres user=palmares_ro password=${PALMARES_RO_PASSWORD:?set PALMARES_RO_PASSWORD — no default} dbname=cexplorer port=5432"
+      PALMARES_PG_OWNER_CONN_STR: "host=postgres user=palmares_owner password=${PALMARES_OWNER_PASSWORD:?set PALMARES_OWNER_PASSWORD — no default} dbname=cexplorer port=5432"
       PORT: "8083"
       # Empty allowlist denies all cross-origin: fail-closed. Set it for a local frontend.
       CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-}"

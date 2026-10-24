@@ -2,13 +2,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Core chain-sync logic: tip comparison and batch match fetching against
--- the Kupo indexer.
+-- the Kupo indexer, plus the pure boot-time decisions @main@ makes from the environment — the
+-- readiness threshold and what to do with the schema version already in the database.
 module ChainSyncLogic
   ( evaluateChainSyncState,
     evaluateChainSyncStateWith,
     readyMaxLagSlotsDefault,
     parseReadyMaxLagSlots,
     readyMaxLagSlotsFromEnv,
+    SchemaDecision (..),
+    schemaDecision,
+    confirmWipeEnvVar,
     reportSyncState,
     CursorCheck (..),
     classifyCursor,
@@ -44,15 +48,21 @@ import Palmares.Storage
 import System.Environment (lookupEnv)
 import Text.Read (readMaybe)
 
--- | The slot gap at which the local tip counts as \"way behind\" the chain, and therefore the gap
--- at which @\/ready@ turns red. The DEFAULT, not the value: @READY_MAX_LAG_SLOTS@ overrides it.
+-- | The slot gap at which the local tip counts as \"way behind\" the chain — the @is_way_behind@ a
+-- probe publishes — and, in seconds, how long the projector may go without an answer from Kupo
+-- before @\/ready@ turns red. The DEFAULT, not the value: @READY_MAX_LAG_SLOTS@ overrides it.
+--
+-- __It no longer reddens @\/ready@ by itself__, and 'ChainsyncAPI.readyVerdict' is where that is
+-- argued: a projector that is behind is catching up, which is the job, and failing the probe for
+-- the duration of a first sync or a post-wipe re-sync is what stopped a Kubernetes rollout from
+-- ever completing. The gap is REPORTED here and bounds the tick's age there; the ceiling on how
+-- stale a projection a READER may be served sits on query-api's @\/ready@, in front of the data.
 --
 -- __Why it had to become configurable.__ 1200 slots is twenty minutes at preprod's and mainnet's
--- one second per slot, and it was a bare constant: a client could be told @ready@ while reading a
--- projection twenty minutes stale, and a Kubernetes readiness probe could not be tuned per
--- environment — twenty minutes is a reasonable allowance for a bulk backfill and far too much for a
--- deployment whose clients read attestations as current. The number is unchanged as the default, so
--- an operator who sets nothing gets exactly the behaviour measured until now.
+-- one second per slot, and it was a bare constant: a Kubernetes readiness probe could not be tuned
+-- per environment, and twenty minutes is a reasonable allowance for a bulk backfill and far too
+-- much for a deployment whose clients read attestations as current. The number is unchanged as the
+-- default, so an operator who sets nothing gets exactly the behaviour measured until now.
 --
 -- The unit is SLOTS because that is what this service measures; query-api's
 -- @PALMARES_READY_MAX_LAG_SECONDS@ / @readyMaxLagDefault@ pair is the same knob in seconds, and at
@@ -78,6 +88,68 @@ parseReadyMaxLagSlots mv = case mv >>= readMaybe of
 -- | @READY_MAX_LAG_SLOTS@, defaulting to 'readyMaxLagSlotsDefault'.
 readyMaxLagSlotsFromEnv :: IO Integer
 readyMaxLagSlotsFromEnv = parseReadyMaxLagSlots <$> lookupEnv "READY_MAX_LAG_SLOTS"
+
+-- | The variable that authorises destroying a projection — @ATTEST_SYNC_CONFIRM_WIPE@.
+--
+-- Named here rather than spelled twice, because the refusal message has to print the same string
+-- the boot sequence reads; an operator who is told to set a variable that is not the one being
+-- looked up has been told nothing.
+confirmWipeEnvVar :: String
+confirmWipeEnvVar = "ATTEST_SYNC_CONFIRM_WIPE"
+
+-- | What the boot sequence must do with the schema version it found in the database — @CS-06@.
+data SchemaDecision
+  = -- | The stored version is this binary's, or there is nothing stored (a fresh database): migrate
+    -- and destroy nothing.
+    SchemaMigrate
+  | -- | The stored version is OLDER and the wipe is authorised: drop, migrate, re-index from chain.
+    SchemaWipe
+  | -- | The stored version is OLDER and the wipe is not authorised — @(stored, current)@.
+    SchemaRefuseWipe Int Int
+  | -- | The stored version is NEWER than this binary writes — @(stored, current)@.
+    SchemaRefuseDowngrade Int Int
+  deriving (Show, Eq)
+
+-- | The decision, given @ATTEST_SYNC_CONFIRM_WIPE@'s raw value, this binary's schema version, and
+-- the version 'Palmares.Storage.readSchemaProbe' found (@Nothing@ for a fresh database).
+--
+-- __Two failures, and they are not the same failure.__ Until this existed, @needWipe@ was one
+-- comparison — @storedVersion < currentSchemaVersion@ — and both of the cases below fell through it:
+--
+--   * __an older stored version__ dropped every chain-sync table with no confirmation of any kind
+--     (@DROP TABLE … CASCADE@ over all eight, 'Palmares.Storage.wipeChainSyncTablesRaw'). The wipe
+--     is the right migration — those tables need an in-place ALTER Postgres rejects, ADR 0007 — but
+--     a deploy that reaches it by accident, or a rollback, or a mistyped image tag, destroys a
+--     projection that costs a full re-sync to rebuild, with the only warning a @putStrLn@ already
+--     scrolling past in a container log;
+--   * __a NEWER stored version__ did not even reach the comparison's true branch. It fell through to
+--     @migrateAll@ against a shape this binary does not know, which is data corruption rather than a
+--     failed boot: a column this version has never heard of is not dropped, a type it disagrees
+--     about is ALTERed under rows written by a newer writer. 'SchemaRefuseDowngrade' is that case,
+--     and the confirmation variable is deliberately NOT an override for it — authorising a wipe is
+--     not the same act as authorising a migration in the wrong direction, and an operator who means
+--     to re-index from scratch under an older binary can drop @palmares_attest@ by hand.
+--
+-- __The guard gates the WIPE, not the BOOT, and the direction is the whole decision.__ Requiring the
+-- variable unconditionally would turn every ordinary restart of a correctly-deployed projector into
+-- an exit 1 — which under Kubernetes or @restart: unless-stopped@ is a crash loop, so an outage, and
+-- the remedy an operator reaches for is to paste the variable permanently into the manifest. The
+-- guard would then be set for ever and authorise the next wipe silently, which is the defect it
+-- exists to prevent. Gated on the wipe, a restart that was never going to destroy anything is
+-- untouched, and the one boot that would destroy something stops and says so.
+--
+-- __The value is the STORED version, not @1@ or @true@.__ A boolean left in a manifest authorises
+-- every future wipe; a version only authorises the one projection it names. And it expires by
+-- itself: once the wipe has run, @chain_sync_config.schema_version@ is the current version, so the
+-- same leftover value no longer matches anything and the next bump asks again.
+schemaDecision :: Maybe String -> Int -> Maybe Int -> SchemaDecision
+schemaDecision mConfirm current mStored = case mStored of
+  Nothing -> SchemaMigrate
+  Just stored
+    | stored > current -> SchemaRefuseDowngrade stored current
+    | stored == current -> SchemaMigrate
+    | (mConfirm >>= readMaybe) == Just stored -> SchemaWipe
+    | otherwise -> SchemaRefuseWipe stored current
 
 -- | Compare local and blockchain tips to derive the current sync state, at the default threshold.
 evaluateChainSyncState :: KupoCheckpoint -> KupoCheckpoint -> ChainSyncState

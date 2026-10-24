@@ -17,7 +17,7 @@ decisions about *this* codebase, which is why the code cites them where the deci
 
 | id | The question | The decision |
 |---|---|---|
-| `D-1` | Governance projection tables: five, or none? | **None.** The governance layer is SQL views over db-sync plus a single materialized view (`palmares.drep_metrics`). A view cannot go stale and needs no projector service; only the attestation pipeline owns tables. |
+| `D-1` | Governance projection tables: five, or none? | **None.** The governance layer is SQL views over db-sync plus two materialized views (`palmares.drep_metrics`, `palmares.vote_partition`). A view cannot go stale and needs no projector service; only the attestation pipeline owns tables. |
 | `D-2` | DRep eligibility: `drep_distr` membership or `drep_registration` intervals? | **Registration intervals.** `drep_distr` is the stake distribution, so using it would silently drop every DRep with zero delegated stake out of its own denominator. |
 | `D-3` | The `rationale_rate` denominator: vote rows or distinct actions? | **Distinct actions.** One preprod (DRep, action) pair has **20** vote rows; counting rows would let a re-voter's rationale rate be computed over twenty copies of one decision. |
 | `D-7` | `/ready` lag threshold: 120, 180 or 300 seconds? | **Red at 300 s**, with the UI's amber at 120 s as a separate, lower bar. |

@@ -92,9 +92,11 @@ transaction whose required signature is missing. So the other two values have to
 
 **`ATTEST_SMOKE_ADDR` is raw CBOR hex, not bech32.** `GYAddress`'s `FromJSON` goes through
 `FromHttpApiData`, which is `deserialiseFromRawBytesHex`; `addr_test1…` is refused. The generated
-document's `GYAddress` *description* says bech32 and is wrong about it — its `format: cbor hex`,
-its 114-character length and its example are right. `scripts/smoke_interaction_api.sh` uses the hex
-form for the same reason.
+document now says so itself — "Cardano address as RAW CBOR HEX (114 hex characters), not bech32 …
+`addr_test1…`/`addr1…` is refused" — alongside its `format: cbor hex`, its 114-character length and
+its example. This paragraph used to apologise for a `GYAddress` description that claimed bech32; that
+description has been corrected, so the document and this page now agree.
+`scripts/smoke_interaction_api.sh` uses the hex form for the same reason.
 
 **`ATTEST_SMOKE_DREP_ID` must be the DRep credential of the key the signer signs with.** Claiming a
 key credential puts `mustBeSignedBy <that key hash>` into the transaction
@@ -178,6 +180,24 @@ refused requests:
 The crossed pair is deliberate: corrupting a bech32 id breaks its checksum, so the write API would
 refuse it as *malformed* — a different case — and there is no way to mint a valid-but-nonexistent
 bech32 id from a shell script. Crossing two real withdrawals is also the mistake a real client makes.
+
+**Two names for one value, and this step is where it bites.** Reading the pair out of
+`/treasury-withdrawals` means reading `.gov_action_id` and **`.beneficiary`** — *not*
+`.stake_address`, which is what that same bech32 value is called on `ResolvedLevelOneAnchor`, on
+`/delegations`, in `palmares.treasury_withdrawal` (the SQL aliases it `AS beneficiary`) and in the
+anchor metadata key `palmares:level1_stake_address` you are about to write it into. Both halves of
+this step read the same field under different names, which is not a defect you can see from either
+end alone.
+
+It has already cost once, in `f72af4e`: step 7 read `stake_address` off a withdrawal row and got
+nothing. The same commit fixed the other half of that run — `/treasury-withdrawals` publishes
+`gov_action_id` as `<tx_hash>#<index>` while `parseLevelOneAnchor` took CIP-129 bech32 only, so a
+client copying an id out of the very route that says what there is to anchor to got a 400. The anchor
+now goes through the API's own `FromHttpApiData GovActionId` and accepts both published forms.
+
+The naming half is **deliberately not fixed**: both names are published and feed the frontend's
+codegen. The recommendation, with its cost, is in
+[`../architecture/system-overview.md` §12](../architecture/system-overview.md).
 
 ## What it leaves behind
 

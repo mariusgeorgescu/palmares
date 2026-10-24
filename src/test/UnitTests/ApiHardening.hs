@@ -20,7 +20,13 @@ import Palmares.WebAPI.CORS (CorsConfig (..), corsPolicy, parseCorsOrigins)
 import Network.HTTP.Types.Header (hContentType)
 import Servant.Server.Internal.ServerError (errHeaders)
 import Palmares.WebAPI.Envelope (ErrorCode (..))
-import Palmares.WebAPI.Errors (genericErrorMessage, mkServantErr, mkServantErrBody)
+import Palmares.WebAPI.Errors (genericErrorMessage, mkServantErr, mkServantErrBody, palmaresErrorFormatters)
+import Servant.Server.Internal.ErrorFormatter (ErrorFormatters (..))
+import Servant.Server.Internal.ServerError (errBody)
+import Data.ByteString.Lazy.Char8 qualified as LBS8
+import Data.Text qualified as T
+import Data.Typeable (typeRep)
+import Data.Proxy (Proxy (..))
 import Palmares.WebAPI.Utils (escapeLikePattern)
 
 -- Run a BasicAuthCheck's handler against supplied raw credential bytes.
@@ -115,8 +121,22 @@ errorTests =
         ( lookup hContentType (errHeaders (mkServantErr 400 InvalidParameter)),
           lookup hContentType (errHeaders (mkServantErrBody 400 "{}"))
         )
-          @?= (Just "application/json", Just "application/json")
+          @?= (Just "application/json", Just "application/json"),
+      -- The body formatter's TWO branches. A malformed body gets the generic message because an
+      -- aeson failure names Haskell constructors and record fields; the ONE message this project
+      -- writes to be published — `FromJSON AdminActionType`, which always fails and says where
+      -- admin actions belong — is passed through. Replacing both with the generic wording is what
+      -- silenced it, and only the interaction-api smoke noticed.
+      testCase "an aeson failure is replaced by the generic message" $
+        bodyMessage "Error in $: key \"nope\" not found, Constructor AdminAction"
+          @?= LBS8.pack ("{\"code\":\"invalid_parameter\",\"message\":\"" <> T.unpack (genericErrorMessage InvalidParameter) <> "\"}"),
+      testCase "the admin-action refusal is published whole, marker stripped" $
+        bodyMessage "Error in $: AdminActionType: admin actions are not accepted over HTTP. Use the admin CLI."
+          @?= LBS8.pack "{\"code\":\"invalid_parameter\",\"message\":\"admin actions are not accepted over HTTP. Use the admin CLI.\"}"
     ]
+  where
+    bodyMessage msg =
+      errBody (bodyParserErrorFormatter palmaresErrorFormatters (typeRep (Proxy @())) defaultRequest msg)
 
 apiHardeningTests :: TestTree
 apiHardeningTests = testGroup "API Hardening (webapi-lib)" [authTests, corsTests, escapeTests, errorTests]

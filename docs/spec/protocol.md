@@ -406,7 +406,7 @@ pipeline owns tables.]**
 ### F1 — The complete product on PREPROD (the implementation goal, fixed by the owner 2026-10-19; widened the same day at the owner's request to include the on-chain attestations and the complete UI)
 
 **GOAL**: on **preprod**, the whole product runs end to end: the governance data layer
-(cardano-db-sync `only_governance` → `palmares.*` views plus a single matview) plus the on-chain
+(cardano-db-sync `only_governance` → `palmares.*` views plus the matviews `sql/` declares) plus the on-chain
 attestation protocol (claimable profiles, countersigned attestations, disputes) plus a public Query
 API plus a **complete UI** — with correctness demonstrated through external parity, idempotence under
 re-sync and emulator tests on the validators, and with the user flow demonstrable from claim through

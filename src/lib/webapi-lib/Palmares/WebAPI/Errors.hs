@@ -170,13 +170,32 @@ palmaresErrorFormatters =
       -- queryParseErrorFormatter to set.
       urlParseErrorFormatter = fromParserMessage,
       headerParseErrorFormatter = fromParserMessage,
-      bodyParserErrorFormatter = \_ _ _ -> mkServantErr 400 InvalidParameter,
+      bodyParserErrorFormatter = \_ _ msg -> fromBodyMessage (T.pack msg),
       notFoundErrorFormatter = const (mkServantErr (errorCodeToHttpStatus RouteNotFound) RouteNotFound)
     }
   where
     fromParserMessage _ _ msg =
       let code = errorCodeFromParserMessage msg
        in mkServantErr (errorCodeToHttpStatus code) code
+
+    -- A malformed body gets the generic message, because an aeson failure names Haskell
+    -- constructors and record fields and none of that is a client's business. The ONE exception is a
+    -- `parseJSON` this project wrote in order to be read: `FromJSON AdminActionType` always fails,
+    -- and its message says where those actions belong instead of only that they were refused. The
+    -- generic wording silenced it, which is how a 400 stopped telling a client to use the admin CLI
+    -- and started sending them to look at the query string.
+    --
+    -- The marker is the type name the instance's own `fail` leads with, and the convention is
+    -- stated at BOTH ends: `Palmares.DomainTypes.Core.Actions` writes it, this publishes it, and
+    -- `scripts/check_vocabulary.sh` fails if either side loses it. The layering forbids a shared
+    -- constant — webapi-lib depends on no project library — so the gate is what holds them together.
+    publishableMarker = "AdminActionType: "
+
+    fromBodyMessage msg = case T.breakOn publishableMarker msg of
+      (_, rest)
+        | not (T.null rest) ->
+            mkServantErrBody 400 (encode (ApiError InvalidParameter (T.drop (T.length publishableMarker) rest)))
+      _ -> mkServantErr 400 InvalidParameter
 
 -- | Give the five refusals servant decides BEFORE a handler the same @{code, message}@ body as
 -- every other non-2xx response.

@@ -91,8 +91,8 @@ main = do
       (mintingPolicyIdFromText policyHexText)
 
   -- Probe the existing schema BEFORE migrating. Wipe (drop) the chain-sync tables if the schema
-  -- version or minting policy changed, so migrateAll only CREATEs fresh tables and never runs an
-  -- incompatible in-place ALTER (varchar->bigint / ADD COLUMN NOT NULL) that Postgres would reject.
+  -- version changed AND the operator confirmed it, so migrateAll only CREATEs fresh tables and never
+  -- runs an incompatible in-place ALTER (varchar->bigint / ADD COLUMN NOT NULL) Postgres would reject.
   -- The schema first, and the path pinned to it for everything after: these tables are declared
   -- unqualified, so without this they land in `palmares`, which query-api drops on every boot.
   runSqlPool ensureAttestSchema pool
@@ -112,11 +112,51 @@ main = do
   -- A SCHEMA VERSION BUMP STILL WIPES, and that is a different question: those tables would need an
   -- in-place ALTER that Postgres rejects (varchar->bigint, ADD COLUMN NOT NULL), so a fresh CREATE
   -- is the only safe path and the records are re-indexed from the chain afterwards.
-  let needWipe = case mProbe of
-        Nothing -> False
-        Just (storedVersion, _storedPolicies) -> storedVersion < currentSchemaVersion
+  --
+  -- IT NO LONGER WIPES UNASKED, and a DOWNGRADE no longer migrates — `CS-06` / `TD-19`. The decision
+  -- is 'ChainSyncLogic.schemaDecision', which also documents why the confirmation gates the wipe
+  -- rather than the boot: a guard that refuses to START would crash-loop every ordinary restart and
+  -- be pasted permanently into the manifest, which is the defect it was added to prevent.
+  mConfirmWipe <- lookupEnv confirmWipeEnvVar
+  needWipe <- case schemaDecision mConfirmWipe currentSchemaVersion (fst <$> mProbe) of
+    SchemaMigrate -> pure False
+    SchemaWipe -> pure True
+    SchemaRefuseDowngrade stored current ->
+      die
+        ( "REFUSING TO START: this database is at attest-sync schema version "
+            <> show stored
+            <> " and this binary writes version "
+            <> show current
+            <> ".\nA DOWNGRADE IS NOT A MIGRATION: migrateAll would ALTER a schema this binary does"
+            <> " not know, under rows a newer writer wrote — corruption rather than a failed boot."
+            <> "\nDeploy attest-sync at schema version "
+            <> show stored
+            <> " or newer. To re-index this registry from the chain under THIS binary instead, drop"
+            <> " the palmares_attest schema by hand first: "
+            <> confirmWipeEnvVar
+            <> " authorises a wipe, not a downgrade."
+        )
+    SchemaRefuseWipe stored current ->
+      die
+        ( "REFUSING TO WIPE: this database is at attest-sync schema version "
+            <> show stored
+            <> " and this binary writes version "
+            <> show current
+            <> ".\nThose tables cannot be migrated in place (varchar->bigint, ADD COLUMN NOT NULL),"
+            <> " so the next step would DROP every chain-sync table in palmares_attest and re-index"
+            <> " the whole registry from the chain — hours, during which every projection is"
+            <> " incomplete.\nIf that is what you mean, set "
+            <> confirmWipeEnvVar
+            <> "="
+            <> show stored
+            <> " — the version being destroyed — and start again."
+        )
   when needWipe $ do
-    putStrLn "Schema version changed; dropping chain-sync tables before migration."
+    putStrLn
+      ( "Schema version changed; dropping chain-sync tables before migration ("
+          <> confirmWipeEnvVar
+          <> " authorises destroying the stored version)."
+      )
     runAttest pool wipeChainSyncTablesRaw
   runAttest pool runMigrations
 
@@ -146,9 +186,11 @@ main = do
     mb <- lookupEnv "ROLLBACK_MARGIN"
     pure $ max 1 (maybe defaultRollbackMargin id (mb >>= readMaybe))
 
-  -- The one number `/ready` turns red on, read once here and used in BOTH halves of the verdict:
-  -- the tip comparison below computes `is_way_behind` with it, and `readyVerdict` measures the
+  -- One number, read once here and used in both places that measure staleness: the tip comparison
+  -- below computes the `is_way_behind` a probe PUBLISHES with it, and `readyVerdict` measures the
   -- tick's age against it. Read it twice and a client could see `is_way_behind: false` beside a 503.
+  -- The gap itself no longer reddens `/ready` — see `readyVerdict` — but the two must still agree
+  -- about what "way behind" means, because the body and the verdict are read together.
   maxLagSlots <- readyMaxLagSlotsFromEnv
 
   initialTip <- getLocalTip pool
@@ -179,7 +221,15 @@ main = do
   putStrLn "Kupo: configured"
   putStrLn ("Pattern: " <> T.unpack matchPattern)
   putStrLn ("Postgres: " <> redactConnStr connStr)
-  putStrLn ("Ready when within: " <> show maxLagSlots <> " slots (READY_MAX_LAG_SLOTS)")
+  -- Both jobs of the one number, because the boot line used to say "Ready when within N slots" and
+  -- that is no longer what /ready decides: catching up is green, a silent Kupo is not.
+  putStrLn
+    ( "Way behind beyond: "
+        <> show maxLagSlots
+        <> " slots (reported); /ready red after "
+        <> show maxLagSlots
+        <> "s without an answer from Kupo (READY_MAX_LAG_SLOTS)"
+    )
 
   forever $ do
     blockchainTip <- getBlockchainTip pool ourPolicy kupoUrl

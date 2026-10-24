@@ -26,7 +26,9 @@ claim about a subject is recorded only once the subject accepts it (`README.md:3
 There are exactly two data paths and they must not be confused (`CLAUDE.md:20-27`). **Governance is
 read-only and holds no state of ours**: `cardano-node` feeds `cardano-db-sync` (`preset: only_governance`,
 ledger enabled, synced from genesis), which writes its own `public` schema into the `cexplorer` database;
-Palmares adds the `palmares` schema — nineteen plain views, one materialized view and one SQL function —
+Palmares adds the `palmares` schema — plain views, two materialized views and SQL functions, as declared
+by `sql/` and no longer counted here (the matview count was published as one in four documents while the
+schema had two) —
 applied by `query-api` at boot and dropped and re-created on every start, so a wrong number is fixed by
 editing a view, never by a pipeline (`sql/000_schema.sql:1-11`, `src/exe/query-api/Query/Views.hs:4-14`).
 **Attestations are the only stateful path**: the PlutusTx validators emit UTxOs under one minting
@@ -234,7 +236,7 @@ flowchart LR
   node["cardano-node"] -->|"from genesis, no db-sync snapshot"| dbsync["cardano-db-sync 13.7.1.0: preset only_governance, ledger enable, shelley enable, offchain_vote_data enable"]
   dbsync -->|"writes"| pub[("cexplorer.public — db-sync tables")]
   pub --> views["palmares.* : 19 views + eligible_actions() (sql/010, sql/020)"]
-  views --> mv["palmares.drep_metrics materialized view (sql/030)"]
+  views --> mv["palmares.drep_metrics (sql/030) + palmares.vote_partition (sql/020) materialized views"]
   subgraph q["query-api :8083"]
     boot["boot: applyPalmaresSchema — DROP SCHEMA palmares CASCADE, re-create, one transaction, owner pool"]
     refresh["refresh thread: REFRESH MATERIALIZED VIEW CONCURRENTLY when tip block or epoch moved, tick = PALMARES_VIEW_REFRESH_SECONDS (300)"]
@@ -273,12 +275,21 @@ read-only (`src/exe/query-api/Main.hs:95-106`). `040_grants.sql` must be last an
 `palmares_ro` existing (`sql/040_grants.sql:12-32`). `sql/000_schema.sql` must never mention
 `palmares_attest` (`sql/000_schema.sql:7-9`).
 
-**The one materialized view.** `palmares.drep_metrics` is refreshed by a thread that compares the tip
-`(block_no, epoch_no)` from `palmares.sync_state` against the mark of the last successful refresh and
-runs `REFRESH MATERIALIZED VIEW CONCURRENTLY palmares.drep_metrics` outside a transaction when it moved;
-failures are logged and retried next tick (`src/exe/query-api/Query/Refresh.hs:57-77, 88-94, 109-145`).
-Interval `PALMARES_VIEW_REFRESH_SECONDS`, default 300 (`:101-106`). `CONCURRENTLY` requires the unique
-index `palmares_idx_drep_metrics_pk` (`sql/030_metrics.sql:250`).
+**The two materialized views.** `palmares.drep_metrics` (`sql/030_metrics.sql`) and
+`palmares.vote_partition` (`sql/020_views.sql`) are refreshed by one thread, on one tick, in that order,
+which compares the tip `(block_no, epoch_no)` from `palmares.sync_state` against the mark of the last
+successful refresh and runs `REFRESH MATERIALIZED VIEW CONCURRENTLY` for each, outside a transaction,
+when it moved; failures are logged and retried next tick (`src/exe/query-api/Query/Refresh.hs:79-106`,
+`:109-155`). Interval `PALMARES_VIEW_REFRESH_SECONDS`, default 300. `CONCURRENTLY` requires a unique
+index on each — `palmares_idx_drep_metrics_pk` (`sql/030_metrics.sql:272`) and
+`palmares_idx_vote_partition_pk` (`sql/020_views.sql:237`) — and is what keeps the API answering during
+a rebuild. The tick cost is the sum: ~3.1 s for `drep_metrics` and ~8.9 s for `vote_partition`'s pass
+over every vote row.
+
+This paragraph said "the one materialized view" for as long as there were two, and so did three other
+documents. `sql/` is the authority on the set, `Query/Refresh.hs:105` on which of them get refreshed,
+and `SELECT matviewname FROM pg_matviews WHERE schemaname='palmares'` on what a given deployment
+actually has.
 
 **Request plumbing.** Each governance read runs in one `RepeatableRead` transaction and projects one
 `row_to_json(...)::text` column that the DTO's `FromJSON` decodes, so a renamed view column fails naming
@@ -554,6 +565,12 @@ headers at all; an unset or empty variable means an empty allowlist, i.e. every 
 denied — fail-closed (`src/lib/webapi-lib/Palmares/WebAPI/CORS.hs:35-44, 60-78`). Credentials are never
 allowed; the five `X-Chain-*`/`X-Data-*` headers are exposed explicitly (`CORS.hs:51-58, 72`).
 
+Each service prints the policy it resolved at boot (`describeCorsConfig`, `CORS.hs`), because
+fail-closed and misconfigured look identical from outside: a browser console shows a blocked request
+either way. The line names the allowed origins or says deny-all explicitly, lists the exposed headers,
+and warns per entry that can never match — `*` (not an origin), a trailing slash, or a bare host with
+no scheme. `DC-06`: the deny-all default is kept, and only made visible.
+
 ---
 
 ## 7. Data model
@@ -671,7 +688,7 @@ separation above exists on paper only — it is the cluster's shape, applied by 
 | Name | Read by | Default | Fail-closed? | README §11 / note |
 | --- | --- | --- | --- | --- |
 | `BASIC_USER`, `BASIC_PASS` | interaction-api (`src/exe/interaction-api/Main.hs:64`, `WebAPI/Auth.hs:54-62`) | none | yes, `die` | docs say "interaction-api, admin"; admin never reads them (no `getBasicAuthFromEnv` in `src/exe/admin`); scripts use them as client credentials |
-| `CORS_ALLOWED_ORIGINS` | query-api, interaction-api, attest-sync probe (`WebAPI/CORS.hs:37-44`; `attest-sync/Main.hs:73`) | empty = deny all cross-origin | effectively (denies) | docs say "both APIs"; the attest-sync probe server applies it too |
+| `CORS_ALLOWED_ORIGINS` | query-api, interaction-api, attest-sync probe (`WebAPI/CORS.hs:37-44`; `attest-sync/Main.hs:73`) | empty = deny all cross-origin | effectively (denies) | all three now ANNOUNCE the resolved policy at boot (`DC-06`), so deny-all is no longer silent |
 | `PG_CONN_STR` | query-api (`Main.hs:31-32, 87`), attest-sync (`Main.hs:50-55, 76`) | `host=postgres … dbname=cexplorer` / `host=localhost … dbname=cexplorer` | no — both default | docs say "required" |
 | `PALMARES_PG_OWNER_CONN_STR` | query-api (`Main.hs:100-104`) | `PG_CONN_STR` | no | not in README §11 (in `.env.example:12-15`) |
 | `PORT` | query-api 8083, interaction-api 8082, attest-sync 8084 (`WebAPI/Utils.hs:18-27`) | per service | no (warns on a bad value) | docs say "all services"; admin reads no port |
@@ -1097,8 +1114,36 @@ for completeness; their detail is in the sibling documents.
   verdict (`src/exe/query-api/Query/ServiceStatus.hs:77-84`). None of the five `X-Chain-*`/`X-Data-*`
   headers carries it, and `null` still cannot be told from "this deployment runs no projector"
   (`Query/Gov.hs:494-503`) — a projector that stopped is caught, one that never started is not.
-- **Blueprint not committed and not gated.** `admin write-blueprint` exists but `docs/generated/` holds
-  only `swagger/`; docs say the blueprint is committed (`README.md:70`, `src/exe/admin/Main.hs:701-703`).
+- **Blueprint committed, still not gated.** `docs/generated/palmares-blueprint.json` is present (it was
+  not at `4eb9117`, which is what this entry used to say) and its four unparameterised validators carry
+  a `hash` and a `compiledCode` matching `config/config_palmares_validators.json` and the pinned sizes
+  in `UnitTests.ScriptSize`. The minting policy is declared by `parameters` with no `compiledCode`, by
+  design. Nothing in CI regenerates it or fails when it drifts, so it is a committed artefact on trust
+  (`src/exe/admin/Main.hs`, `admin write-blueprint`).
+- **Two published names for one value: `beneficiary` and `stake_address`.** A treasury withdrawal's
+  payee is `beneficiary` on `/treasury-withdrawals` and on `/gov-action/{id}`'s inlined withdrawals
+  (`QueryResponses.hs:1118,1713`, the `?beneficiary=` filter at `RestAPI.hs:1155`, the CSV header at
+  `Query/Csv.hs:300,317`), while the same bech32 value is `stake_address` on
+  `ResolvedLevelOneAnchor` (`:1996`), on `/delegations` and `/delegators`, on `proposer_stake_address`,
+  in the column the SQL reads (`palmares.treasury_withdrawal.stake_address`, aliased `AS beneficiary`
+  at `Query/Gov.hs:1317,2631`) and in the frozen on-chain metadata key
+  `palmares:level1_stake_address`. It has already cost one defect: `f72af4e` records step 7 of the
+  smoke flow reading `stake_address` off a withdrawal row that publishes `beneficiary`.
+  **Open by decision, not by neglect.** `stake_address` is the API's word for this value — ten uses in
+  the generated Swagger against `beneficiary`'s five, and the chain froze it in the anchor key, where
+  nothing burns, so every anchored attestation on preprod carries `palmares:level1_stake_address` for
+  good. But `beneficiary` is not simply wrong either: it names the ROLE, and this API already has a
+  convention for that, `proposer_stake_address`. By that convention the correct name is
+  `beneficiary_stake_address`, which neither route uses, so "align them" is a three-way rename and not
+  a two-way one. Against that: both names are published, the Swagger is the frontend's codegen input,
+  and a renamed CSV header breaks saved spreadsheets silently. So the **recommendation is not to
+  rename now** — document the synonym (done here and in
+  `docs/deployment/attest-flow-smoke.md` step 7) and, if a breaking window opens, rename
+  `beneficiary` → `beneficiary_stake_address` across the two response DTOs, the query parameter, the
+  two CSV sites, the two SQL aliases, `Reconcile.hs`'s `WWithdrawal` (which parses our own
+  `/gov-action/{id}`, so it is an internal consumer and would break too), `check_swagger.sh`, the
+  Swagger version, and the frontend in lockstep. The defect it caused was discoverability, and
+  discoverability is the half that is fixable for free.
 - **Dormant modules.** `Query/Aggregates.hs`, `Query/Pages.hs`, `Query/Projected.hs` are kept on disk,
   excluded from the build, and no longer compile against the DTOs (`palmares.cabal:353-366`,
   `scripts/check_vocabulary.sh:29-32`).
@@ -1127,9 +1172,13 @@ for completeness; their detail is in the sibling documents.
 | `CLAUDE.md:57, 59-60` — `query-api/Metrics/Catalog.hs`, `Query/Aggregates.hs`, `Query/Pages.hs`, `Query/Projected.hs` | catalogue is `offchain-lib/Palmares/Metrics/Catalog.hs`; the three query modules are not compiled; attestation reads are `Query/Attest.hs` |
 | `src/exe/CLAUDE.md:20, 42-47, 55-57, 81` — Swagger written at startup; `QueryAppContext` has auth + provider; `Query/Projected.hs`; `Query/Metrics.hs` | `--write-swagger-only` only; no auth and no provider in query-api (`QueryAppMonad.hs:5-15`); `Query/Attest.hs`; no `Query/Metrics.hs` — `/metrics/formulas` is served by `RestAPI.hs:235-259` |
 | `docs/metrics.md:11-12`, `Catalog.hs:11` — `Query.Metrics` runs each statement by `formula_id` | no such module; one statement is run via `lookupMetricSql` (`Gov.hs:897`), the rest are embodied in `palmares.drep_metrics` and the views |
-| `docs/adr/0001:12` — fourteen views | nineteen (`sql/010`, `sql/020`; ADR `:60, :107` agree) |
+| `docs/adr/0001:12` — fourteen views | nineteen (`sql/010`, `sql/020`). **Rewritten 2026-10-24**: the ADR now points at `sql/` instead of counting, because the matview count beside it had been wrong in four documents at once |
+| **`scripts/smoke_views.sh:44` — `expect "materialized views" 1`** | **the schema has TWO** (`drep_metrics`, `vote_partition`), so this assertion fails against a correct deployment — and `expect` exits 1, so none of the checks after it run. The only one of these rows that is a broken test rather than stale prose. Patch: `expect "materialized views" 2`, and add `vote_partition`'s populated/unique-index pair beside `drep_metrics`'s |
+| `src/exe/CLAUDE.md:59` — "the one materialized view's `REFRESH … CONCURRENTLY` loop" | two, refreshed on one tick, `drep_metrics` first (`Query/Refresh.hs:105`, whose own header says "the schema's two matviews") |
+| `src/exe/query-api/QueryAppMonad.hs:9` — "the one matview" | two, as above |
+| `docs/spec/decisions.md:20` (`D-1`) — "plus a single materialized view (`palmares.drep_metrics`)" | two; `vote_partition` arrived for `votes_cast` and the `is_final` filter (`sql/020_views.sql:221`). `D-1`'s actual decision — no governance projection **tables** — is unaffected |
 | `docs/adr/0002:28` — token excluded by `.gitignore` and `.dockerignore` | TRUE as of 2026-10-24 (`TD-01`): `.dockerignore` now excludes `config/config_atlas.json` and the validators config from the build context, the four runtime stages no longer `COPY ./config`, and `scripts/build-images.sh` refuses to build if either line is missing. It was false when the audit looked |
-| `docs/deployment/attest-flow-smoke.md:138-142` — no service reports attest-sync lag | `/ready` folds it in (`Gov.hs:345-361`) **and** `/status` publishes `attest_lag_seconds` (`Query/ServiceStatus.hs:84`); only the response headers still omit it |
+| ~~`docs/deployment/attest-flow-smoke.md:138-142` — no service reports attest-sync lag~~ | **FIXED.** That page now describes `/status.attestation` and the three `X-Attest-*` headers (`DC-32`). The same false claim survived in `scripts/smoke_attest_flow.sh:144,157` — where the same script read `attest_lag_seconds` 120 lines later — and was corrected 2026-10-24 |
 | `src/exe/query-api/Query/Gov.hs:498-503` — publishing the projector's lag is "a follow-up, deliberately not smuggled in here" | it was published, in `9a8d79b`, with the Swagger bump and the `check_swagger.sh` assertion the comment asks for; the comment is stale |
 | `scripts/check_vocabulary.sh:24-32` — five test modules dormant | all listed in the cabal test-suite and imported |
 | `src/exe/interaction-api/RestAPI.hs:243` — Swagger license GPL-3.0 | repository license is Apache-2.0 (`LICENSE`, `palmares.cabal:9`) |

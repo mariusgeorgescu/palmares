@@ -397,6 +397,21 @@ govDtoTests =
           readyVerdict 300 (inputs7 True 250 320 320 "preprod" "preprod" (Just 40))
         )
           @?= (Just IndexerBehind, Nothing),
+      -- The exemption, and it is the case the guard above cannot reason about. A projector reporting
+      -- `syncing` is behind by definition: after a wipe its cursor starts at 0, so the summed lag is
+      -- the whole chain — 137 million seconds against a 300 s ceiling — and the guard fired for the
+      -- entire re-sync, taking governance routes that were complete and correct out of rotation for
+      -- hours. The second element is the contrast that keeps the exemption honest: the same enormous
+      -- lag with the state ABSENT is still a 503, so this pins the exemption and not the guard's
+      -- removal.
+      testCase "a projector mid-backfill is ready, and the same lag without that state is not" $
+        ( readyVerdict
+            300
+            (inputs7 True 250 320 320 "preprod" "preprod" (Just 137000000))
+              {readyAttestState = Just "syncing"},
+          readyVerdict 300 (inputs7 True 250 320 320 "preprod" "preprod" (Just 137000000))
+        )
+          @?= (Nothing, Just IndexerBehind),
       -- PALMARES_READY_MAX_LAG_SECONDS has to be able to change the verdict, or it is decorative.
       -- It governs the projector's ceiling too, which is deliberate: one knob, because an operator
       -- who widens the tolerance for a slow database means the whole read surface, not half of it.

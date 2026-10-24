@@ -1067,6 +1067,11 @@
                 },
                 "treasury_requested_lovelace": {
                     "type": "integer"
+                },
+                "unknown_dreps": {
+                    "maximum": 9223372036854775807,
+                    "minimum": -9223372036854775808,
+                    "type": "integer"
                 }
             },
             "required": [
@@ -1074,6 +1079,7 @@
                 "total_dreps",
                 "active_dreps",
                 "inactive_dreps",
+                "unknown_dreps",
                 "retired_dreps",
                 "drep_power_lovelace",
                 "always_abstain_lovelace",
@@ -2893,7 +2899,7 @@
             "name": "Apache-2.0"
         },
         "title": "Palmares Query API",
-        "version": "1.8.0"
+        "version": "1.9.0"
     },
     "paths": {
         "/activity": {

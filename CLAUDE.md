@@ -20,8 +20,11 @@ attestation protocol has state of our own.
 **Two data paths, and they must not be confused.**
 
 1. **Governance (read-only, no state of ours)**: `cardano-node` → `cardano-db-sync` (`preset: only_governance`,
-   ledger enabled) → PostgreSQL. Our layer is the `palmares` schema: read-only views, one materialized view,
-   two SQL functions, and one single-row `schema_fingerprint` table that gates the boot DDL. No governance
+   ledger enabled) → PostgreSQL. Our layer is the `palmares` schema: read-only views, the materialized
+   views `sql/` declares (`drep_metrics`, `vote_partition` — `sql/` is the authority, and
+   `SELECT matviewname FROM pg_matviews WHERE schemaname='palmares'` is the live check; a count written
+   out here has gone stale repeatedly), SQL functions, and one single-row `schema_fingerprint` table
+   that gates the boot DDL. `Query/Refresh.hs` refreshes every one of them on one tick. No governance
    projection tables, no projection service, no ingestion, no re-derivation of ledger math. If a governance
    number is wrong, the fix is a view, not a pipeline.
 2. **Attestations (our own state)**: on-chain validators → Kupo → `attest-sync` → `palmares_attest` schema.

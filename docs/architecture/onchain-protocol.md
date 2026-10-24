@@ -555,7 +555,8 @@ under the protocol currency symbol; every branch is preceded by the oracle read 
 | `Mm` | `validateMetadataFields metadata` | `NewAttestation` | redeemer | `:289` |
 | `Mn` | `validateOtherMetadata otherMetadata` — count, sizes, reserved keys, duplicates | `NewAttestation` | redeemer | `:290` |
 | `Mf` | `valueSpent` holds exactly 1 of `deriveUserFromRefAC issuer` — **unless `kind` is `CredentialWithdrawal`**, the one deliberate exemption (ADR 0003: the profile whose token would be asked for may be exactly the party that claimed a credential it does not control) | `NewAttestation` | redeemer, all inputs | `:304` |
-| `Mg` | `subject` and `issuer` are both `isProtocolRefToken` under this policy's symbol | `NewAttestation` | redeemer, own symbol | `:305` |
+| `Mg` | `subject` and `issuer` are both `isProfileId` under this policy's symbol — the symbol AND CIP-67 label 100 | `NewAttestation` | redeemer, own symbol | `:244-245`, `:326` |
+| `Mr` | An attestation may not be self-issued: `isCredentialKind \|\| subject /= issuer`. The two credential kinds are **exempt**, because `Mc1` requires `subject == issuer` of them — applying the rule literally would make the two contradict and every credential record unmintable (`OC-05`) | `NewAttestation` | redeemer | `:341` |
 | `Mc1` | If `kind` is `CredentialClaim` or `CredentialWithdrawal`, `subject == issuer` — a credential record is self-issued | `NewAttestation` | redeemer | `:308` |
 | `Mc2` | Those two kinds must name a credential (`claimedCredential` is `Just`) | `NewAttestation` | redeemer | `:309` |
 | `Mc3` | The named credential must control this transaction — `checkCredentialControl`, the rule `Mp3` used to be: a key credential in `txInfoSignatories`, a script credential in the **payment** half of some input's address | `NewAttestation` | redeemer, signatories, inputs | `:310`, `Utils.hs:326-334` |
@@ -563,6 +564,7 @@ under the protocol currency symbol; every branch is preceded by the oracle read 
 | `Mh` | `seedTxOutRef` is among the inputs | `NewAttestation` | inputs | `:312` |
 | `Mj` | Whole minted value == attestation ref NFT ×1, burned value empty | `NewAttestation` | mint | `:313-315` |
 | `Mk` | outputs[attestationOutputIdx] at `scriptHashAddress attestationsValidatorScriptHash`, inline datum = computed attestation datum, value ≥ NFT + `opMinUTxOValue` | `NewAttestation` | outputs[idx] | `:316` |
+| `Ms` | outputs[attestationOutputIdx] holds 0 of `deriveUserFromRefAC issuer` — `Mp6`'s rule on this path (`OC-03`). Nothing burns an attestation, so an issuer's user token locked into the record is gone for good. **A `CredentialWithdrawal` is NOT exempt here**, unlike under `Mf`: that exemption is about what the transaction spends, this is about what the output holds | `NewAttestation` | outputs[idx] | `:361` |
 | `Mp1` | seed spent | `MintProfile` | inputs | `:347` |
 | `Mp2` | Whole minted value == profile ref NFT + profile user NFT, burned empty | `MintProfile` | mint | `:348-350` |
 | `Mp4` | `validateMetadataFields metadata` | `MintProfile` | redeemer | `:356` |
@@ -571,9 +573,11 @@ under the protocol currency symbol; every branch is preceded by the oracle read 
 | `Md1` | seed spent | `OpenDispute` | inputs | `:462` |
 | `Md2` | Whole minted value == dispute ref NFT ×1, burned empty | `OpenDispute` | mint | `:463-465` |
 | `Md3` | `valueSpent` holds exactly 1 of `deriveUserFromRefAC openedBy` | `OpenDispute` | all inputs | `:466` |
-| `Md4` | `target` and `openedBy` are both `isProtocolRefToken` | `OpenDispute` | redeemer, own symbol | `:467` |
+| `Md4` | `isAttestationId target` (label 1) **and** `isProfileId openedBy` (label 100) — a dispute names an attestation and is opened by a profile | `OpenDispute` | redeemer, own symbol | `:517` |
 | `Md8` | Some input's address == `depositTo` | `OpenDispute` | inputs | `:468` |
+| `Mda` | `isKeyAddress depositTo` — the refund address must be a key address, not a script. `D4` pays the deposit back as a DATUM-LESS output, which is unspendable at a Plutus address, so one credential test closes all three ways a dispute could lose its own deposit (`OC-06` parts 2-4). The staking half is not inspected | `OpenDispute` | redeemer | `:545` |
 | `Md5` | outputs[disputeOutputIdx] at disputes address, datum = computed dispute datum, value ≥ NFT + minLv + `opDisputeDeposit` lovelace | `OpenDispute` | outputs[idx], oracle datum | `:469` |
+| `Md9` | outputs[disputeOutputIdx] holds 0 of `deriveUserFromRefAC openedBy` — `Mp6`'s rule on this path (`OC-03`). `Md5` is a `geq` and the output already holds the deposit, so without this the opener's user token could ride along and never come back: resolution returns the deposit and re-locks the dispute, and nothing burns a dispute | `OpenDispute` | outputs[idx] | `:551` |
 | `Md6` | `openedAt` inside the validity interval (same rule as `Mq`) | `OpenDispute` | validity range | `:470` |
 | `Md7` | `validateMetadataFields metadata` | `OpenDispute` | redeemer | `:471` |
 
@@ -663,9 +667,10 @@ Index 2 is burnt (section 5).
 | `P3` | `valueSpent` holds exactly 1 of `deriveUserFromRefAC profileId` | `UpdateProfile` | all inputs | `:159` |
 | `P4` | `validateMetadataFields newFields` | `UpdateProfile` | redeemer | `:160` |
 | `P5` | outputs[profileOutputIdx] at own address, datum = `updateCIP68DatumMetadata newFields profileDatum`, value ≥ own input value | `UpdateProfile` | outputs[idx] | `:161` |
+| `Pa` | outputs[profileOutputIdx] holds 0 of `deriveUserFromRefAC profileId` — `Mp6`'s rule on the UPDATE path (`OC-03`). Locking the user NFT into the state output would leave the identity **permanently world-writable**, because `P3` would then be satisfied by the profile's own input; only the holder can trigger it, and nothing burns a user token, so it is irreversible rather than third-party | `UpdateProfile` | outputs[idx] | `:178` |
 
-`Cleanup` with no datum or an unparseable datum succeeds unconditionally (`:87-90`). `P2`–`P5` are
-evaluated with `and [...]`, so a failing update logs every failing code, not only the first
+`Cleanup` with no datum or an unparseable datum succeeds unconditionally (`:87-90`). `P2`–`P5` and `Pa`
+are evaluated in one `and [...]`, so a failing update logs every failing code, not only the first
 (`ScriptSize.hs:198-204`). `P8` and `P9` are **retired, not reassigned**: they belonged to the D-E
 `RevokeCredential` arm that ADR 0003 removed, and the module records that so an operator who finds
 `P8` in an old log can tell that the rule is gone rather than renamed (`:164-168`).
@@ -704,6 +709,7 @@ input.
 | `A1` | outputs[outputIdx] at own address, datum = same datum with `attestationIsAccepted = True`, value ≥ own value | `AcceptAttestation` | outputs[idx] | `:163-171` |
 | `A5` | `valueSpent` holds exactly 1 of `deriveUserFromRefAC attestationSubject` | `AcceptAttestation` | all inputs | `:174` |
 | `A6` | Own input value holds exactly 1 of `attestationId` | `AcceptAttestation` | own input value | `:177` |
+| `A8` | outputs[outputIdx] holds 0 of `deriveUserFromRefAC attestationSubject` — `Mp6`'s rule on the ACCEPT path (`OC-03`). The pair is the point: `A5` says the subject's token must move, `A8` says where it may not move to, and accepting an attestation about yourself would otherwise cost you your own authority instrument | `AcceptAttestation` | outputs[idx] | `:183` |
 
 `A7` is the **first, unconditional conjunct** of the acceptance chain, and that position is
 load-bearing: the oracle binding is non-strict, so what forces the read is being reached
@@ -859,17 +865,34 @@ all, which is exactly why `U2` and `U3` were unreachable and why both the functi
 are now gone. Each state validator resolves its own input with `unsafeFindOwnInputByTxOutRef`
 instead, and the comment now records the refutation rather than the claim.
 
-Inventory at `2bf5bde`, **70 distinct codes**, all described above — of which `U2` and `U3` are now
-retired, leaving 68 a transaction can actually be refused with:
+Inventory, **76 names, of which 74 are live** and all described above — `U2` and `U3` are retired:
 
 ```
-A0 A1 A2 A3 A4 A5 A6 A7   D0 D1 D2 D3 D4 D5 D6 D7 D8 D9 Da   K1 K2
-M0 M1 Mc1 Mc2 Mc3 Mc4   Md1 Md2 Md3 Md4 Md5 Md6 Md7 Md8
-Mf Mg Mh Mj Mk Mm Mn Mq   Mp1 Mp2 Mp4 Mp5 Mp6
-N0 N1 N2   O0 O1 O2 O3 O4 O5 O6   P0 P1 P2 P3 P4 P5 P6 P7   U0 U1 U2 U3
+A0 A1 A2 A3 A4 A5 A6 A7 A8   D0 D1 D2 D3 D4 D5 D6 D7 D8 D9 Da   K1 K2
+M0 M1 Mc1 Mc2 Mc3 Mc4   Md1 Md2 Md3 Md4 Md5 Md6 Md7 Md8 Md9 Mda
+Mf Mg Mh Mj Mk Mm Mn Mq Mr Ms   Mp1 Mp2 Mp4 Mp5 Mp6
+N0 N1 N2   O0 O1 O2 O3 O4 O5 O6   P0 P1 P2 P3 P4 P5 P6 P7 Pa   U0 U1 U2 U3
 ```
 
-Five arrived since `4eb9117` — `A7` (D-C), `D9` and `Da` (D-A), `Mc1`–`Mc4` (ADR 0003) — and two left:
+**How 74 is counted, because six different numbers are each defensible and only one is the answer.**
+This section said **70** for as long as there were 74, and the six it had no row for were `A8`, `Md9`,
+`Mda`, `Mr`, `Ms` and `Pa` — `OC-03`'s four user-token conjuncts, `OC-05`'s `Mr` and `OC-06`'s `Mda`.
+The numbers a reader can honestly arrive at, and what each one is:
+
+| Number | What it is |
+|---|---|
+| **74** | live codes. **This is the answer.** |
+| 73 | emitted directly by a `traceIfFalse`/`traceError` whose literal is in the source |
+| 72 | 73 minus `Mda`, which the regex printed below this table until 2026-10-24 could not match — a three-character code ending in a letter. The bug that makes a seventh number, found by running the documented command rather than trusting it |
+| 67 | what a ONE-LINE grep sees: six codes put their literal on the line **after** their `traceIfFalse` (`A1`, `D2`, `Mj`, `Mp2`, `Md2`, `N2`), which is why the command below needs `-A1` |
+| 76 | the block above, which keeps `U2` and `U3` as retired names so an operator reading an old log can tell "the rule is gone" from "the rule was renamed" |
+| 68/70 | this section's two previous answers. Both were right when written and neither was re-derived |
+
+`U0` is the 74th and is in none of the grep counts: it is passed as an ARGUMENT to the local
+`parseData` inside `mkUntypedLambda`, so the literal never sits next to a `traceError`. It needs its
+own command, which is why there are two below and not one.
+
+Five arrived between `4eb9117` and `2bf5bde` — `A7` (D-C), `D9` and `Da` (D-A), `Mc1`–`Mc4` (ADR 0003) — and two left:
 `K3`, retired with `unsafeGetProtocolParamsFromProfileRefInput` (`3654f57`), and `Mp3`, retired with the
 profile credential (ADR 0003). **Neither name is reused**, and nor are `Mp3`'s off-chain neighbours
 `P8`/`P9`. There are gaps in the alphabet by design: `Mp3` is missing from the `Mp` run, `Mi`/`Ml`/`Mo`
@@ -936,9 +959,12 @@ pays `fcAttestationFee`.
 8. **`ProtocolParams` is the same value everywhere.** The policy's parameter is written into every
    profile datum (`MintingPolicy.hs:344`) and its `oracleToken` into every dispute datum (`:454`) and,
    since D-C, every attestation datum (`:255`).
-9. **Protocol ids are checked by shape, not existence.** `isProtocolRefToken` = right currency symbol
-   and the kind's own CIP-67 label (`Mg` profiles, `Md4` attestation target + profile opener); the unparameterised validators check the label only
-   (`Utils.hs:426-431`).
+9. **Protocol ids are checked by shape, not existence.** The typed predicates — `isProfileId`,
+   `isAttestationId` — are right currency symbol AND the kind's own CIP-67 label (`Mg` profiles,
+   `Md4` attestation target + profile opener); the unparameterised validators check the label only,
+   because they are not given the symbol (`Utils.hs`, `isUnbackedDatum`). `isProtocolRefToken` is the
+   untyped ancestor these replaced and survives only in `UnitTests.MintInputs`; it is byte-identical
+   to `isProfileId`.
 10. **Pause stops the writes that can reach the oracle**: `M0`, `P6`, `D7` and, since D-C, `A7`. Not
     gated: `ExpireDispute` (deliberately — the admin must not be able to gate the escape hatch), every
     `Cleanup`, and `OracleUpdate` (so the admin who paused can unpause).
@@ -992,7 +1018,7 @@ The facts above are pinned by tests; when one of these fails, this document is t
 | `applyOracleAdminAction` ≡ off-chain `applyAdminAction` — but for **six of the seven** actions. `allAdminActions` is hand-written and was not extended when D-A appended `OracleSetDisputeTimeout`, so the assertion still reads `[0,1,2,2,3,4,5]` and its own comment ("the line that fails when a seventh admin action is added") no longer holds. A gap, not a drift of this document | `PropertyTests.oracleMirrorTests` (`src/test/PropertyTests.hs:73-117`) |
 | Every datum and enum type round-trips through `toBuiltinData`/`fromBuiltinData` (section 5 encodings) | `PropertyTests.dataRoundTripTests` (`src/test/PropertyTests.hs:125-160`) |
 | `feeFor` covers every `MintAction` | `UnitTests.Fees`, driven off `[minBound .. maxBound]` (`Types.hs:258-261`) |
-| `isProtocolRefToken` rejects a user token as a profile id; `validateOtherMetadata` bounds; `checkDateInRange` bound semantics | `UnitTests.MintInputs` (`src/test/UnitTests/MintInputs.hs:42`; `ScriptSize.hs:172`); `UnitTests.OracleRules` (`ScriptSize.hs:197-201`) |
+| `isProtocolRefToken` rejects a user token as a profile id; `validateOtherMetadata` bounds; `checkDateInRange` bound semantics | `UnitTests.MintInputs` (`src/test/UnitTests/MintInputs.hs:42`; `ScriptSize.hs:172`); `UnitTests.OracleRules` (`ScriptSize.hs:197-201`). These three assertions are the **only** remaining reference to `isProtocolRefToken`, which no validator calls and which is byte-identical to `isProfileId`; retiring the binding means swapping them to `isProfileId` in the same commit, or the test module stops compiling |
 | A lineage attestation cannot be accepted | `UnitTests.Attestation` 5.11b (`AttestationsValidator.hs:27`) |
 | `checkNoOpenDispute` semantics and constructor indices read back from encodings | `UnitTests.Dispute` (`src/test/UnitTests/Dispute.hs:113-121`; `PropertyTests.hs:168-169`) |
 | The four rules ADR 0003 added, each isolated by one changed input (`Mc1`–`Mc4`), and the `Mf` exemption | `UnitTests.Profile`, `UnitTests.Claim`, `UnitTests.MutationGuards` (added by `2bf5bde`) |
@@ -1002,13 +1028,17 @@ The facts above are pinned by tests; when one of these fails, this document is t
 Regenerate the trace-code inventory (sections 7.1–7.7) rather than editing it by hand:
 
 ```sh
-# -A1 because six codes (A1, D2, Mj, Mp2, Md2, N2) sit on the line after their traceIfFalse
-grep -rnE -A1 'trace(IfFalse|Error)' src/lib/onchain-lib --include='*.hs' | grep -oE '"[A-Z][a-z]?[0-9]*"' | sort -u
-grep -n 'parseData c "' src/lib/onchain-lib/Palmares/Onchain/Utils.hs   # U0 is passed through a helper
+# -A1 because six codes (A1, D2, Mj, Mp2, Md2, N2) sit on the line after their traceIfFalse.
+# The last character class is [0-9a-z] and not [0-9]*: `Mda` ends in a LETTER, and with the old
+# pattern it matched nothing and was silently absent — 72 instead of 73, with no error to notice.
+grep -rnE -A1 'trace(IfFalse|Error)' src/lib/onchain-lib --include='*.hs' | grep -oE '"[A-Z][a-z]?[0-9a-z]?"' | sort -u   # 73
+grep -n 'parseData c "' src/lib/onchain-lib/Palmares/Onchain/Utils.hs   # U0 is passed through a helper — the 74th
 ```
 
 Any code the first command prints that section 7 does not list is a rule this document does not
-describe; the two commands together must print exactly the 70 codes in section 7.7. Regenerate the
+describe; the two commands together must print exactly the 74 live codes in section 7.7 — count them,
+do not copy the number out of a previous draft, which is how 64, 68, 70 and 72 all got published. The
+census table in §7.7 says which number each method yields and why. Regenerate the
 blueprint with `admin write-blueprint` after any change to a type in section 5, and re-read the
 `makeIsDataSchemaIndexed` calls when a constructor is added: append, never insert — and when one is
 removed, retire its index and its trace code rather than reusing either, which is what `Mp3`,

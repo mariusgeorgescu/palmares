@@ -120,9 +120,8 @@ probeDatabase pool = do
 --     is therefore the only evidence available, and it is sufficient: the loop sleeps ten seconds
 --     when up to date and ten more between Kupo retries, so an age in the hundreds of seconds means
 --     tens of missed ticks.
---   * __the cursor's freshness__ — the slot gap, via @smChainSyncState@, which @main@ computes with
---     this same configured threshold so the @is_way_behind@ a client reads and the verdict it gets
---     cannot disagree.
+--   * __the cursor's POSITION__, via @smChainSyncState@, for the two shapes in which it is not
+--     answerable at all: above Kupo's tip, or naming a block that is not on the chain.
 --
 -- __The tick age is compared against the SLOT threshold__, which is one knob doing two jobs rather
 -- than a second magic number: at one second per slot, a projector that has had no word from Kupo
@@ -135,9 +134,41 @@ probeDatabase pool = do
 -- halves together. If the two ever need to diverge, the upgrade is a second variable and a second
 -- argument here — not a hardcoded multiple of the loop's sleep, which is what this replaced.
 --
--- @Behind False@ stays green on purpose: a healthy projector is a slot or two behind the tip
--- between blocks, and a probe that went red there would take a correct service out of rotation
--- every twenty seconds.
+-- __BEING BEHIND IS NOT A DEPENDENCY FAILURE, and that is a fix rather than a relaxation.__
+-- @Behind True@ used to answer 503, so a first sync and a post-wipe re-sync answered 503 for their
+-- whole duration: @main@ boots with @Behind True@, the cursor starts at slot 0 after a wipe, and
+-- 'ChainSyncLogic.evaluateChainSyncStateWith' cannot report anything else until a gap of a hundred
+-- million slots has been closed. Measured, not theorised — a schema-version bump wiped and
+-- re-indexed and @\/ready@ was red for the entire window. A Kubernetes rollout whose readiness
+-- probe points here therefore never completes on the very deploy that bumped the version, while the
+-- projector it is waiting for works correctly throughout.
+--
+-- The line this draws is between the PROCESS and the DATA, and it is the one query-api's
+-- @readyVerdict@ already draws where it refuses to turn red on a projector reporting @syncing@ —
+-- \"a projector mid-pass is a healthy service answering honest partial pages\". Behind-ness is a
+-- property of the projection, and this service serves no projection: it publishes
+-- @local_tip@, @blockchain_tip@ and @is_way_behind@ in this very response, and writes
+-- @attest_sync_state@ for everything that is not this probe. The API in front of the data is
+-- query-api, which reads that row and has its own ceiling for its lag. Each probe guards what it
+-- owns.
+--
+-- @Behind False@ was already green for a smaller version of the same reason: a healthy projector is
+-- a slot or two behind the tip between blocks, and a probe that went red there would take a correct
+-- service out of rotation every twenty seconds.
+--
+-- __The price, named.__ No slot gap turns this probe red any more, so a projector that ticks happily
+-- while permanently losing ground stays green here for ever; its lag shows in the three places above
+-- and still reddens query-api's @\/ready@. If this probe ever has to catch that too, the upgrade is a
+-- \"has been up to date at least once since boot\" bit in 'SyncMetrics', written by the first tick
+-- that sees 'UpToDate' — a backfill stays green and a REGRESSION from the tip goes red — and not a
+-- return to failing every first sync.
+--
+-- The same bit is what a BOOT WITH KUPO ALREADY DOWN costs: @main@ seeds @smLastSyncTime@ with the
+-- process's start time, so until the threshold elapses the tick looks fresh and this answers 200
+-- having never heard from Kupo at all — where the old @Behind True@ answered 503 by accident rather
+-- than by measurement. It is visible from the first retry regardless: that path writes
+-- @attest_sync_state.state = 'error'@ with the client error in @last_error@ every ten seconds, and
+-- query-api's @\/ready@ is red on that state immediately. This probe follows at the threshold.
 readyVerdict :: Integer -> Integer -> SyncMetrics -> Maybe ErrorCode
 readyVerdict maxLagSlots tickAgeSeconds m
   | not (smDbReady m) = Just DbUnavailable
@@ -145,8 +176,9 @@ readyVerdict maxLagSlots tickAgeSeconds m
   | tickAgeSeconds > maxLagSlots = Just IndexerBehind
   | otherwise = case smChainSyncState m of
       UpToDate -> Nothing
-      Behind False -> Nothing
-      Behind True -> Just IndexerBehind
+      -- Catching up is the projector DOING ITS JOB, whether the gap is two slots or the whole
+      -- chain. The tick-age guard above is what separates that from a projector that has stopped.
+      Behind _ -> Nothing
       -- Kupo is serving a chain whose tip is BELOW our cursor, so the index this service reads is
       -- the thing that is behind. The next tick rolls back; until it has, the projections above
       -- Kupo's tip are not answerable.

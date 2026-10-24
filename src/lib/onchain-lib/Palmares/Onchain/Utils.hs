@@ -279,6 +279,20 @@ checkDateHasPassed date = V1.contains (V1.from date)
 
 -------------------------------------------------------------------------------
 
+-- | Is this address's PAYMENT half a key credential rather than a script?
+--
+-- The question @OC-06@ needed asked of a dispute's refund address. A datum-less output — which is
+-- what @D4@ pays — is spendable by a key and useless at a script, so the three ways a dispute could
+-- lose its own deposit all reduce to this one predicate.
+--
+-- The staking half is not inspected, for the reason 'checkCredentialControl' gives: it is
+-- attacker-chosen data the ledger never witnesses.
+{-# INLINEABLE isKeyAddress #-}
+isKeyAddress :: Address -> Bool
+isKeyAddress (Address payment _) = case payment of
+  PubKeyCredential _ -> True
+  ScriptCredential _ -> False
+
 -- | Does this transaction demonstrate control of the given credential?
 --
 -- __This is the identity claim's whole rule__, and the spec states it in one sentence: /prove you can
@@ -333,20 +347,16 @@ checkDateHasPassed date = V1.contains (V1.from date)
 --
 -- Takes the two lists rather than a @TxInfo@ so that the rule is a pure function of its actual inputs:
 -- it is cheaper to pass, and it is what makes the rule unit-testable without building a transaction.
--- | Is this address's PAYMENT half a key credential rather than a script?
 --
--- The question @OC-06@ needed asked of a dispute's refund address. A datum-less output — which is
--- what @D4@ pays — is spendable by a key and useless at a script, so the three ways a dispute could
--- lose its own deposit all reduce to this one predicate.
---
--- The staking half is not inspected, for the reason 'checkCredentialControl' gives: it is
--- attacker-chosen data the ledger never witnesses.
-{-# INLINEABLE isKeyAddress #-}
-isKeyAddress :: Address -> Bool
-isKeyAddress (Address payment _) = case payment of
-  PubKeyCredential _ -> True
-  ScriptCredential _ -> False
-
+-- __All of the above used to sit above 'isKeyAddress', which is @OC-11f@ reintroduced after @OC-11f@
+-- was closed.__ Two @-- |@ blocks with nothing declared between them are ONE comment to Haddock, and
+-- it attaches the pair to whatever declaration follows — so fifty-four lines arguing about a
+-- claimable-credential hole were published against a five-line predicate, and the rule they describe
+-- appeared undocumented. Nothing warns: both blocks are well-formed and the module compiles. The only
+-- edit was moving these lines past 'isKeyAddress'; every non-comment line of this module is unchanged
+-- and in the same order, which is what makes it safe against a frozen script hash. Same trap as the
+-- 'valueAtOutputIdx' note further down, from the other direction: there a declaration was inserted
+-- into a comment's gap, here a comment was parked above the wrong declaration.
 {-# INLINEABLE checkCredentialControl #-}
 checkCredentialControl :: Credential -> [PubKeyHash] -> [TxInInfo] -> Bool
 checkCredentialControl credential signatories inputs = case credential of
@@ -491,7 +501,8 @@ isUnbackedDatum isOwnKindName stateNFT@(AssetClass (_, tn)) spendingTxOutRef txI
 -- and @U0@ and @U1@ above keep their meanings.
 --
 -- @hasCurrencySymbol@ answered \"does this asset class belong to this policy\" and nothing asked it.
--- It is the untyped ancestor of 'Palmares.Onchain.CIP68.isProtocolRefToken' and of the typed
+-- It is the untyped ancestor of @isProtocolRefToken@ — itself since deleted, as a byte-identical
+-- twin of 'Palmares.Onchain.CIP68.isProfileId' — and of the typed
 -- @is*Id@ predicates beside it, and the upgrade to those was a FIX: the symbol alone is satisfied by
 -- a profile's USER token, which is the hole @Mg@ and @Md4@ were closed over and which
 -- @UnitTests.MintInputs@ pins. Keeping the weaker predicate exported — and prescribed by

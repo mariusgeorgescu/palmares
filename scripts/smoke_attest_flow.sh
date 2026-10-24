@@ -140,10 +140,20 @@ die() { echo; echo "  FATAL step $STEP: $*" >&2; exit 2; }
 # Poll until a jq filter over a query-API path equals an expected value, or the timeout expires.
 #
 # A bounded poll and not a fixed sleep, because the read surface is fed by attest-sync
-# ASYNCHRONOUSLY: a projection does not exist the instant its transaction confirms, and neither
-# /ready nor /status on either service reports attest-sync's lag at all (both speak for the
-# governance index over db-sync). This loop is therefore the only check in the script that the
-# projector is alive, which is why its timeout message says so.
+# ASYNCHRONOUSLY: a projection does not exist the instant its transaction confirms.
+#
+# THIS IS NO LONGER THE ONLY CHECK THAT THE PROJECTOR IS ALIVE, and this comment claimed it was
+# for as long as that was false — contradicted by this same script at step 1, which reads
+# `.attest_lag_seconds` off query-api's /status and `die`s on a null. The projector's lag IS
+# published (`Query/ServiceStatus.hs`, as the nullable `attest_lag_seconds` beside the governance
+# block) and /ready DOES fold it in, added to db-sync's lag before the ceiling comparison
+# (`Query/Gov.hs`, readyVerdict) — for a cursor that exists; absence still passes /ready on
+# purpose, because a governance-only deployment runs no projector and is not broken.
+#
+# So what reaches this loop is narrower than "a dead projector": step 1 has already refused the
+# no-cursor case before any transaction was submitted, and /ready has already refused a projector
+# whose lag exceeds the ceiling. This catches the projector that was alive at step 1 and stopped,
+# or one lagging under the /ready ceiling but over this timeout for this one projection.
 wait_for() {
   local path="$1" filter="$2" want="$3" what="$4" deadline=$((SECONDS + ATTEST_SMOKE_TIMEOUT)) got
   while [ "$SECONDS" -lt "$deadline" ]; do
@@ -153,9 +163,10 @@ wait_for() {
   done
   die "$what did not appear within ${ATTEST_SMOKE_TIMEOUT}s (last: $got, want $want).
         $path $filter
-        Nothing is wrong with this assertion yet: check that attest-sync is running and
-        following Kupo. Neither /ready nor /status reports its lag, so this is where a dead
-        projector shows up."
+        Nothing is wrong with this assertion yet: check that attest-sync is still running and
+        following Kupo. Its cursor was visible at step 1, so it has stopped since, or it is
+        lagging under query-api's /ready ceiling and over this timeout — read
+        .attest_lag_seconds and .attestation off $QAPI/status to tell those apart."
 }
 
 # An authenticated POST to the write API. The body of a 4xx is kept (no -f), because the refusal

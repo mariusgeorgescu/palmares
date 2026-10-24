@@ -54,4 +54,24 @@ COPY --from=builder /palmares/interaction-api /app/interaction-api
 
 RUN mkdir -p /app/docs/generated/swagger
 
+# TD-11. The earlier "stops running as superuser" commit was about the POSTGRES ROLE; the container
+# itself still ran as uid 0. `nobody` (uid/gid 65534) is alpine's own baselayout account, so the
+# runtime base needs no `adduser` of its own.
+#
+# It reads `/app/interaction-api` (COPY lands it root:root 0755) and, when `ATLAS_CORE_CONFIG` is
+# unset, `config/config_palmares_validators.json` from the `./config:/app/config:ro` mount at mode
+# 0644. It writes nothing: the Swagger document comes from `--write-swagger-only` in CI and not from
+# boot any more, so the mkdir above is a write path nothing uses.
+#
+# ONE PROVIDER SHAPE CANNOT RUN AS THIS USER, and it is the one `compose.yaml` configures:
+# `{"socketPath": "/ipc/node.socket", …}`. cardano-node creates that socket `srwxr-xr-x root:root`
+# (measured on the running preprod node), and `connect()` on a UNIX socket needs the WRITE bit — so
+# a non-root client gets EACCES before Atlas has done anything. No supplementary group helps: the
+# group bits are `r-x`. The image therefore ships non-root, which is what a cluster using
+# `{"blockfrostKey": …}` gets, and `compose.yaml`'s interaction-api opts back into uid 0 explicitly,
+# at the deployment layer, with that reason written beside it.
+#
+# LAST instruction before the entrypoint on purpose: every RUN and COPY above needs root.
+USER nobody
+
 ENTRYPOINT ["/app/interaction-api"]

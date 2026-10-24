@@ -41,7 +41,11 @@ expect() {
 #    out of palmares.vote so that the committee hot-to-cold mapping has ONE definition, which two
 #    objects now use. See its own comment for the 87s-to-2s measurement that forced it.
 expect "plain views" 19 "$(psql_at "SELECT count(*) FROM pg_views WHERE schemaname = 'palmares'")"
-expect "materialized views" 1 "$(psql_at "SELECT count(*) FROM pg_matviews WHERE schemaname = 'palmares'")"
+expect "materialized views" 2 "$(psql_at "SELECT count(*) FROM pg_matviews WHERE schemaname = 'palmares'")"
+# `vote_partition` needs its own line, not just the count: `REFRESH ... CONCURRENTLY` fails at
+# runtime without a unique index, and this block exists for exactly that failure mode.
+expect "vote_partition is populated" "t" \
+  "$(psql_at "SELECT ispopulated FROM pg_matviews WHERE schemaname = 'palmares' AND matviewname = 'vote_partition'")"
 expect "functions" 1 "$(psql_at "SELECT count(*) FROM pg_proc p
                                   JOIN pg_namespace n ON n.oid = p.pronamespace
                                   WHERE n.nspname = 'palmares' AND p.proname = 'eligible_actions'")"

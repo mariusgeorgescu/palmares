@@ -65,4 +65,16 @@ COPY --from=builder /palmares/attest-sync /app/attest-sync
 # image's value is the real operating default rather than a shadow of a good one.
 ENV FETCH_BATCH_SIZE=100000
 
+# TD-11. The earlier "stops running as superuser" commit was about the POSTGRES ROLE; the container
+# itself still ran as uid 0. `nobody` (uid/gid 65534) is alpine's own baselayout account, so the
+# runtime base needs no `adduser` of its own.
+#
+# It can reach everything it needs: `/app/attest-sync` is landed by COPY as root:root 0755, Kupo is
+# an HTTP URL and Postgres a TCP DSN, and the one file it reads from disk —
+# `config/config_palmares_validators.json`, for the minting policy hash — arrives through the
+# `./config:/app/config:ro` bind mount at mode 0644, i.e. world-readable. It writes nothing.
+#
+# LAST instruction before the entrypoint on purpose: every RUN and COPY above needs root.
+USER nobody
+
 ENTRYPOINT ["/app/attest-sync"]

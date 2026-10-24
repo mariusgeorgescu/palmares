@@ -16,7 +16,7 @@ module UnitTests.MintInputs (tests) where
 import Palmares.Onchain.CIP68
   ( deriveUserFromRefTN,
     generateRefAndUserTN,
-    isProtocolRefToken,
+    isProfileId,
     isRefTokenName,
     maxOtherMetadataEntries,
     validateOtherMetadata,
@@ -67,11 +67,11 @@ refTokenTests =
         isRefTokenName (TokenName "plainname") @?= False,
       -- And the combined predicate: BOTH halves are required, so each one failing alone is a refusal.
       testCase "the right prefix under the WRONG policy is refused" $
-        isProtocolRefToken (AssetClass (otherCS, refTN)) ourCS @?= False,
+        isProfileId (AssetClass (otherCS, refTN)) ourCS @?= False,
       testCase "the right policy with the WRONG prefix is refused" $
-        isProtocolRefToken (AssetClass (ourCS, userTN)) ourCS @?= False,
+        isProfileId (AssetClass (ourCS, userTN)) ourCS @?= False,
       testCase "the right policy and the right prefix is accepted" $
-        isProtocolRefToken (AssetClass (ourCS, refTN)) ourCS @?= True
+        isProfileId (AssetClass (ourCS, refTN)) ourCS @?= True
     ]
   where
     -- Built with the protocol's own generator rather than hand-written prefixes, so this test cannot

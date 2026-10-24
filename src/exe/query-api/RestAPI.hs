@@ -1388,6 +1388,7 @@ handleGetDashboardPage topLimit closingSoonLimit epochsParam = do
               dashboardTotalDreps = n DRepActive + n DRepInactive + n DRepUnknown,
               dashboardActiveDreps = n DRepActive,
               dashboardInactiveDreps = n DRepInactive,
+              dashboardUnknownDreps = n DRepUnknown,
               dashboardRetiredDreps = n DRepRetired,
               dashboardPowerEpoch = totalsPowerEpoch ts,
               dashboardDrepPowerLovelace = totalsDrepPowerLovelace ts,
@@ -1975,7 +1976,12 @@ apiSwagger =
     -- so, and says the same about `rate_limited` — reserved, no throttle built, no 429 declared on
     -- any operation. Four codes a client could have written an unreachable branch for; now four
     -- codes whose reachability is stated beside them. No route of this service changed.
-    & info . Data.Swagger.version .~ "1.8.0"
+    --
+    -- 1.9.0 adds one field to `DashboardPageResponse`: `unknown_dreps`. Additive and required, and
+    -- it closes an arithmetic hole rather than adding a figure — `total_dreps` counts the three
+    -- registered statuses, so without this field the dashboard's own numbers accounted for 204 of
+    -- 294 and named no reason for the other 90. No route changed.
+    & info . Data.Swagger.version .~ "1.9.0"
     & info . Data.Swagger.description
       ?~ "Read-only queries over the Cardano governance record: DReps, governance actions, votes, \
          \delegations, the constitutional committee and treasury withdrawals. Every row comes from \

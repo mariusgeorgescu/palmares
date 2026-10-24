@@ -51,7 +51,7 @@ substrate and validators have soaked. See `docs/adr/` for the decisions and thei
 ```
 cardano-node ──▶ cardano-db-sync (preset only_governance, ledger enabled) ──▶ PostgreSQL
                                                                                  │
-                          palmares.* read-only SQL views + one materialized view ┤
+                         palmares.* read-only SQL views + two materialized views ┤
                                                                                  ▼
    attestation validators ──▶ Kupo ──▶ palmares_attest.* ──▶ query-api (public) ──▶ explorer / API clients
 ```
@@ -135,17 +135,38 @@ Containers, and the read-path stack. Two profiles, matching the two doors of §2
 
 ```bash
 scripts/build-images.sh                    # all four service images, host architecture, loaded locally
+
+# NO PASSWORD IN THIS FILE HAS A DEFAULT — a password written into a committed file is a credential
+# that ships, so `compose.yaml` uses `${VAR:?}` throughout and refuses the whole `up`, naming the one
+# you forgot. Put these three in `.env` (compose reads it for interpolation) or export them.
+export POSTGRES_PASSWORD=…               # the Postgres superuser; initdb bakes it into the volume
+export PALMARES_OWNER_PASSWORD=…         # `apply-roles` creates palmares_owner with it
+export PALMARES_RO_PASSWORD=…            # and palmares_ro with it
+
 docker compose --profile chain up -d       # node + db-sync + Postgres: the whole read path
-docker compose --profile app   up -d       # + the public query API on :8083, as palmares_owner
+docker compose --profile app   up -d       # + the public query API on :8083, as palmares_ro
 
 # The write path, once `admin deploy-reference-scripts` has run. BASIC_USER and BASIC_PASS have no
-# defaults — a shipped credential is worse than a missing one — so compose names the one you forgot.
+# defaults either, for the same reason.
 BASIC_USER=you BASIC_PASS=secret docker compose --profile write up -d
 ```
 
 Every published port binds to `127.0.0.1`, including Postgres. The `write` profile brings up Kupo,
 the interaction API **and `attest-sync`**: without the last one the stack can submit an attestation
 to the chain and never read it back, which is what the audit found.
+
+The four service containers run as **`nobody`** (uid/gid 65534), set in each `Dockerfile.*` — they
+read a static binary and at most one read-only config file, and write nothing. One deployment shape
+cannot: `compose.yaml`'s `interaction-api` sets `user: "0:0"` because `cardano-node` creates
+`/ipc/node.socket` as `srwxr-xr-x root:root` and connecting to a UNIX socket needs the write bit.
+A deployment using a hosted provider instead of `socketPath` should drop that line. The `admin`
+image is non-root too, so an invocation that writes into a bind mount — `reconcile-koios --out`,
+`deploy-reference-scripts` — has to pass `--user "$(id -u):$(id -g)"` to own what it creates.
+
+**Architecture:** the `chain` profile runs on arm64 and amd64 — every third-party image there
+publishes both, and all four are pinned by digest. The four images *this project* publishes are
+`linux/arm64` only (`images.yml`), so an amd64 host must build them locally with the script above
+rather than pull them for `--profile app` / `--profile write`.
 
 Time until useful, measured 2026-10-20 on an Apple-silicon laptop (Experiment A, numbers in
 `docs/adr/0001-governance-data-substrate.md`):
@@ -171,7 +192,7 @@ exits rather than starting with an unsafe default.
 |---|---|---|
 | `BASIC_USER` | required, **fail-closed** | interaction-api |
 | `BASIC_PASS` | required, **fail-closed** | interaction-api |
-| `CORS_ALLOWED_ORIGINS` | optional; unset or empty denies all cross-origin, which is the safe default and not a boot failure | query-api, interaction-api, attest-sync |
+| `CORS_ALLOWED_ORIGINS` | optional; unset or empty denies all cross-origin, which is the safe default and not a boot failure. All three services ANNOUNCE the resolved policy at boot (`CORS: …` on stdout) — deny-all included, with the headers it still sends and a warning for any entry that can never match an `Origin`. An `Origin` is `scheme://host[:port]`, so `*` and a trailing slash both allow nothing | query-api, interaction-api, attest-sync |
 | `PG_CONN_STR` | required — db-sync's own database, the pool that serves requests | query-api, attest-sync |
 | `PALMARES_PG_OWNER_CONN_STR` | optional; the owner pool for the boot DDL and the matview refresh. Unset, it falls back to `PG_CONN_STR` | query-api |
 | `ATLAS_CORE_CONFIG` | write path; **the JSON itself**, not a path — unset reads `config/config_atlas.json` | interaction-api, attest-sync, admin |
@@ -180,14 +201,17 @@ exits rather than starting with an unsafe default.
 | `KUPO_URL` | required, **fail-closed** — no default: the projector's only view of the chain | attest-sync |
 | `FETCH_BATCH_SIZE` | slots per fetch window; default `10000000` in the binary, `100000` as the images and `compose.yaml` set it | attest-sync |
 | `ROLLBACK_MARGIN` | default `2160` | attest-sync |
-| `READY_MAX_LAG_SLOTS` | default `1200` — the slot gap at which `/ready` turns red, and the same number in seconds bounds how long the projector may go without an answer from Kupo. Unparseable or non-positive falls back to the default rather than failing the boot | attest-sync |
+| `READY_MAX_LAG_SLOTS` | default `1200` — the slot gap beyond which attest-sync REPORTS `is_way_behind`, and the same number in seconds bounds how long the projector may go without an answer from Kupo before `/ready` turns red. **The gap alone no longer reddens `/ready`**: catching up is the job, and failing the probe for the whole of a first sync or a post-wipe re-sync is what stopped a rollout from ever completing. Unparseable or non-positive falls back to the default rather than failing the boot | attest-sync |
+| `ATTEST_SYNC_CONFIRM_WIPE` | no default — a schema-version bump drops every chain-sync table and re-indexes from the chain, and attest-sync refuses to do that unless this names the **stored** version being destroyed (the refusal prints the number). Gated on the wipe and not on the boot, so an ordinary restart never needs it; a stored version NEWER than the binary's is refused outright and this is not an override for that | attest-sync |
+| `POSTGRES_PASSWORD` | required by `compose.yaml`, **no default** — the superuser password `initdb` bakes into the volume on first boot. Read by compose, never by the Haskell | compose |
 | `PALMARES_VIEW_REFRESH_SECONDS` | default `300` | query-api |
 | `PALMARES_READY_MAX_LAG_SECONDS` | default `300` — `/ready` red above this | query-api |
 | `PALMARES_AMBER_LAG_SECONDS` | default `120` — UI amber above this | query-api |
 | `PALMARES_NETWORK_NAME` | default `preprod` — the value `/ready` compares `meta.network_name` against | query-api |
 | `PALMARES_FRESHNESS_POLL_MS` | default `5000` | query-api |
 | `PALMARES_ADMIN_CONN_STR` | required by `apply-indexes` and `apply-roles`, **fail-closed** — the superuser DSN, deliberately not `PG_CONN_STR` | admin |
-| `PALMARES_OWNER_PASSWORD` · `PALMARES_RO_PASSWORD` | required by `apply-roles`, **fail-closed** — it never invents a password | admin |
+| `PALMARES_OWNER_PASSWORD` · `PALMARES_RO_PASSWORD` | required by `apply-roles`, **fail-closed** — it never invents a password. `compose.yaml` requires both with **no default** for the `app` and `write` profiles: they are the passwords `palmares_owner` and `palmares_ro` are created with, and they are also what `query-api` and `attest-sync` connect as | admin, query-api, attest-sync, compose |
+| `POSTGRES_PASSWORD` | required by `compose.yaml`, **no default** — read by compose, never by the Haskell. It is the Postgres superuser password, which `initdb` bakes into the volume on first boot; db-sync's `gen-pgpass` and `apply-roles` must then be given the same value. Was `${POSTGRES_PASSWORD:-devonly}` at three points in that file until `TD-09` | postgres, cardano-db-sync, admin `apply-roles` (all via compose) |
 | `PALMARES_API` · `KOIOS_API` · `KOIOS_API_TOKEN` | the parity gate's two base URLs and an optional Koios token; `PALMARES_API` is **query-api's** base | admin |
 | `PALMARES_TEST_PG_CONN_STR` | required by `cabal test` — see §10 | test suite |
 | `PALMARES_FIXTURE_PG_CONN_STR` | optional; a synced preprod db-sync for the epoch-320 metric gate — unset, that gate reports `SKIPPED` inside passing cases | test suite |

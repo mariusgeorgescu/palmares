@@ -23,6 +23,10 @@ check() {
   else
     echo "  FAIL $1"
     echo "       $2 => $(jq -c "$2" "$DOC" 2>&1 | head -1)"
+    # An optional THIRD argument is a jq expression that names what tripped the check. The closed-
+    # vocabulary assertions below reduce to a bare `false`, which says a status is declared somewhere
+    # and not where — so those pass the offending "<path> <method>" list here instead.
+    if [ -n "${3:-}" ]; then echo "       offenders: $(jq -c "$3" "$DOC" 2>&1 | head -1)"; fi
     fail=1
   fi
 }
@@ -33,8 +37,9 @@ echo "== swagger metadata"
 # `GET /profiles/by-user-token/{id}`, `x-nullable` on all nullable properties, the real
 # `limit`/`offset` bounds, and a `{code, message}` body on the 405 and 406 the router answered empty.
 # 1.8.0 adds `route_not_found`, which is the third of those router refusals and the last one that
-# answered with zero bytes and no content type.
-check "version is 1.8.0" '.info.version == "1.8.0"'
+# answered with zero bytes and no content type. 1.9.0 adds `unknown_dreps` to the dashboard, the
+# field that makes its three registered counts sum to `total_dreps`.
+check "version is 1.9.0" '.info.version == "1.9.0"'
 # D-A. A client that SWITCHES on the verdict gains a case here, and one that renders `expired` as a
 # finding is wrong — which is the whole reason the value is in the published enum rather than left
 # to a null and a comment.
@@ -112,13 +117,32 @@ check "the ErrorCode description admits the codes this service cannot return" \
   '.definitions.ErrorCode.description | test("cannot be returned by THIS service") and test("rate_limited") and test("reserved")'
 # And `rate_limited` stays unreachable: no operation may declare a 429 until the throttle exists, at
 # which point this line is the one that has to be deliberately changed.
+#
+# `.paths[][]` — EVERY OPERATION, and it said `.paths[].get` until 2026-10-24, which made the check
+# vacuous on the surface it will matter for. The read document is all GET, so GET-scoped passed and
+# looked like it was working; the write surface is all POST, so a 429 declared on a write route went
+# straight through the gate written to stop exactly that. (The write document has its own cover —
+# the closed-status union in the interaction section below is `.paths[][]` and fails on any status
+# outside its list — but a gate whose text is narrower than its stated intent is one rename away
+# from being the only one left.)
 check "no 429 is declared while rate limiting is unimplemented" \
-  '[.paths[].get.responses | keys[]] | unique | index("429") == null'
+  '[.paths | to_entries[] | .key as $p | .value | to_entries[] | select(.value.responses | has("429")) | "\($p) \(.key)"] == []' \
+  '[.paths | to_entries[] | .key as $p | .value | to_entries[] | select(.value.responses | has("429")) | "\($p) \(.key)"]'
 # `route_not_found` is a 404 and the seven beside it are missing-record codes, so the one thing worth
 # asserting about it separately is that it did not land in the wrong group: the 404 description has
 # to name it, or a reader finds the code in the enum and no status for it anywhere.
+# `.paths[][]` for the same reason as the 429 above: this is a property of every operation, not of
+# every GET, and the document being GET-only today is what hid the difference. `// ""` is what the
+# widening MADE necessary — an operation with no 404 at all now reaches this predicate, and `test`
+# on null aborts jq and staples a stack trace to the failure instead of reporting it.
+#
+# `.paths[][] | .responses[…]` and NOT `.paths[][].responses[…]`, which is the same expression right
+# up to the `//` and silently wrong: as one path expression the left of `//` is a STREAM, and `//`
+# on a stream FILTERS the nulls out instead of mapping each to "". Measured on a document with one
+# operation missing its 404: the path form collected 31 descriptions out of 32 operations and the
+# check passed; the piped form collects 32 and fails.
 check "the 404 description names route_not_found beside the lookup codes" \
-  '[.paths[].get.responses["404"].description] | (length > 0) and all(test("route_not_found"))'
+  '[.paths[][] | .responses["404"].description // ""] | (length > 0) and all(test("route_not_found"))'
 # 405, 406 and 500 join the three that were here. Each is a status this service really answers with
 # and did not declare: the first two come out of servant's router (no ErrorFormatters hook exists
 # for either, so `refusedRequestMiddleware` carries the body) and the third is warp's last resort,
@@ -129,12 +153,16 @@ check "the 404 description names route_not_found beside the lookup codes" \
 # service holds no provider to fail against. A 502 a client sees here came from the proxy in front,
 # with the proxy's own body. Declaring it would repeat exactly the mistake `invalid_asset_class`
 # was — a published case nothing can reach.
+#
+# `.paths[][]` and not `.paths[].get` throughout, for the 429's reason: "global" means every
+# operation, and a GET-scoped traversal of a GET-only document cannot tell the two apart.
 for s in 400 404 405 406 500 503; do
   check "the global $s response carries the ApiError schema" \
-    "[.paths[].get.responses[\"$s\"].schema[\"\$ref\"]] | unique == [\"#/definitions/ApiError\"]"
+    "[.paths[][].responses[\"$s\"].schema[\"\$ref\"]] | unique == [\"#/definitions/ApiError\"]"
 done
 check "query-api declares no 502: it has no provider to fail against" \
-  '[.paths[].get.responses | keys[]] | unique | index("502") == null'
+  '[.paths | to_entries[] | .key as $p | .value | to_entries[] | select(.value.responses | has("502")) | "\($p) \(.key)"] == []' \
+  '[.paths | to_entries[] | .key as $p | .value | to_entries[] | select(.value.responses | has("502")) | "\($p) \(.key)"]'
 
 echo "== parameters that must exist, and ones that must not"
 # Accept is a HEADER parameter and must be optional: it is how a handler learns the negotiated
@@ -336,6 +364,14 @@ if [ -f "$IDOC" ]; then
   }
   icheck "license is Apache-2.0" '.info.license.name == "Apache-2.0"'
   icheck "title is the product's name" '.info.title == "Palmares Interaction API"'
+  # PINNED HERE, beside the read document's `version is 1.8.0`, because nothing gated it and the
+  # cost of that showed up immediately: `UnitTests.InteractionApi` asserts this version too, but a
+  # unit test gates the CODE and not the artifacts beside it, so `scripts/smoke_interaction_api.sh`
+  # sat on `3.3.0` through 3.4.0, 3.5.0 and 3.6.0 against a served `3.6.0`, with CI green the whole
+  # time — the smoke script is not run by CI and the only thing that would have caught the drift was
+  # a check in this file, which is run on every pull request. Bumping it is the same deliberate act
+  # the read document's line is.
+  icheck "version is 3.6.0" '.info.version == "3.6.0"'
 
   # ---- the write API's status contract (added by the write-path gap-closing task) ---------------
   #

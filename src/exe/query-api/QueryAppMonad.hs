@@ -6,7 +6,7 @@
 -- The context is deliberately small: a connection pool, the cached chain freshness, and the two
 -- numbers @\/ready@ decides on. There is __no Cardano provider__ and __no deployed-script
 -- context__, because this service never queries the chain — D-1 says every row comes from a
--- @palmares@ view or the one matview, and the inherited live-query handlers that needed a
+-- @palmares@ view or one of the two matviews, and the inherited live-query handlers that needed a
 -- provider are gone. The consequence is worth stating: query-api boots with nothing but a
 -- Postgres DSN, so it needs no provider key and no @config_atlas.json@, which is both one less
 -- secret on a public read service and what makes the smoke script runnable anywhere.

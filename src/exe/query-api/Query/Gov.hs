@@ -369,7 +369,23 @@ readyVerdict maxLag ReadyInputs {..}
   -- absolute staleness, which is what the ceiling is supposed to bound. Reaching this guard already
   -- implies `readyLagSeconds <= maxLag`, so this is strictly stronger than the check it replaces
   -- and can only ever turn a PASS into a 503 — never the reverse.
-  | Just lag <- readyAttestLagSeconds, readyLagSeconds + lag > maxLag = Just IndexerBehind
+  -- __And `syncing` is exempt, because this guard cannot mean anything about it.__ A projector
+  -- reporting `syncing` is behind BY DEFINITION, so the sum is not its staleness — it is the whole
+  -- distance left to backfill. After a wipe `attest_sync_state.cursor_slot` starts at 0 and advances
+  -- per window, so the sum is ~137 million against a 300 s ceiling and this guard fired for the
+  -- entire re-sync, never reaching the `otherwise` below whose comment PROMISES not to do that:
+  -- "Red here would take a fresh deployment's governance routes — which are complete and correct —
+  -- out of rotation for the hours the attestation backfill takes." It did exactly that, today, on
+  -- the schema bump that added `dispute_projection.stale_after`.
+  --
+  -- A backfill that STALLS is still caught, by the two guards below: `state = 'error'` fires on the
+  -- first failed tick, and the report age fires when the projector stops writing at all. So the
+  -- exemption loses no detection — it removes a verdict about a condition this arithmetic cannot
+  -- distinguish from progress.
+  | Just lag <- readyAttestLagSeconds,
+    readyAttestState /= Just "syncing",
+    readyLagSeconds + lag > maxLag =
+      Just IndexerBehind
   -- `CS-07`. Both guards fire only when the projector HAS written a row, so a governance-only
   -- deployment is untouched — absence still passes, for the reason the record's field says.
   --
@@ -951,7 +967,15 @@ drepMetricsQuery dhid =
 -- chain's delegation history before the outer predicate keeps five rows, measured at 32.9 s for one
 -- credential over five epochs against a 30 s statement timeout — which also stopped the Koios parity
 -- gate, because the reconciler reads this route. @palmares.drep_delegator_counts@ is the same
--- arithmetic with the one predicate that CAN be pushed through the window: 1.30 s, same counts.
+-- arithmetic with the one predicate that CAN be pushed through the window, same counts.
+--
+-- That function's own @1.30 s@ was measured over FIVE epochs and did not describe this caller,
+-- which asks for the whole series. For @drep_always_abstain@ — 1,776 delegating addresses against a
+-- median of 2 for a registered DRep — the series is 158 epochs, and this route measured 11.07 s
+-- (HTTP) / 10.57-10.95 s (SQL) against 0.015 s for a registered DRep. The power series was 2.5 ms
+-- of it; the rest was the function re-running its de-registration lookup once per (interval, epoch)
+-- pair. Fixed inside the function with @AS MATERIALIZED@ — see 'sql/020_views.sql' — not here:
+-- 0.15 s, same rows. Nothing on this side needed to change, which is why nothing did.
 --
 -- The function needs an epoch range and this route's bounds are optional, so the range is taken from
 -- the power series itself — which is the right range anyway, since a count for an epoch with no

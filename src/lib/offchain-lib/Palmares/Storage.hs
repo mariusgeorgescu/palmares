@@ -313,6 +313,37 @@ runMigrations = do
     "CREATE INDEX IF NOT EXISTS profile_projection_credential_idx \
     \ON profile_projection (profile_credential)"
     []
+  -- `CS-15`: the three columns every read of this registry filters on by equality. Measured on the
+  -- live preprod database before adding them — @pg_indexes@ over @palmares_attest@ listed exactly
+  -- ONE secondary index, the credential one above; every other entry was a primary key or a unique
+  -- constraint. Same raw-SQL reason as that one, and the same @IF NOT EXISTS@, so every boot after
+  -- the first is a catalog lookup.
+  --
+  -- __No schema-version bump, and that is the point.__ An index adds no column, so @migrateAll@ has
+  -- nothing to ALTER and 'currentSchemaVersion' does not move — which is what lets these land on an
+  -- existing deployment at its next restart instead of through ADR 0007's wipe-and-re-index.
+  --
+  --   * @subject_profile_id@ — @GET \/attestations?subject=@ ('Query.Attest.attestationWhere'), the
+  --     whole of @GET \/profiles\/{id}\/attestations@, and the projector's own
+  --     'deriveProfileCredential'. That last caller is why this one is not cosmetic at eleven rows:
+  --     it runs this exact predicate once per projected profile event and once per credential
+  --     record, so a @Seq Scan@ here is O(n^2) over a re-sync. Measured as @Seq Scan on
+  --     attestation_projection … Rows Removed by Filter: 11@, 0.121 ms over the live 11-row table.
+  --   * @issuer_profile_id@ — @GET \/attestations?issuer=@, the issuance history.
+  --   * @target_attestation_id@ — 'Query.Attest.disputesFor', which runs on EVERY
+  --     @GET \/attestations\/{id}@, and @GET \/disputes?target=@.
+  --
+  -- NOT indexed, deliberately: @profile_type@ (an enum of three values — the scan is cheaper than
+  -- the index), the @LIKE '%…%'@ profile search (wants a trigram index and a measurement first),
+  -- and @attestation_date@ / @opened_at@, whose only use is an @ORDER BY@ the page's @LIMIT@ already
+  -- bounds. @onchain_match_event.created_slot@ needs nothing either: @unique_kupo_match@ leads with
+  -- it, so the range delete in 'rollbackTo' is already index-served.
+  forM_
+    [ "CREATE INDEX IF NOT EXISTS attestation_projection_subject_idx ON attestation_projection (subject_profile_id)",
+      "CREATE INDEX IF NOT EXISTS attestation_projection_issuer_idx ON attestation_projection (issuer_profile_id)",
+      "CREATE INDEX IF NOT EXISTS dispute_projection_target_idx ON dispute_projection (target_attestation_id)"
+    ]
+    (\sql -> rawExecute sql [])
 
 -- | Bump when the chain-sync DB schema changes incompatibly; startup wipes + re-syncs on a mismatch.
 --

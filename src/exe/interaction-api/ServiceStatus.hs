@@ -19,10 +19,17 @@
 --
 -- __It is public, beside the probes.__ Everything here is either an on-chain fact or the provider's
 -- family name; nothing is a secret and nothing needs the operator's credentials. It costs THREE
--- provider round trips per request — the third reads the oracle datum, which is what @oracle@
--- publishes and which this service is the only one able to read: query-api carries no Cardano
--- provider at all, by a documented boot contract of \"nothing but a Postgres DSN\", and the db-sync
--- behind it is indexed without UTxOs, so the oracle UTxO is not in that database either.
+-- provider round trips — seven queries, since the first of the three is five @utxoAtTxOutRef@ calls —
+-- and the third reads the oracle datum, which is what @oracle@ publishes and which this service is
+-- the only one able to read: query-api carries no Cardano provider at all, by a documented boot
+-- contract of \"nothing but a Postgres DSN\", and the db-sync behind it is indexed without UTxOs, so
+-- the oracle UTxO is not in that database either.
+--
+-- __Those seven queries are now per CACHE MISS and not per request__ (@OF-13@). Being public and
+-- costing seven chain queries is a combination anyone could aim a loop at, so the whole response is
+-- memoised for 'InteractionAppMonad.probeCacheTtl' — see there for the number and the argument. The
+-- response is cached whole rather than per probe because every field in it is a chain or config
+-- fact; nothing in it is derived from the request.
 --
 -- @oracle@ and @oracle_paused@ come from two separate reads on purpose. @opPaused@ lives in the very
 -- datum @oracle@ returns, so one read could serve both — but @oracle_paused@ is read off
@@ -30,6 +37,7 @@
 -- with the production check. Deriving it from the datum would trade that guarantee for a round trip.
 module ServiceStatus (InteractionStatusResponse (..), getStatus) where
 
+import Control.Concurrent.MVar (MVar, newMVar)
 import Control.Exception (SomeException, fromException, try)
 import Control.Lens ((&), (?~))
 import Control.Monad (void)
@@ -38,13 +46,14 @@ import Control.Monad.Reader (ReaderT, ask, runReaderT)
 import Data.Swagger (ToSchema (..), description, genericDeclareNamedSchema)
 import Data.Swagger qualified as Swagger
 import Data.Text (Text, pack)
+import Data.Time (UTCTime)
 import Data.Typeable (cast)
 import Deriving.Aeson
 import GeniusYield.GYConfig (GYCoreConfig (..), GYCoreProviderInfo (..))
 import GeniusYield.TxBuilder (GYTxQueryMonadIO)
 import GeniusYield.TxBuilder.Errors (GYTxMonadException (..))
 import GeniusYield.Types (GYNetworkId (..))
-import InteractionAppMonad (InteractionAppContext (..), InteractionAppMonad)
+import InteractionAppMonad (InteractionAppContext (..), InteractionAppMonad, cachedFor)
 import Palmares.Constants (appVersion)
 import Palmares.DomainTypes.Transfer.Types (OracleParamsResponse)
 import Palmares.TxBuilding.Context (DeployedScriptsContext, ProviderCtx (..), TxBuildingContext (..), runQuery)
@@ -53,6 +62,7 @@ import Palmares.TxBuilding.Exceptions (TxBuildingException (ProtocolPaused))
 import Palmares.TxBuilding.Lookups (queryOracleParams)
 import Palmares.TxBuilding.Operations (getOracleRefInputSkeleton, verifyDeployedScriptsAreReady)
 import Palmares.Utils (mkStripPrefixSchemaOptions)
+import System.IO.Unsafe (unsafePerformIO)
 
 -------------------------------------------------------------------------------
 
@@ -109,14 +119,26 @@ instance ToSchema InteractionStatusResponse where
 
 -------------------------------------------------------------------------------
 
--- | Three chain reads, each allowed to fail without failing the response.
+-- | The response, from the cache when it is fresh and from the chain when it is not.
 getStatus :: InteractionAppMonad InteractionStatusResponse
 getStatus = do
   InteractionAppContext {..} <- ask
-  let cfg = ctxCoreCfg (providerCtx txBuildingContext)
-  scripts <- liftIO (probe txBuildingContext verifyDeployedScriptsAreReady)
-  oracle <- liftIO (probe txBuildingContext (void getOracleRefInputSkeleton))
-  params <- liftIO (probe txBuildingContext (paramsOf <$> queryOracleParams))
+  liftIO (cachedFor statusCache (readStatus txBuildingContext))
+
+-- | @\/status@'s cell. Top-level 'unsafePerformIO' for the reasons given at
+-- 'InteractionAppMonad.readyProbeCache'; a separate cell from that one because the two routes
+-- compute different things and sharing would mean restructuring both to agree on a type.
+statusCache :: MVar (Maybe (UTCTime, InteractionStatusResponse))
+statusCache = unsafePerformIO (newMVar Nothing)
+{-# NOINLINE statusCache #-}
+
+-- | Three chain reads, each allowed to fail without failing the response.
+readStatus :: TxBuildingContext -> IO InteractionStatusResponse
+readStatus ctx = do
+  let cfg = ctxCoreCfg (providerCtx ctx)
+  scripts <- probe ctx verifyDeployedScriptsAreReady
+  oracle <- probe ctx (void getOracleRefInputSkeleton)
+  params <- probe ctx (paramsOf <$> queryOracleParams)
   return
     InteractionStatusResponse
       { statusProvider = providerFamily (cfgCoreProvider cfg),

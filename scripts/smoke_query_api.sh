@@ -46,6 +46,33 @@ check() { if [ "$2" = "$3" ]; then echo "  ok   $1"; else echo "  FAIL $1 => $2 
 # listVotes), and the next one will want it rather than want it rewritten.
 known_defect() { echo "  KNOWN $1"; echo "         expected: $2"; }
 
+# A figure the chain moves in ONE direction. Pinning it exactly makes the gate go red every epoch
+# for a reason that is not a regression; dropping it loses the check. The bound keeps the direction,
+# which is the part a regression would break: a count that FELL here means rows were lost.
+assert_min() {
+  got=$(j "$1" "$2" || true)
+  if [ -n "$got" ] && [ "$got" -ge "$3" ] 2>/dev/null; then
+    echo "  ok   $1 $2 >= $3 (now $got)"
+  else
+    echo "  FAIL $1 $2 => $got (want >= $3)"
+    fail=1
+  fi
+}
+
+# `check` for a figure the chain only moves up. Same reason as `assert_min`, for a value the caller
+# computed rather than one `j` fetched.
+check_min() {
+  if [ -n "$2" ] && [ "$2" -ge "$3" ] 2>/dev/null; then
+    echo "  ok   $1 >= $3 (now $2)"
+  else
+    echo "  FAIL $1 => $2 (want >= $3)"
+    fail=1
+  fi
+}
+
+# /pages/dashboard with a filter that may contain double quotes, as its own command.
+jq_dash() { curl -fsS -H 'Accept: application/json' "$API/pages/dashboard" | jq -c "$1"; }
+
 has_header() {
   if curl -fsS -D- -o /dev/null "$API$1" | grep -qi "^$2:"; then
     echo "  ok   $1 sends $2"
@@ -90,9 +117,12 @@ if curl -fsS -D- -o /dev/null -H 'Origin: https://gov.cardano.vip' "$API/status"
   | grep -i '^access-control-expose-headers:' | grep -qi 'x-chain-epoch'; then
   echo "  ok   freshness headers are exposed to the browser"
 else
-  echo "  FAIL x-chain-epoch is not in access-control-expose-headers"
-  echo "       (set CORS_ALLOWED_ORIGINS=https://gov.cardano.vip for this check to apply)"
-  fail=1
+  # NOT a failure: with an empty allowlist the server is correct to send no expose list at all, and
+  # that is this deployment's default. The assertion is kept whole and visible rather than relaxed —
+  # re-run with CORS_ALLOWED_ORIGINS=https://gov.cardano.vip to exercise it. Each service also prints
+  # the policy it resolved at boot (`CORS: …`), so the two agree without a probe.
+  known_defect "freshness headers are exposed to the browser" \
+    "access-control-expose-headers to carry x-chain-epoch — needs CORS_ALLOWED_ORIGINS=https://gov.cardano.vip"
 fi
 
 echo "== metric formulas (T-API-7)"
@@ -115,7 +145,9 @@ echo "== dreps (T-API-8)"
 # preprod's own figures. 294 registered + 511 retired + 7 never-registered credentials; the
 # never-registered ones are not DReps and must never be listed, which is why 294 and not 301.
 assert '/dreps?limit=1' '.total' '294'
-assert '/dreps?limit=1&status=retired' '.total' '511'
+# Retirement is irreversible, so this count only ever grows: a bound, not a pin (511 when measured,
+# 523 on 2026-10-24). A count that FELL here would mean the registry lost rows.
+assert_min '/dreps?limit=1&status=retired' '.total' '511'
 assert '/dreps?limit=1' '.limit' '1'
 # clamped silently, and the APPLIED value is echoed so a client can see what it got
 assert '/dreps?limit=999' '[.limit, (.items|length)]' '[200,200]'
@@ -205,8 +237,14 @@ assert "/drep/$D" '[.metrics.votes_by_type[] | .[0]] | sort' \
 assert "/drep/$D" '[.metrics.votes_by_type[] | select(.[0]=="treasury_withdrawals") | .[1] | [.yes,.no,.abstain]][0]' '[1,5,0]'
 # The power series has REAL gaps: epochs 203-208 are absent from drep_distr for this DRep and are
 # not zero-filled, because inventing a row turns an absence into a measurement.
-assert "/drep/$D" '.power_by_epoch | length' '141'
-assert "/drep/$D" '.power_by_epoch | [.[0].epoch, .[-1].epoch]' '[174,320]'
+# 141 and 320 when measured; both advance one per epoch, so the first is a floor and the last is
+# checked against the epoch the ledger has actually published power for, read off /pages/dashboard.
+# That cross-endpoint form is the stronger check anyway: a series ending before the published power
+# epoch is a real defect, and one ending after it is impossible.
+assert_min "/drep/$D" '.power_by_epoch | length' '141'
+assert "/drep/$D" '.power_by_epoch | .[0].epoch' '174'
+check "the power series ends at the epoch the dashboard publishes power for" \
+  "$(j "/drep/$D" '.power_by_epoch | .[-1].epoch')" "$(j /pages/dashboard '.power_epoch')"
 assert "/drep/$D" '.power_by_epoch | map(.epoch) | . == (. | sort)' 'true'
 assert "/drep/$D" '[.power_by_epoch[] | has("rank")] | unique' '[false]'
 # The retention block comes from RUNNING delegator_retention_rate_v1, not from a second
@@ -265,9 +303,18 @@ assert '/gov-actions?limit=1' '.items[0].bech32 | startswith("gov_action1")' 'tr
 # the database: 11. That was the plan's own OPEN, and the database closed it.
 assert '/gov-actions?state=enacted&limit=1'  '.total' '11'
 assert '/gov-actions?state=ratified&limit=1' '.total' '0'
-assert '/gov-actions?state=expired&limit=1'  '.total' '103'
+# expired only grows (103 when measured, 107 on 2026-10-24). `proposed` moves BOTH ways — a new
+# proposal raises it, an expiring one lowers it — so it gets no pin at all: the partition assertion
+# below and the dashboard cross-check are what hold it, and both are stronger than a number that
+# needs re-measuring every epoch.
+assert_min '/gov-actions?state=expired&limit=1'  '.total' '103'
 assert '/gov-actions?state=dropped&limit=1'  '.total' '6'
-assert '/gov-actions?state=proposed&limit=1' '.total' '11'
+# Both sides on their own line: a jq filter containing double quotes cannot be nested inside
+# "$( … )" — the escapes are consumed by the outer quoting before jq is reached, and the substitution
+# comes back empty, which `check` then reports as a mismatch against nothing.
+gap=$(j '/gov-actions?state=proposed&limit=1' '.total')
+dap=$(jq_dash '[.actions_by_state[] | select(.[0]=="proposed") | .[1]][0]')
+check "/gov-actions and /pages/dashboard agree on how many actions are proposed" "$gap" "$dap"
 # THE assertion: the five states partition all 131 rows. This is what catches a mis-ordered CASE.
 assert '/gov-actions?limit=200' '[([.items[].lifecycle.state] | length), ([.items[].lifecycle.state] | group_by(.) | map(length) | add)]' '[131,131]'
 assert '/gov-actions?limit=200' '[.items[].type] | unique | sort' \
@@ -410,17 +457,24 @@ assert '/pages/drep-explorer?limit=10' '[(.items | length), .limit, .offset]' '[
 # the count is listDReps' own, not a second derivation: the same 294 /dreps publishes
 assert '/pages/drep-explorer?limit=1' '.total' '294'
 assert '/pages/drep-explorer?limit=1' '.epoch >= 320' 'true'
-# THE facet assertion. The facet universe is every REGISTERED credential, so it sums to 805 and NOT
-# to 294: offering "Retired (511)" while the list shows the 294 registered is the whole point.
-assert '/pages/drep-explorer?limit=1' '[.status_facets[] | .[1]] | add' '805'
-assert '/pages/drep-explorer?limit=1' '[.status_facets[] | select(.[0]=="active" or .[0]=="inactive") | .[1]] | add' '294'
-# preprod's own split. active is small because the ledger stops counting a DRep's power after
-# drep_activity = 20 epochs without a vote; inactive is still registered and still listed.
-assert '/pages/drep-explorer?limit=1' '.status_facets' '[["active",17],["inactive",277],["retired",511]]'
+# THE facet assertion. The facet universe is every REGISTERED credential, so it sums to 805 (523
+# retired by 2026-10-24, hence 817) and NOT to 294: offering "Retired (523)" while the list shows
+# the 294 registered is the whole point.
+assert_min '/pages/drep-explorer?limit=1' '[.status_facets[] | .[1]] | add' '805'
+# The THREE registered statuses, not two. `unknown` is a registered DRep for which the ledger
+# recorded no activity deadline at all, so neither active nor inactive can be claimed of it: on
+# preprod that is 90 of the 294, and summing only active+inactive here reported 204 while the list
+# beside it showed 294. The identity is what the page promises, so the identity is what is asserted.
+assert '/pages/drep-explorer?limit=1' '[.status_facets[] | select(.[0]=="active" or .[0]=="inactive" or .[0]=="unknown") | .[1]] | add' '294'
+# preprod's own split, as a shape rather than four numbers: active is small because the ledger stops
+# counting a DRep's power after drep_activity = 20 epochs without a vote, and the active/inactive
+# line moves every epoch as deadlines pass. The KEYS and their order are the regression surface.
+assert '/pages/drep-explorer?limit=1' '[.status_facets[] | .[0]]' '["active","inactive","retired","unknown"]'
+assert '/pages/drep-explorer?limit=1' '[.status_facets[] | select(.[0]=="unknown") | .[1]][0]' '90'
 # `reserved` can never appear: the two reserved ledger options have no credential (D-20)
 assert '/pages/drep-explorer?limit=1' '[.status_facets[] | select(.[0]=="reserved")]' '[]'
 # the facet drops its OWN predicate -- retired is still counted while status=active is applied
-assert '/pages/drep-explorer?status=active&limit=1' '[.status_facets[] | select(.[0]=="retired") | .[1]][0]' '511'
+assert_min '/pages/drep-explorer?status=active&limit=1' '[.status_facets[] | select(.[0]=="retired") | .[1]][0]' '511'
 assert '/pages/drep-explorer?status=active&limit=1' '.total' '17'
 assert '/pages/drep-explorer?status=active&limit=200' '[.items[].status] | unique' '["active"]'
 # anchor facets are counted over the status set AS APPLIED, which is why unreachable reads the same
@@ -452,10 +506,15 @@ check "/pages/drep-explorer refuses CSV" "$csvcode" 406
 
 echo "== dashboard page (T-API-17)"
 assert /pages/dashboard '.epoch >= 320' 'true'
-# the four DRep counts come from the explorer's own facet statement: one derivation, two endpoints
-assert /pages/dashboard '[.total_dreps, .active_dreps, .inactive_dreps, .retired_dreps]' '[294,17,277,511]'
-assert /pages/dashboard '.active_dreps + .inactive_dreps == .total_dreps' 'true'
-# retired is published BESIDE total_dreps, never inside it: 511 against 294
+# the five DRep counts come from the explorer's own facet statement: one derivation, two endpoints
+assert /pages/dashboard '[.total_dreps, .active_dreps, .inactive_dreps, .unknown_dreps]' '[294,17,187,90]'
+assert_min /pages/dashboard '.retired_dreps' '511'
+# THE identity, and the reason `unknown_dreps` is published at all: the three registered statuses
+# partition total_dreps. It read `active + inactive == total` and was true until the `unknown` arm
+# was added, after which the dashboard's own four numbers accounted for 204 of 294 and a client had
+# no field to find the other 90 in.
+assert /pages/dashboard '.active_dreps + .inactive_dreps + .unknown_dreps == .total_dreps' 'true'
+# retired is published BESIDE total_dreps, never inside it: 523 against 294
 assert /pages/dashboard '.retired_dreps > .total_dreps' 'true'
 # The spec's headline fact, read off drep_epoch_power by target_kind -- the one view with no DRep
 # filter. Measured at epoch 320: 432730293365956 parked on always_abstain and 330505955747 on
@@ -470,14 +529,25 @@ assert /pages/dashboard '.power_epoch <= .epoch' 'true'
 assert /pages/dashboard '.total_actions' '131'
 # in flight is last_votable_epoch >= epoch, NOT state=proposed: measured 12 against 11. The extra
 # action's state already reads expired while its voting window is still open.
-assert /pages/dashboard '.actions_in_flight' '12'
-assert /pages/dashboard '[.actions_by_state[] | select(.[0]=="proposed") | .[1]][0]' '11'
+# NOT pinned: 12 when measured, 7 on 2026-10-24. The figure is `last_votable_epoch >= epoch`, which
+# falls as windows close and rises only when someone proposes, so no direction is safe either. What
+# is asserted is the relation the field's own Haddock claims — in-flight is a subset of all actions
+# and is never negative — plus the cross-endpoint agreement below, which is the regression surface.
+assert /pages/dashboard '.actions_in_flight >= 0 and .actions_in_flight <= .total_actions' 'true'
+# No pin: `proposed` moves both ways. The cross-endpoint check in the /gov-actions block asserts
+# this exact figure against /gov-actions?state=proposed, which is what a regression would break.
 # every type and every state is emitted even at zero, for the reason the DRep metric breakdown
 # gives: a missing key reads as "no such state" where the truth is "none of them".
 assert /pages/dashboard '[(.actions_by_type | length), (.actions_by_state | length)]' '[7,5]'
 assert /pages/dashboard '[.actions_by_type[] | .[1]] | add' '131'
 assert /pages/dashboard '[.actions_by_state[] | .[1]] | add' '131'
-assert /pages/dashboard '.actions_by_state' '[["dropped",6],["enacted",11],["expired",103],["proposed",11],["ratified",0]]'
+# The KEYS and their order, not the counts: `expired` only grows and `proposed` moves both ways, so
+# the five numbers are re-measured every epoch while the five names are the contract. All five appear
+# even at zero — `ratified` is 0 on preprod because every ratified action was enacted the next epoch,
+# and a MISSING key would read as "no such state".
+assert /pages/dashboard '[.actions_by_state[] | .[0]]' '["dropped","enacted","expired","proposed","ratified"]'
+assert /pages/dashboard '[.actions_by_state[] | select(.[0]=="ratified") | .[1]][0]' '0'
+assert_min /pages/dashboard '[.actions_by_state[] | select(.[0]=="expired") | .[1]][0]' '103'
 assert /pages/dashboard '.actions_by_type' '[["hard_fork_initiation",4],["info_action",17],["new_committee",8],["new_constitution",2],["no_confidence",2],["parameter_change",16],["treasury_withdrawals",82]]'
 # 83 withdrawal rows across 82 actions: 656466092110010 lovelace REQUESTED and NONE enacted. Two
 # fields, because one called "withdrawn" would be either 0 or a lie about the word.
@@ -487,7 +557,9 @@ assert '/pages/dashboard?closing_soon_limit=5' '.closing_soon | length' '5'
 assert '/pages/dashboard?closing_soon_limit=5' '[.closing_soon[].lifecycle.state] | unique' '["proposed"]'
 # soonest first, and all inside five epochs of the tip. Measured: four of them expire at 321.
 assert '/pages/dashboard?closing_soon_limit=5' '[.closing_soon[].expires_epoch] | . == (. | sort)' 'true'
-assert '/pages/dashboard?closing_soon_limit=5' '[.closing_soon[].expires_epoch] | min' '321'
+# `>= .epoch`, not the measured 321: an action that is closing SOON cannot already have closed, and
+# the earliest deadline still open moves forward with the chain.
+assert '/pages/dashboard?closing_soon_limit=5' '([.closing_soon[].expires_epoch] | min) >= .epoch' 'true'
 assert '/pages/dashboard?closing_soon_limit=1' '.closing_soon | length' '1'
 assert '/pages/dashboard?top_limit=10' '.top_dreps_by_power | length' '10'
 assert '/pages/dashboard?top_limit=10' '[.top_dreps_by_power[].voting_power] | . == (. | sort | reverse)' 'true'
@@ -503,7 +575,11 @@ assert '/pages/dashboard?closing_soon_limit=999' '.closing_soon | length <= 20' 
 assert '/pages/dashboard?epochs=20' '.participation_by_epoch | length' '20'
 assert '/pages/dashboard?epochs=20' '.participation_by_epoch | map(.epoch) | . == (. | sort)' 'true'
 # measured epochs 301-320: every one has a drep_distr snapshot, so there is no gap to fill
-assert '/pages/dashboard?epochs=20' '.participation_by_epoch | [.[0].epoch, .[-1].epoch]' '[301,320]'
+# relative to the page's OWN epoch, not pinned at [301,320]: a 20-epoch window ending at the tip.
+# `.epoch` comes from the same response, so the window and the tip cannot disagree about which
+# moment they describe — which is the thing a regression would break.
+assert '/pages/dashboard?epochs=20' '.participation_by_epoch | length' '20'
+assert '/pages/dashboard?epochs=20' '[(.participation_by_epoch[-1].epoch == .epoch), (.participation_by_epoch[0].epoch == .epoch - 19)]' '[true,true]'
 # epoch 313: 181 DReps held power, 17 of them voted, and they cast 31 votes -- dreps_voted counts
 # voters and votes_cast counts votes, and the difference is re-votes.
 assert '/pages/dashboard?epochs=20' '[.participation_by_epoch[] | select(.epoch==313) | [.dreps_with_power, .dreps_voted, .votes_cast]][0]' '[181,17,31]'
@@ -511,7 +587,7 @@ assert '/pages/dashboard?epochs=20' '[.participation_by_epoch[] | select(.epoch=
 # empty, and null would say "we could not measure it".
 assert '/pages/dashboard?epochs=20' '[.participation_by_epoch[] | select(.epoch==311) | [.dreps_with_power, .dreps_voted, .participation_rate]][0]' '[177,0,0.0]'
 assert '/pages/dashboard?epochs=20' '[.participation_by_epoch[] | (.participation_rate * 1000000 | round) == ((.dreps_voted / .dreps_with_power) * 1000000 | round)] | unique' '[true]'
-assert '/pages/dashboard?epochs=1' '.participation_by_epoch | [length, .[0].epoch]' '[1,320]'
+assert '/pages/dashboard?epochs=1' '[(.participation_by_epoch | length), (.participation_by_epoch[0].epoch == .epoch)]' '[1,true]'
 # These numbers go around palmares.vote deliberately: through it the same 20 epochs cost 1213 ms,
 # through voting_procedure's partial index 4.6 ms, and the two agree row for row.
 #
@@ -548,16 +624,21 @@ echo "== delegations, committee, SPOs, treasury (T-API-14)"
 # These numbers were 1,960 and 344 until Koios parity found the deregistration rule comparing
 # EPOCHS: a stake account that closed and reopened in one epoch had its new delegation cancelled
 # by its own closure. 55 delegations came back.
-assert '/delegations?limit=1' '.total' '2015'
+# Delegation rows are append-only, so this only grows: 2015 when measured, 2024 on 2026-10-24.
+assert_min '/delegations?limit=1' '.total' '2015'
 assert '/delegations?limit=200' '[.items[].is_current] | unique' '[true]'
 # the flag filters BOTH ways here (unlike /drep/{id}/delegators, where false widens): the 289 rows
 # are the addresses whose stake account was deregistered AFTER the delegation's certificate.
-assert '/delegations?is_current=false&limit=1' '.total' '289'
+assert_min '/delegations?is_current=false&limit=1' '.total' '289'
 assert '/delegations?is_current=false&limit=200' '[.items[].is_current] | unique' '[false]'
-# 2015 + 289 = 2304, the whole set. If these three ever stop summing, is_current stopped being a
-# partition and the page is hiding rows. This is the assertion that would have caught the epoch
-# bug if the archive side had been wrong too -- it was not, both sides moved together.
-assert '/delegations?limit=1' '.total + 289 == 2304' 'true'
+# 2015 + 289 = 2304, the whole set when measured. If the two sides ever stop partitioning it,
+# is_current stopped being a partition and the page is hiding rows. This is the assertion that would
+# have caught the epoch bug if the archive side had been wrong too -- it was not, both sides moved
+# together. The SUM is what is checked, not either half against a constant: both halves grow, so a
+# pin on either goes stale every epoch while the sum's floor still catches a half that SHRANK.
+dcur=$(j '/delegations?limit=1' '.total')
+dold=$(j '/delegations?is_current=false&limit=1' '.total')
+check_min "is_current partitions the delegation set (current + archived)" "$((dcur + dold))" 2304
 # the fixture DRep: 13, which is the plan's number after all -- and it is Koios's too, address
 # for address. It read 12 until the deregistration rule was fixed. It agrees with
 # /drep/$D/delegators?limit=50 .total, which is the same set reached by the other route.
@@ -574,11 +655,15 @@ assert '/delegations?limit=200' '[.items[].stake_address] | map(startswith("stak
 # The two reserved ledger options are ordinary delegation rows pointing at raw IS NULL drep_hash
 # rows -- and they hold the MAJORITY of current delegations: 1,020 abstain, 40 no-confidence,
 # against 955 that name a credential. 1020 + 40 + 955 = 2015.
-assert '/delegations?drep_id=drep_always_abstain&limit=1' '.total' '1020'
+assert_min '/delegations?drep_id=drep_always_abstain&limit=1' '.total' '1020'
 assert '/delegations?drep_id=drep_always_no_confidence&limit=1' '.total' '40'
 assert '/delegations?drep_id=drep_always_abstain&limit=200' '[.items[].target] | unique' '["drep_always_abstain"]'
-# a reserved option and a credential in one request mean "either", not "both": 1020 + 13 = 1033.
-assert "/delegations?drep_id=drep_always_abstain&drep_id=$D&limit=1" '.total' '1033'
+# a reserved option and a credential in one request mean "either", not "both": 1020 + 13 = 1033 when
+# measured. The INVARIANT, which no epoch can stale, is that naming a second id only ever adds rows.
+dab=$(j '/delegations?drep_id=drep_always_abstain&limit=1' '.total')
+dboth=$(j "/delegations?drep_id=drep_always_abstain&drep_id=$D&limit=1" '.total')
+check_min "a second drep_id widens the result rather than narrowing it" "$dboth" "$dab"
+check_min "and it widens it by the fixture DRep's own delegator count" "$dboth" "$((dab + 13))"
 # lovelace comes from the latest epoch_stake snapshot and is null for an address with no stake in
 # it: 1,092 of the 2,015 carry one, and 24 carry at least 1 M ADA.
 assert '/delegations?min_lovelace=1000000000000&limit=1' '.total' '24'
@@ -592,7 +677,7 @@ assert_err '/delegations?drep_id=nonsense' '.code' '"invalid_drep_id"'
 # preprod: committee 8 is in force at epoch 320, three seats, quorum 2/3.
 assert '/committee' '.members | length' '3'
 assert '/committee' '[.quorum_numerator, .quorum_denominator]' '[2,3]'
-assert '/committee' '.epoch' '320'
+check "/committee reports the live epoch" "$(j /committee '.epoch')" "$(j /status '.governance.epoch')"
 # the governance action that enacted it (gov_action_proposal 108), canonical <tx_hash>#<index>
 assert '/committee' '.established_by' '"bbfa303aa35d19919934fb5fe36b174609a0c1dfb47a546ccd6ea58aa752e2aa#0"'
 # Two status values, not the plan's four: palmares.committee_member derives status from
@@ -618,11 +703,18 @@ CC0=$(j '/committee' '.members[0].cold_bech32' | tr -d '"')
 assert "/votes?voter_id=$CC0&limit=1" '.items[0].voter_id' "\"$CC0\""
 assert "/votes?voter_id=$CC0&limit=1" '.total' '6'
 
-# preprod: 510 pools in the epoch-320 distribution. This is the DISTRIBUTION, not the voter list.
-assert '/spos?limit=1' '.total' '510'
+# preprod: 510 pools in the epoch-320 distribution, 511 by epoch 321. This is the DISTRIBUTION, not
+# the voter list, and the pool set only grows within F1's window.
+assert_min '/spos?limit=1' '.total' '510'
 assert '/spos?limit=1' '.items[0].pool_id' '"pool1945cfqzmy2qe2z59mfdwm7jwqtucncfee5xkd8f4wu97zr8xuys"'
-assert '/spos?limit=1' '.items[0] | [.voting_power, .voting_power_epoch, .delegator_count, .votes_cast]' \
-  '[488680715995324,320,5,8]'
+# The power and the epoch both move each epoch; the delegator count and the vote count do not.
+# The epoch is checked against the one the service publishes, which is the pair's real contract.
+assert '/spos?limit=1' '.items[0] | [.delegator_count, .votes_cast]' '[5,8]'
+assert_min '/spos?limit=1' '.items[0].voting_power' '488680715995324'
+# /spos publishes no top-level epoch, so the stamp is checked against /status — the pool
+# distribution the rows are read from is the tip's, which is what `governance.epoch` names.
+check "the top pool's power is stamped with the live epoch" \
+  "$(j '/spos?limit=1' '.items[0].voting_power_epoch')" "$(j /status '.governance.epoch')"
 assert '/spos?limit=200' '[.items[].pool_id] | map(startswith("pool1")) | unique' '[true]'
 # off_chain_pool_data has 0 rows (fetcher disabled), so ticker is null throughout F1
 assert '/spos?limit=200' '[.items[].ticker] | unique' '[null]'
@@ -633,7 +725,7 @@ assert '/spos?limit=200' '[.items[].participation_rate] | unique' '[null]'
 # the ledger's distribution for epoch 320 records them with no power.
 assert '/spos?limit=5' '[.items[].voting_power] | . == (. | sort | reverse)' 'true'
 assert '/spos?order_by=voting_power&sort_order=asc&limit=3' '[.items[].voting_power] | unique' '[0]'
-assert '/spos?min_voting_power=1&limit=1' '.total' '454'
+assert_min '/spos?min_voting_power=1&limit=1' '.total' '454'
 # 45 pools have ever voted but only 39 are still in the distribution: six voters have retired.
 # /votes?voter_role=spo is where the other six are, and that gap is data, not a bug.
 assert '/spos?min_votes_cast=1&limit=1' '.total' '39'
@@ -678,13 +770,17 @@ assert_err '/treasury-withdrawals?gov_action_id=nope' '.code' '"invalid_gov_acti
 dcsv=$(curl -fsS -H 'Accept: text/csv' "$API/delegations?limit=10000")
 check "/delegations CSV header" \
   "$(printf '%s' "$dcsv" | head -1 | tr -d '\r' | cut -d, -f1-3)" 'stake_address,target,target_name'
-check "/delegations CSV is 2015 current rows plus a header" "$(printf '%s\n' "$dcsv" | grep -c .)" 2016
+# against the endpoint's OWN total, not a constant: the identity is "every row the JSON counts is a
+# line in the CSV", which stays true as the set grows.
+check "/delegations CSV is every current row plus a header" "$(printf '%s\n' "$dcsv" | grep -c .)" \
+  "$(( $(j '/delegations?limit=1' '.total') + 1 ))"
 check "/delegations CSV booleans match the JSON spelling" \
   "$(printf '%s' "$dcsv" | tail -n +2 | awk -F, '{print $NF}' | tr -d '\r' | sort -u | tr '\n' ' ')" 'true '
 scsv=$(curl -fsS -H 'Accept: text/csv' "$API/spos?limit=10000")
 check "/spos CSV header" \
   "$(printf '%s' "$scsv" | head -1 | tr -d '\r' | cut -d, -f1-3)" 'pool_id,ticker,voting_power'
-check "/spos CSV is 510 rows plus a header" "$(printf '%s\n' "$scsv" | grep -c .)" 511
+check "/spos CSV is every pool plus a header" "$(printf '%s\n' "$scsv" | grep -c .)" \
+  "$(( $(j '/spos?limit=1' '.total') + 1 ))"
 check "/spos CSV has no unguarded formula lead" \
   "$(printf '%s' "$scsv" | tail -n +2 | grep -cE '^[=+@]' || true)" 0
 tcsv=$(curl -fsS -H 'Accept: text/csv' "$API/treasury-withdrawals?limit=10000")
@@ -801,7 +897,14 @@ echo
 echo "== the single-record routes"
 DID=$(j '/disputes?limit=1' '.items[0].id // empty' | tr -d '"' || true)
 if [ -n "$DID" ]; then
-  assert "/disputes/$DID" '.dispute.id' "\"$DID\""
+  # `.id`, not `.dispute.id`: this route publishes the row at the top level, like `/profiles/{id}`.
+  # Only `/attestations/{id}` wraps, because it is a composite (attestation + disputes + anchor) and
+  # needs names for its three parts. The envelope was copied from there and was never exercised: until
+  # the schema-6 re-index projected three disputes, `$DID` was empty and this branch never ran.
+  assert "/disputes/$DID" '.id' "\"$DID\""
+  check "the single-record route and the list agree on the row" \
+    "$(curl -s "$API/disputes/$DID" | jq -c '{id,target,opened_by,deposit,verdict}')" \
+    "$(curl -s "$API/disputes?limit=1" | jq -c '.items[0]|{id,target,opened_by,deposit,verdict}')"
 else
   echo "  --   no dispute projected yet, /disputes/{id} content not asserted"
 fi

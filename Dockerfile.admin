@@ -54,4 +54,21 @@ COPY --from=builder /palmares/admin /app/admin
 # `reconcile-koios` reads them from the image and neither is a secret.
 COPY ./config/reconcile-exceptions.yaml ./config/reconcile-sample.preprod.json /app/config/
 
+# TD-11. The earlier "stops running as superuser" commit was about the POSTGRES ROLE; the container
+# itself still ran as uid 0. `nobody` (uid/gid 65534) is alpine's own baselayout account, so the
+# runtime base needs no `adduser` of its own.
+#
+# The one command this image runs as a SERVICE is `apply-roles` (compose's `palmares-roles`), which
+# touches Postgres over TCP and no file at all. `/app/admin` and the two reconcile files are landed
+# by COPY as root:root 0644/0755, so `nobody` reads them.
+#
+# THE CALLER OWNS THE UID FOR ANYTHING THAT WRITES. `reconcile-koios --out` creates its report in
+# the caller's directory (`Reconcile.hs:451-452`), and `deploy-reference-scripts` writes
+# `config/config_palmares_validators.json` — both land in a bind mount owned by the host user, which
+# is nobody's by definition. Those invocations pass `--user "$(id -u):$(id -g)"`;
+# `.github/workflows/reconcile.yml` is the worked example.
+#
+# LAST instruction before the entrypoint on purpose: every RUN and COPY above needs root.
+USER nobody
+
 ENTRYPOINT ["/app/admin"]

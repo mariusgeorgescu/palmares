@@ -174,35 +174,65 @@ declaredIndexes = mapMaybe nameOf (splitStatements (TE.decodeUtf8 indexesSql))
       (_ : n : _) -> Just (T.takeWhile (\c -> c == '_' || isAlphaNum c) n)
       _ -> Nothing
 
--- | The declared indexes that PostgreSQL has marked INVALID.
+-- | Everything wrong with the declared index set, one line per index; @[]@ means every index in
+-- 'declaredIndexes' is present and usable. Same shape, and for the same reason, as
+-- 'Palmares.TxBuilding.Operations.deployedScriptsProblems'.
 --
--- __This is the one @CREATE INDEX CONCURRENTLY@ failure a retry cannot see.__ Concurrently builds
--- in two passes with a commit between them; interrupt it — a cancelled Job, a deadlock, a killed
--- pod — and the index is left behind with @indisvalid = false@. The planner then ignores it, and
--- @IF NOT EXISTS@ sees the name and does nothing, so every later run reports success while the
--- query the index was built for stays on a sequential scan. Nothing raises an error, ever.
+-- __Both directions, because @CREATE INDEX CONCURRENTLY@ has two silent failures and this used to
+-- cover one__ (@GV-17@). The old version asked PostgreSQL for invalid indexes and intersected the
+-- answer with 'declaredIndexes', so on a database holding NONE of them it returned @[]@ and
+-- @apply-indexes@ printed \"all 23 declared indexes are valid\" — a claim about 23 indexes it had
+-- never counted. It was a property of the empty set.
 --
--- Recovering means @DROP INDEX@ and re-create, which costs a full build and is a human decision.
--- What this owes the operator is the names, so @apply-indexes@ can end on a non-zero exit instead
--- of a green Job.
+--   * __INVALID.__ Concurrently builds in two passes with a commit between them; interrupt it — a
+--     cancelled Job, a deadlock, a killed pod — and the index is left behind with
+--     @indisvalid = false@. The planner then ignores it, and @IF NOT EXISTS@ sees the name and does
+--     nothing, so every later run reports success while the query the index was built for stays on
+--     a sequential scan. Nothing raises an error, ever.
+--   * __MISSING.__ Recovering from the above means @DROP INDEX@ and re-create, which is two steps
+--     and a human — so the failure this check itself creates is an operator who read the INVALID
+--     line, dropped the index as instructed, and did not re-run @apply-indexes@. The old check then
+--     went green on a database with the index simply gone. The other way in is a @DROP INDEX@ this
+--     repository does not perform: these indexes live in @public@, which is db-sync's, so a db-sync
+--     migration that recreates one of its own tables takes our index with it and nothing re-applies
+--     the file. Absence is not a subtle regression — the file records 2.03 s to 0.89 s on one page
+--     of the activity feed, and a CC-vote arm that \"simply never finishes\" without
+--     @gov_idx_committee_reg_hot@.
 --
--- Intersected with 'declaredIndexes' in Haskell rather than filtered in SQL: an invalid index is
--- rare enough that fetching all of them costs nothing, and it keeps the declared names out of a
--- spliced @IN@ list. An invalid index that is NOT ours is db-sync's business to report.
+-- __Still intersected in Haskell rather than filtered in SQL__, which the missing half needs anyway:
+-- answering \"which declared name is absent\" requires the set of names that ARE there, so the query
+-- fetches @public@'s index catalogue — a few hundred rows on db-sync — and the comparison happens
+-- here. That keeps the declared names out of a spliced @IN@ list, and it keeps the declared set
+-- coming from the SQL file and nowhere else. An invalid index that is NOT ours stays db-sync's
+-- business to report.
 assertIndexesValid :: ConnectionPool -> IO [Text]
-assertIndexesValid pool =
-  filter (`elem` declaredIndexes) . map unSingle
-    <$> runSqlPoolNoTransaction
-      ( rawSql
-          "SELECT c.relname FROM pg_class c \
+assertIndexesValid pool = do
+  rows <-
+    runSqlPoolNoTransaction
+      ( rawSql @(Single Text, Single Bool)
+          "SELECT c.relname, i.indisvalid FROM pg_class c \
           \JOIN pg_index i ON i.indexrelid = c.oid \
           \JOIN pg_namespace n ON n.oid = c.relnamespace \
-          \WHERE n.nspname = 'public' AND NOT i.indisvalid \
+          \WHERE n.nspname = 'public' \
           \ORDER BY c.relname"
           []
       )
       pool
       Nothing
+  let present = [(unSingle n, unSingle v) | (n, v) <- rows]
+  return $
+    [ n <> ": MISSING — no index of that name exists in schema public. Re-run `admin apply-indexes`; \
+      \every statement is CREATE INDEX CONCURRENTLY IF NOT EXISTS, so the ones already there cost a \
+      \catalogue lookup each."
+    | n <- declaredIndexes,
+      n `notElem` map fst present
+    ]
+      <> [ n <> ": INVALID — the index exists, the planner ignores it, and IF NOT EXISTS will skip it \
+           \for ever. DROP INDEX CONCURRENTLY it and then re-run `admin apply-indexes` — a retry on \
+           \its own will not fix it, and dropping without re-running leaves it MISSING."
+         | (n, False) <- present,
+           n `elem` declaredIndexes
+         ]
 
 -- | Apply @sql\/050_roles.sql@, then set the two passwords.
 --

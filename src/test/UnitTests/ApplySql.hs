@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | The statement splitter, and the two files it has to split.
+-- | The statement splitter, the two files it has to split, and the check that the index file
+-- actually landed.
 --
 -- __Why this is tested at all.__ @CREATE INDEX CONCURRENTLY@ cannot run inside a transaction, so
 -- the index and role files cannot be sent as one multi-statement query and must be split. Splitting
@@ -9,20 +10,25 @@
 -- on the next line somebody adds — and the failure mode is a half-sent @DO@ block reporting a
 -- syntax error that points at the wrong place. So the splitter is pinned here, including against
 -- the real files.
+--
+-- The last case needs a real PostgreSQL, because 'assertIndexesValid' is a question about
+-- @pg_class@ and @pg_index@ and there is nothing in it to test without them.
 module UnitTests.ApplySql (tests) where
 
 import Data.Char (isAlphaNum)
 import Data.List (isInfixOf, nub)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as TE
-import Palmares.Admin.ApplySql (declaredIndexes, indexesSql, rolesSql, splitStatements)
+import Database.Persist.Sql (rawExecute)
+import Palmares.Admin.ApplySql (applyIndexes, assertIndexesValid, declaredIndexes, indexesSql, rolesSql, splitStatements)
+import Test.Pg (runPg, withScratchDb)
 import Test.Tasty
 import Test.Tasty.HUnit
 
 tests :: TestTree
 tests =
   testGroup
-    "SQL statement splitting"
+    "SQL statement splitting and the index check"
     [ testCase "plain statements split on the semicolon, and the trailing one is not an empty query" $
         splitStatements "SELECT 1; SELECT 2;" @?= ["SELECT 1", "SELECT 2"],
       -- Every statement in both files is preceded by prose, and that prose has semicolons in it.
@@ -128,7 +134,49 @@ tests =
               "CURRENT_USER" `isInfixOf` up,
               "RAISE EXCEPTION" `isInfixOf` up
             )
-              @?= (True, True, True)
+              @?= (True, True, True),
+      -- ---------------------------------------------------------------------------------------
+      -- `assertIndexesValid`, in both directions. @GV-17@: it only ever asked PostgreSQL for
+      -- INVALID indexes, so on a database holding none of the declared ones it returned `[]` and
+      -- `admin apply-indexes` printed "all 23 declared indexes are valid" — a claim about 23
+      -- indexes it had never counted, true of the empty set.
+      testCase "the index check names a declared index that is absent, and one that is invalid" $
+        withScratchDb $ \pool -> do
+          -- The file applies to the db-sync skeleton as it stands: 23 statements, 23 indexes.
+          -- Against `length declaredIndexes` rather than a literal, so the two cannot disagree.
+          applyIndexes pool >>= either assertFailure (@?= length declaredIndexes)
+          -- The clean case FIRST. Without it the two assertions below could both pass on a function
+          -- that always returns every declared name, and the old function passed this one too — it
+          -- is the only case it could pass honestly.
+          assertIndexesValid pool >>= (@?= [])
+          -- MISSING: the direction that did not exist. Reachable two ways — an operator who read an
+          -- INVALID line, dropped the index as instructed and stopped there; and a db-sync migration
+          -- that recreates one of its own `public` tables, taking our index with it, with nothing in
+          -- this repository re-applying the file afterwards.
+          runPg pool $ rawExecute "DROP INDEX public.gov_idx_voting_procedure_tx" []
+          -- INVALID: what an interrupted CREATE INDEX CONCURRENTLY leaves behind. A concurrent build
+          -- cannot be interrupted on demand, so the catalogue row is falsified directly. The only
+          -- write to `pg_index` in this suite, and it lives in a database that is dropped when the
+          -- case ends.
+          runPg pool $
+            rawExecute "UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'public.gov_idx_ocvd_anchor'::regclass" []
+          -- And an invalid index that is NOT ours, which must stay db-sync's business to report.
+          -- This is what makes the count below an assertion rather than an artefact of the skeleton
+          -- happening to carry no other index.
+          runPg pool $ rawExecute "CREATE INDEX not_a_declared_index ON public.block (block_no)" []
+          runPg pool $
+            rawExecute "UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'public.not_a_declared_index'::regclass" []
+          problems <- assertIndexesValid pool
+          assertBool
+            ("the dropped index must be reported MISSING: " <> show problems)
+            (any (\p -> T.isInfixOf "gov_idx_voting_procedure_tx" p && T.isInfixOf "MISSING" p) problems)
+          assertBool
+            ("the falsified index must be reported INVALID: " <> show problems)
+            (any (\p -> T.isInfixOf "gov_idx_ocvd_anchor" p && T.isInfixOf "INVALID" p) problems)
+          -- Those two and nothing else: `not_a_declared_index` is invalid and must not be reported,
+          -- and the other 22 declared indexes are fine. Asserted last so the two messages above
+          -- name what went wrong before this one reduces it to a number.
+          length problems @?= 2
     ]
   where
     toUpperC c = if c >= 'a' && c <= 'z' then toEnum (fromEnum c - 32) else c

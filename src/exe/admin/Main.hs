@@ -933,16 +933,25 @@ main = do
       pool <- adminPool
       printYellow "Applying sql/indexes/001_gov_indexes.sql (CONCURRENTLY, one statement at a time) ..."
       applySql "apply-indexes" (applyIndexes pool)
-      -- And then the check no error code gives you: an interrupted CONCURRENTLY build leaves an
-      -- INVALID index that IF NOT EXISTS will happily skip forever.
-      invalid <- assertIndexesValid pool
-      unless (null invalid) $
+      -- And then the two checks no error code gives you: a declared index that is simply not there,
+      -- and an interrupted CONCURRENTLY build that left an INVALID index IF NOT EXISTS will skip for
+      -- ever. Each returned line says which of the two it is and what to do about it.
+      --
+      -- The MISSING half is why the old green line was a lie by omission: it printed "all 23 declared
+      -- indexes are valid" after a query that only ever looked for INVALID ones, so on a database
+      -- that had received none of them the line was vacuously true — a claim about 23 indexes the
+      -- check never counted.
+      problems <- assertIndexesValid pool
+      unless (null problems) $
         die $
           "apply-indexes: "
-            <> show (length invalid)
-            <> " index(es) exist but are INVALID — DROP and re-create each, a retry will not fix them:"
-            <> concatMap (\i -> "\n  " <> T.unpack i) invalid
-      printGreen ("apply-indexes: all " <> show (length declaredIndexes) <> " declared indexes are valid")
+            <> show (length problems)
+            <> " of "
+            <> show (length declaredIndexes)
+            <> " declared index(es) are MISSING or INVALID:"
+            <> concatMap (\i -> "\n  " <> T.unpack i) problems
+      printGreen
+        ("apply-indexes: all " <> show (length declaredIndexes) <> " declared indexes are present and valid")
     ApplyRoles -> do
       -- Read BEFORE the file is applied. A run that creates the two roles and then dies because a
       -- password is missing leaves two login roles that cannot log in, and the next run would have

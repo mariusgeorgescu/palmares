@@ -1410,9 +1410,12 @@ instance ToSchema EpochParticipationPoint where
 -- applies to @votes@ and @timeline@. A counter published as a literal @0@ is not a measurement of
 -- anything.
 --
--- @total_dreps@ is the universe @\/dreps@ lists by default — the REGISTERED DReps, active plus
--- inactive — and @retired_dreps@ is published beside it rather than inside it. Measured on
--- preprod: 294 registered against 511 retired, which is why the two are never summed.
+-- @total_dreps@ is the universe @\/dreps@ lists by default — the REGISTERED DReps: @active_dreps@
+-- + @inactive_dreps@ + @unknown_dreps@, an identity a client may rely on. @retired_dreps@ is
+-- published beside it rather than inside it. Measured on preprod 2026-10-24: 294 registered
+-- (17 active, 187 inactive, 90 unknown) against 523 retired, which is why the two are never
+-- summed. @unknown_dreps@ is the third term because the ledger records no activity deadline for
+-- those 90, and the sum without it reads as a registry that lost 90 DReps.
 --
 -- The treasury pair is two numbers because the honest answer needs both: 83 withdrawals are
 -- RECORDED on preprod and none has been enacted, so a single field called @withdrawn@ would be
@@ -1426,6 +1429,11 @@ data DashboardPageResponse = DashboardPageResponse
     dashboardTotalDreps :: Int,
     dashboardActiveDreps :: Int,
     dashboardInactiveDreps :: Int,
+    -- | Registered DReps for which the ledger recorded no activity deadline at all, so neither
+    -- @active@ nor @inactive@ can be claimed of them. Published because @total_dreps@ counts them:
+    -- without this field a client reading the other three finds 204 of 294 and no account of the
+    -- rest. Measured on preprod: 90 of the 294. See @GET \/dreps@ for how the status is decided.
+    dashboardUnknownDreps :: Int,
     dashboardRetiredDreps :: Int,
     -- | The epoch the three lovelace figures below are measured at. @null@ only when db-sync has
     -- written no DRep stake distribution at all.

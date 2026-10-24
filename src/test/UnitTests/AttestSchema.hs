@@ -16,7 +16,7 @@
 -- thing that was actually broken.
 module UnitTests.AttestSchema (tests) where
 
-import ChainSyncLogic (parseReadyMaxLagSlots, readyMaxLagSlotsDefault)
+import ChainSyncLogic (SchemaDecision (..), parseReadyMaxLagSlots, readyMaxLagSlotsDefault, schemaDecision)
 import ChainsyncAPI (ChainSyncState (..), SyncMetrics (..), probeDatabase, readyVerdict)
 import Data.List (sort)
 import Data.Text qualified as T
@@ -290,6 +290,33 @@ tests =
           idx <- indexesOn pool attestSchema "profile_projection" "profile_credential"
           assertBool ("no index on profile_credential: " <> show idx) (not (null idx))
           assertEqual ("a UNIQUE index on profile_credential: " <> show idx) [] (filter snd idx),
+      -- `CS-15`: that index above was the ONLY secondary index in the whole schema — verified on the
+      -- live preprod database, where every other entry in `pg_indexes` was a primary key or a unique
+      -- constraint. These three are the equality filters the read API and the projector actually run:
+      -- `subject_profile_id` serves `GET /attestations?subject=`, the whole of
+      -- `GET /profiles/{id}/attestations` AND `Storage.deriveProfileCredential`, which runs that
+      -- predicate once per projected profile event; `issuer_profile_id` serves `issuer=`;
+      -- `target_attestation_id` serves `disputesFor`, on every `GET /attestations/{id}`.
+      --
+      -- Asserted through `runMigrations` rather than by reading the SQL, because these are raw
+      -- statements on UNQUALIFIED table names: the only thing that puts them in `palmares_attest` is
+      -- `runAttest`'s pinned search_path, and a wrong name would surface as a boot-time error on a
+      -- deployed service rather than as a compile error here.
+      --
+      -- NO SCHEMA-VERSION BUMP COMES WITH THEM, which is why they can land on an existing deployment
+      -- at its next restart: an index adds no column, so `migrateAll` has nothing to ALTER, the
+      -- tripwire above still describes the same schema, and nothing wipes.
+      testCase "the three columns every read filters on by equality are indexed, not uniquely" $
+        withScratchDb $ \pool -> do
+          runPg pool ensureAttestSchema
+          runAttest pool runMigrations
+          let hasPlainIndex table column = do
+                idx <- indexesOn pool attestSchema table column
+                assertBool ("no index on " <> T.unpack column <> ": " <> show idx) (not (null idx))
+                assertEqual ("a UNIQUE index on " <> T.unpack column <> ": " <> show idx) [] (filter snd idx)
+          hasPlainIndex "attestation_projection" "subject_profile_id"
+          hasPlainIndex "attestation_projection" "issuer_profile_id"
+          hasPlainIndex "dispute_projection" "target_attestation_id",
       -- THE WRITE PATH, exercised rather than inspected. `putAttestationProjection` was a
       -- 13-argument positional application and is now 16 named fields — but a review pointed out that
       -- nothing in the suite CALLED it, so a transposition among the three GYAssetClass columns would
@@ -364,9 +391,44 @@ tests =
         parseReadyMaxLagSlots (Just "1200 slots") @?= readyMaxLagSlotsDefault
         parseReadyMaxLagSlots (Just "0") @?= readyMaxLagSlotsDefault
         parseReadyMaxLagSlots (Just "-1") @?= readyMaxLagSlotsDefault,
+      -- THE WIPE, `CS-06` / `TD-19`. `needWipe` was one comparison and nothing asked: a schema
+      -- version bump dropped all eight chain-sync tables with `DROP TABLE … CASCADE`, and the only
+      -- warning was a `putStrLn` already scrolling past in a container log. Pure, because the
+      -- decision is two integer comparisons and a parse — no database can be made to produce these
+      -- four cases on demand, which is the same reason query-api's `readyVerdict` is pure.
+      testCase "a fresh database and a matching stored version both migrate, destroying nothing" $ do
+        schemaDecision Nothing currentSchemaVersion Nothing @?= SchemaMigrate
+        schemaDecision Nothing 6 (Just 6) @?= SchemaMigrate
+        -- A confirmation left behind in a manifest changes neither, and that expiry is why the value
+        -- is a VERSION and not `1` or `true`: it authorises the one projection it names, and once
+        -- that wipe has run the stored version IS the current one, so the leftover value authorises
+        -- nothing and the next bump has to ask again.
+        schemaDecision (Just "6") 6 (Just 6) @?= SchemaMigrate,
+      testCase "an older stored version refuses to wipe unless the confirmation names it" $ do
+        schemaDecision Nothing 6 (Just 5) @?= SchemaRefuseWipe 5 6
+        schemaDecision (Just "") 6 (Just 5) @?= SchemaRefuseWipe 5 6
+        -- A boolean-shaped value is not a confirmation: nothing in it says WHICH projection the
+        -- operator agreed to destroy, which is the whole property that makes a leftover value safe.
+        schemaDecision (Just "1") 6 (Just 5) @?= SchemaRefuseWipe 5 6
+        schemaDecision (Just "true") 6 (Just 5) @?= SchemaRefuseWipe 5 6
+        -- Nor is the version this BINARY writes — the number an operator reads off an image tag. It
+        -- names the schema that is not being destroyed.
+        schemaDecision (Just "6") 6 (Just 5) @?= SchemaRefuseWipe 5 6
+        -- The version being destroyed, which is the number the refusal prints.
+        schemaDecision (Just "5") 6 (Just 5) @?= SchemaWipe,
+      -- THE DOWNGRADE, which did not even reach the old comparison's true branch: `needWipe` tested
+      -- `storedVersion < currentSchemaVersion` only, so a binary OLDER than its database fell
+      -- through to `migrateAll` against a shape it does not know — ALTERing columns under rows a
+      -- newer writer wrote. That is data corruption rather than a failed boot, so it is a refusal,
+      -- and the wipe confirmation is deliberately not an override for it: authorising a wipe is not
+      -- the same act as authorising a migration in the wrong direction.
+      testCase "a newer stored version refuses outright, and the wipe confirmation is no override" $ do
+        schemaDecision Nothing 5 (Just 6) @?= SchemaRefuseDowngrade 6 5
+        schemaDecision (Just "6") 5 (Just 6) @?= SchemaRefuseDowngrade 6 5
+        schemaDecision (Just "5") 5 (Just 6) @?= SchemaRefuseDowngrade 6 5,
       -- THE VERDICT, pure, one case per dependency this service has. Each row below is a shape in
       -- which the process is running perfectly and `/ready` used to answer 200.
-      testCase "every dependency failure is a 503 with its own code, and only a fresh cursor is ready" $ do
+      testCase "every dependency failure is a 503 with its own code, and catching up is not one" $ do
         let healthy =
               SyncMetrics
                 { smLocalTip = 137170034,
@@ -384,8 +446,8 @@ tests =
           Nothing
           (verdict healthy {smChainSyncState = Behind False, smLocalTip = 137170032})
         assertEqual
-          "past the threshold"
-          (Just IndexerBehind)
+          "way behind, but ticking: catching up is the job, not a dependency failure"
+          Nothing
           (verdict healthy {smChainSyncState = Behind True, smLocalTip = 137168000})
         assertEqual "the database did not answer" (Just DbUnavailable) (verdict healthy {smDbReady = False})
         assertEqual
@@ -400,6 +462,42 @@ tests =
           "our cursor names a block that is not on the chain"
           (Just NotReady)
           (verdict healthy {smChainSyncState = UpToDateButDifferentBlockHash}),
+      -- THE POST-WIPE RE-SYNC, which is the shape `/ready` answered 503 on for its whole duration.
+      -- `main` boots with `Behind True` and the cursor at slot 0 after a wipe, so this record is
+      -- what every probe sees from the first tick until the backfill has closed a gap of a hundred
+      -- million slots — hours. A Kubernetes rollout gated on this probe never completes, on exactly
+      -- the deploy that bumped the schema version and caused the wipe. Measured: a bump wiped and
+      -- re-indexed and `/ready` was red throughout.
+      --
+      -- Green now, because the projector is working; the gap is still published in the same
+      -- response (`local_tip`, `blockchain_tip`, `is_way_behind`) and still reddens query-api's
+      -- `/ready`, which is the probe in front of the data.
+      testCase "a post-wipe re-sync is READY: the projector is catching up, which is the job" $ do
+        let resyncing =
+              SyncMetrics
+                { smLocalTip = 0,
+                  smBlockchainTip = 137182904,
+                  smLastSyncTime = read "2026-10-24 14:47:15 UTC",
+                  smDbReady = True,
+                  smMigrationsComplete = True,
+                  smChainSyncState = Behind True
+                }
+        -- A tick five seconds old: `fetchingMatches` writes `smLastSyncTime` after every applied
+        -- window, so a running backfill keeps this fresh however far from the tip it is.
+        assertEqual "mid-re-sync, ticking" Nothing (readyVerdict 1200 5 resyncing)
+        -- And the one thing that must still be red in the middle of a re-sync: Kupo gone. The
+        -- tick-age guard is what separates "catching up" from "stopped", and it is the only guard
+        -- that can, because every slot number here is indistinguishable from the stalled case.
+        assertEqual "mid-re-sync, and Kupo stopped answering" (Just IndexerBehind) (readyVerdict 1200 1801 resyncing)
+        -- The two that stay red whatever the gap: both say the cursor itself is unanswerable.
+        assertEqual
+          "mid-re-sync, cursor above Kupo's tip"
+          (Just IndexerBehind)
+          (readyVerdict 1200 5 resyncing {smChainSyncState = Ahead})
+        assertEqual
+          "mid-re-sync, cursor on a fork"
+          (Just NotReady)
+          (readyVerdict 1200 5 resyncing {smChainSyncState = UpToDateButDifferentBlockHash}),
       -- THE KUPO CASE, and the reason the tick's age had to become a signal. `getBlockchainTip`
       -- retries inside the tick, so with Kupo unreachable nothing below it runs: the metrics MVar is
       -- never touched and `chain_sync_state`, `local_tip` and `blockchain_tip` all stand at their

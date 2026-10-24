@@ -40,9 +40,17 @@ tests =
       -- script carries the script PLUS its own inputs, outputs, change and witnesses. 14000 leaves
       -- about 2.4 KB for all of that, which is the margin `deployValidators` actually runs in.
       --
-      -- The MintingPolicy is the one to watch: at 12241 bytes it is 75% of a whole transaction, and
-      -- it is the only script that grows when a redeemer case is added. The four spending validators
-      -- sit between 7.6 and 8.4 KB and have room.
+      -- The MintingPolicy is the one to watch: at 12953 bytes it is 79% of a whole transaction and
+      -- leaves 1047 against the 14000 below, and it is the only script that grows when a redeemer
+      -- case is added. The four spending validators sit between 7856 and 9978 bytes and have room.
+      --
+      -- __Those three figures are READ OFF `expected` below, and were 712 bytes stale.__ This said
+      -- 12241 and "7.6 to 8.4 KB" — 12241 was right at the mint-path entry in the history below and
+      -- has been superseded eight times since, so the one number a reader takes from this file
+      -- without scrolling was the most out-of-date thing in it. A derived figure in prose beside a
+      -- pinned table is the table's weakest point: the pin is asserted every run and the sentence is
+      -- asserted by nobody. Recompute both from `expected`, never from memory, in the same commit
+      -- that moves a size.
       testCase "every validator leaves room for the transaction that deploys it" $
         filter ((> 14_000) . snd) measured @?= []
     ]
@@ -56,6 +64,17 @@ tests =
 -- publishing a CIP-57 @hash@ field that matched no deployment. A measurement against a placeholder
 -- is honest; a published hash derived from one is not, which is the whole difference between these
 -- two uses of the same trick.
+--
+-- __Four of the five pins can be checked WITHOUT a build__, which is worth knowing on a machine that
+-- cannot compile — and it is how the header's stale figures above were caught:
+--
+-- @jq -r '.validators[] | "\\(.title) \\((.compiledCode // "") | length \/ 2 | floor)"' docs\/generated\/palmares-blueprint.json@
+--
+-- agrees byte-for-byte with `expected` on ProfilesValidator, AttestationsValidator,
+-- DisputesValidator and OracleValidator. The MintingPolicy is the one it cannot answer, for the
+-- reason just above — the blueprint ships no @compiledCode@ for it — and a db-sync running
+-- @preset: only_governance@ indexes no @script@ rows either, so the deployed copy is no help. That
+-- fifth number is a build or nothing, and a wrong pin is worse than a stale comment.
 measured :: [(String, Int)]
 measured =
   [ ("ProfilesValidator", profilesValidatorSize),
@@ -105,7 +124,9 @@ measured =
 -- Then the mint-path redeemer checks, and this is the most expensive single change so far:
 --
 --   MintingPolicy 11920 -> 12241  @Mn@ ('validateOtherMetadata') and the CIP-67 reference-prefix
---                                 half of @Mg@ and @Md4@ ('isProtocolRefToken'). The other four did
+--                                 half of @Mg@ and @Md4@ (then @isProtocolRefToken@, since deleted
+--                                 as a byte-identical twin of 'Palmares.Onchain.CIP68.isProfileId';
+--                                 the SIZE recorded here is the one it had). The other four did
 --                                 not budge.
 --
 -- 321 bytes, and almost all of it is @Mn@: the duplicate-key check is a quadratic scan written as

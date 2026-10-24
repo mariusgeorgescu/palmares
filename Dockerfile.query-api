@@ -54,4 +54,16 @@ COPY --from=builder /palmares/query-api /app/query-api
 
 RUN mkdir -p /app/docs/generated/swagger
 
+# TD-11. The earlier "stops running as superuser" commit was about the POSTGRES ROLE; the container
+# itself still ran as uid 0. `nobody` (uid/gid 65534) is alpine's own baselayout account, so the
+# runtime base needs no `adduser` of its own.
+#
+# It can reach everything it needs: `/app/query-api` is landed by COPY as root:root 0755, `/app` is
+# 0755, and Postgres is reached over TCP. It writes NOTHING — the Swagger document is produced by
+# `--write-swagger-only` in CI and no longer on boot (`query-api/Main.hs:40-41` records that move),
+# so the mkdir above is a write path nothing uses any more.
+#
+# LAST instruction before the entrypoint on purpose: every RUN and COPY above needs root.
+USER nobody
+
 ENTRYPOINT ["/app/query-api"]

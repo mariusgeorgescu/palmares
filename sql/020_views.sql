@@ -50,7 +50,10 @@ $$;
 -- /drep/{id}/power measures over 500 ms p95 on preprod — not before, because a matview adds a
 -- refresh thread and a staleness window to maintain.
 --
--- __That threshold was crossed, by a factor of 65, and the answer was not a matview.__ Measured on
+-- __That threshold was crossed, by a factor of 65, and the answer was not a matview.__ (Historical;
+-- the figures in this paragraph predate the index work. The view measures 0.40 s for the same shape
+-- today — see `palmares.drep_delegator_counts` for the re-measurement and for the separate defect
+-- that kept the ROUTE at 11 s long after the view was fast.) Measured on
 -- preprod 2026-10-24: this view for ONE credential over five epochs took 32.9 s, `/drep/{id}` took
 -- 30.8 s and `/drep/{id}/power` exceeded the 30 s statement timeout and served 503 — which also
 -- stopped the Koios parity gate, since the reconciler reads that route. The reason is the window
@@ -130,12 +133,54 @@ GROUP BY i.drep_hash_id, e.epoch_no;
 -- it. Measured on preprod, credential 2 over epochs 316-320: 32.9 s through the view, 1.30 s here,
 -- same five counts.
 --
+-- __Both of those numbers are dated, and one of them was read as a property of the ROUTE when it is
+-- a property of the RANGE.__ Re-measured 2026-10-24 after the index work landed: the view is 0.40 s
+-- for that same five-epoch shape, not 32.9 s, and this function is 0.43 s for five epochs — but
+-- **8.0 s for the 158 epochs the route actually asks for**, because the cost is linear in
+-- (certificates × epochs) and five epochs is 3% of the series. The 1.30 s therefore never described
+-- `/drep/{id}/power`; it described a five-epoch slice of it. That is the honest reading of both
+-- figures, and the reason the `AS MATERIALIZED` below is what closed the route rather than a matview.
+--
 -- A function and not a matview, deliberately: a matview for a per-credential read would add a
 -- refresh thread and a staleness window to a number that is exact and cheap to compute on demand.
 -- Same shape as palmares.eligible_actions above, and for the same reason.
 --
 -- The epoch range is REQUIRED rather than optional: the only caller that wants every epoch is the
 -- view, and an unbounded call here would generate the full series per address for no reader.
+--
+-- __`intervals` IS `AS MATERIALIZED`, AND THAT ONE WORD IS 11 SECONDS.__ Re-measured 2026-10-24:
+-- the pushdown above was only half the fix. With `intervals` inlined, PostgreSQL pulls the
+-- `to_epoch` expression up into the join against `epochs`, so the de-registration lookup lands in
+-- the Nested Loop's JOIN FILTER and is re-executed once per (interval, epoch) PAIR instead of once
+-- per interval. Confirmed on the plan this function actually runs — EXPLAIN (GENERIC_PLAN), since
+-- the body is planned with its parameters unknown:
+--
+--   Join Filter: (s.from_epoch <= generate_series($2, $3)
+--                 AND LEAST(COALESCE(s.next_epoch, ...), COALESCE((SubPlan 1), ...))
+--                       > generate_series($2, $3))
+--
+-- The cost is therefore linear in intervals x epochs. For `drep_always_abstain` that is 5,145
+-- certificates x 158 epochs = 812,910 index lookups on stake_deregistration: 8.0 s inside the
+-- function and 11.0 s for /drep/drep_always_abstain/power end to end. The 1.30 s quoted above was
+-- measured over FIVE epochs, 316-320 (re-measured today: 0.43 s) — the route asks for the whole
+-- series, so that figure never described this caller.
+--
+-- `AS MATERIALIZED` makes the CTE an optimisation barrier: `to_epoch` is computed once per interval
+-- and the join filter becomes two integer comparisons. Measured over epochs 164-321, same plan
+-- shape under EXPLAIN (GENERIC_PLAN):
+--
+--   drep_always_abstain         11.0 s  -> 0.15 s
+--   drep_always_no_confidence    2.28 s -> 0.097 s
+--   largest registered DRep      0.30 s -> 0.012 s
+--   a single-delegator DRep      0.049 s -> 0.050 s   (noise, as it must be: one interval)
+--
+-- Output-identical by construction — materialisation is an evaluation barrier, not a semantic one,
+-- and the body has no volatile functions — and checked anyway over the whole corpus: all 256
+-- delegation targets, epochs 164-321, 19,085 (epoch, count) rows, EXCEPT empty in both directions.
+--
+-- REJECTED, an index: the lookups were already index-served by gov_idx_stake_dereg_addr, there were
+-- simply 158x too many of them. REJECTED, a matview: for the reason the view above states, and it
+-- would now be a refresh thread bought to save 150 ms.
 CREATE FUNCTION palmares.drep_delegator_counts(drep_hash_id bigint, from_epoch int, to_epoch int)
 RETURNS TABLE (epoch_no int, delegator_count bigint)
 LANGUAGE sql
@@ -160,7 +205,7 @@ AS $$
     WHERE dv.addr_id IN (SELECT t.addr_id FROM target t)
     WINDOW w AS (PARTITION BY dv.addr_id ORDER BY b.slot_no, tx.block_index, dv.cert_index)
   ),
-  intervals AS (
+  intervals AS MATERIALIZED (
     SELECT
       s.addr_id,
       s.drep_hash_id,

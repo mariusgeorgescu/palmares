@@ -1,22 +1,39 @@
 # Palmares architecture documentation
 
-This set was written against `main` @ `4eb9117` and reconciled against `main` @ `2bf5bde` (2026-10-23).
+This set was written against `main` @ `4eb9117` and last **fully** reconciled against `main` @
+`2bf5bde` (2026-10-23). It has not been reconciled since, and `main` has moved a long way: **52
+commits** as of 2026-10-24 (`8d31e81`), including the level-1 anchor (ADR 0008), the votes feed
+(ADR 0009), `OC-03`/`OC-05`/`OC-06` on chain and two waves of audit agents.
+
+Read that figure as a floor, not a fact — it is the number this line was stamped with, and the whole
+lesson of these documents is that a number in prose rots. The authority is the repository:
+
+```sh
+git log --oneline 2bf5bde..main | wc -l   # how far past the last reconciliation you are
+git log --oneline 2bf5bde..main -- docs/architecture/   # and what has been patched since, piecemeal
+```
+
+Individual claims below have been corrected past `2bf5bde` without a full re-reconciliation, so a
+`path:line` citation is the thing to trust and a summary sentence is the thing to check.
 
 Written 2026-10-22 against `main` @ `4eb9117`, from the code (every fact cites `path:line`; line numbers
 drift as the code moves). Three documents, one directory of rendered diagrams, and a companion set of
 audit reports in [`../audit/`](../audit/README.md).
 
-**All three documents are now reconciled against `2bf5bde`**, and every diagram has been re-rendered
-from the edited source. `main` moved fourteen commits past `4eb9117`; the audit synthesis maps each of
-them to what it affects ([`../audit/README.md` §9 and §10](../audit/README.md)). What those commits
-changed here, for the record: `Protocol/Id.hs`, `unsafeGetProfile*`,
+**All three documents were reconciled against `2bf5bde`**, and every diagram was re-rendered from the
+edited source at that point. `main` had moved fourteen commits past `4eb9117` by then; the audit
+synthesis maps each of them to what it affects ([`../audit/README.md` §9 and §10](../audit/README.md)).
+What those commits changed here, for the record: `Protocol/Id.hs`, `unsafeGetProfile*`,
 `unsafeGetProtocolParamsFromProfileRefInput` and trace code `K3` no longer exist; `Mp3` went with
-ADR 0003 and `A7`, `D9`, `Da` and `Mc1`–`Mc4` arrived, so the inventory at the end of
-`onchain-protocol.md` §7.7 is **70 codes**, not the 64 an earlier draft of this paragraph claimed
-(64 was `65 − K3` and missed both halves of ADR 0003); `interaction-api` no longer depends on
+ADR 0003 and `A7`, `D9`, `Da` and `Mc1`–`Mc4` arrived; `interaction-api` no longer depends on
 `http-types` / `wai-extra` nor the test suite on `warp`; `admin operator-address` prints three forms;
 and ADR 0003 and D-A moved the HTTP surface, both Swagger versions, the attestation-kind and
 dispute-verdict enums, and the projection schema version.
+
+**The trace-code count is not kept here.** This paragraph used to carry it, and carried `64`, then
+`70`, while the protocol had `74` — a second copy of a number is a second thing to forget. It lives in
+one place, [`onchain-protocol.md` §7.7](onchain-protocol.md), beside the census table that says which
+counting method yields which number and the two commands that re-derive it.
 
 `U2` and `U3` are unreachable, and the history is worth getting right because this paragraph got it
 wrong once. At `4eb9117` the documented chain was real: `unsafeGetProfile` and
@@ -30,7 +47,9 @@ Reconciliation also found claims in these documents that were **already false at
 than drift — the component diagram putting `onchain-lib` behind a node labelled with off-chain
 dependencies is the one that mattered, since "no off-chain deps in `onchain-lib`" is a load-bearing
 claim of this set. Each is listed in the commit that fixed it.
-Six `system-overview-*.svg` files are now behind their Mermaid source — see that file.
+Several `system-overview-*.svg` files are behind their Mermaid source — see that file. The data-path
+diagram joined them on 2026-10-24 (it named one materialized view where the schema has two). The
+Mermaid block is always the authority; `diagrams/README.md` has the renderer.
 
 | Document | Question it answers | Diagrams |
 |---|---|---|

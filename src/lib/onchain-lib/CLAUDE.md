@@ -52,8 +52,11 @@ PlutusTx on-chain code. No off-chain imports (no Aeson, Servant, Swagger). Plutu
 - One-off tokens: require spending a **seed TxOutRef**, derive token name from it.
 - Validate referenced AssetClasses with the TYPED predicate for the kind you mean: `isProfileId` or
   `isAttestationId` from `Palmares.Onchain.CIP68` — symbol AND that kind's CIP-67 label.
-  `isProtocolRefToken` is the untyped ancestor and now means only "is a profile id"; it is kept
-  because `isRefTokenName` is still what `P7` asks of a profile datum. There is no `isDisputeId`: it
+  `isProtocolRefToken` is the untyped ancestor and is now a BYTE-IDENTICAL twin of `isProfileId` —
+  both are `cs == cs' && isRefTokenName tn` — with no production caller left; only
+  `UnitTests.MintInputs` still names it, which is the one thing keeping it compiled. Treat it as dead
+  and reach for the typed predicate. (The half that genuinely is load-bearing is `isRefTokenName`,
+  which `P7` asks of a profile datum; that is a different function.) There is no `isDisputeId`: it
   had no caller, because no redeemer field anywhere names an id of the DISPUTE class — a dispute
   points at things and nothing points at a dispute. Write it back if that changes;
   `isDisputeTokenName` (the half `D8` and `Ingestion` use) is still there.

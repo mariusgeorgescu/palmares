@@ -105,8 +105,10 @@ in `GYTxGameMonad`
 - Missing `INLINEABLE` on cross-module onchain functions
 - Forgetting ProtocolParams: update `ProtocolParams` and redeploy minting policy if new validator hash needed
 - Not checking opPaused: check pause gate if concept involves minting
-- Missing CurrencySymbol validation: validate referenced AssetClasses with `isProtocolRefToken`, which
-  checks the symbol AND the reference prefix — `hasCurrencySymbol` accepts a user token too
+- Missing CurrencySymbol validation: validate referenced AssetClasses with the TYPED predicate for the
+  kind you mean — `isProfileId` or `isAttestationId` — which check the symbol AND that kind's CIP-67
+  label. A symbol-only check accepts a user token; `isProtocolRefToken` is the untyped ancestor, is
+  byte-identical to `isProfileId`, and is dead apart from `UnitTests.MintInputs` — do not reach for it
 - Datum type confusion: use wrapper sum type for multiple datum types at same validator
 - Incomplete skeleton: include all required ref inputs (e.g. oracle), validity range when the contract
   checks time, `mustBeSignedBy` when the contract expects signatories

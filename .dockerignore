@@ -9,6 +9,18 @@ node_modules
 dist
 dist-newstyle
 .direnv
+# `.cabal` IS THE BIG ONE, and it was missing while the two beside it were excluded: measured
+# 2026-10-24 at 3.7 GB against dist-newstyle's 2.5 GB and .direnv's 88 KB. It is `CABAL_DIR` — the
+# package db and the store the Nix/direnv shell points at — and every `docker build` was shipping it
+# to the daemon as build context. Nothing copies it: the builder image primes its OWN store at
+# `/root/.cabal` from `cabal.project.freeze`. Context with it: ~3.6 GiB. Without: ~13 MiB.
+.cabal
+# `out/` is `reconcile-koios --out` and the smoke scripts' reports (5.5 MB of local run output);
+# `experiments/` is the measurement rigs, including a compose project of its own; `.vscode/` is
+# editor state. None is in `extra-source-files`, so no stage can copy any of them.
+out
+experiments
+.vscode
 result
 result-*
 .hie

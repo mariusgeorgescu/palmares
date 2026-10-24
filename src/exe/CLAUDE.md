@@ -56,7 +56,8 @@ Sources in `src/exe/<name>/`.
 - **`Query/Views.hs`**: embeds `sql/*.sql` with `file-embed` and applies it at boot, so a fresh database is
   brought to the current view set by starting the service. Idempotent — every statement is
   `CREATE OR REPLACE` / `CREATE ... IF NOT EXISTS`.
-- **`Query/Refresh.hs`**: the one materialized view's `REFRESH ... CONCURRENTLY` loop, interval from
+- **`Query/Refresh.hs`**: the two matviews' `REFRESH ... CONCURRENTLY` loop — `drep_metrics` then
+  `vote_partition`, one tick for both (`:105`) — interval from
   `PALMARES_VIEW_REFRESH_SECONDS`.
 - **`/metrics/formulas`**: served out of `offchain-lib/Palmares/Metrics/Catalog.hs`, which embeds
   `resources/metric-formulas.json` and `resources/metrics/*.sql` at compile time. The SQL file is the
@@ -87,5 +88,6 @@ Sources in `src/exe/<name>/`.
   (`docs/spec/protocol.md` §4.2) belongs to a BFF that does not exist yet. Only write and admin routes are
   protected.
 - **CORS**: `mkCorsMiddleware` (from env `CORS_ALLOWED_ORIGINS`) as outermost middleware. Empty allowlist
-  denies all cross-origin: fail-closed.
+  denies all cross-origin: fail-closed, and `describeCorsConfig` prints the resolved policy at boot so
+  deny-all is distinguishable from a misread allowlist.
 - **Swagger**: Written to `docs/generated/swagger/` on startup. Do not edit by hand.

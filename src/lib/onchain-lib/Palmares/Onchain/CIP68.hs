@@ -32,7 +32,6 @@ module Palmares.Onchain.CIP68
     validateOtherMetadata,
     maxOtherMetadataEntries,
     isRefTokenName,
-    isProtocolRefToken,
 
     -- * CIP-67 Token Name Derivation
     generateRefAndUserTN,
@@ -219,13 +218,21 @@ validateOtherMetadata entries =
 isRefTokenName :: TokenName -> Bool
 isRefTokenName (TokenName bs) = sliceByteString 0 4 bs == refTokenPrefixBS
 
--- | Is this asset class a protocol REFERENCE token: right policy, right CIP-67 prefix?
+-- @isProtocolRefToken@ — "right policy, right CIP-67 prefix" — is gone. It was the untyped ancestor
+-- of the typed predicates below and had become a BYTE-IDENTICAL twin of 'isProfileId'
+-- (@cs == cs' && isRefTokenName tn@, both of them), with no caller in any validator: @Mg@ asks
+-- 'isProfileId' and @Md4@ asks 'isAttestationId'. Two names for one predicate is one name too many,
+-- which is the same reason @isDisputeId@ went.
 --
--- The pair of checks a protocol id has to pass, kept together because passing only the first was
--- the finding. 'isRefTokenName' above says what naming a user token instead buys an attacker.
-{-# INLINEABLE isProtocolRefToken #-}
-isProtocolRefToken :: AssetClass -> CurrencySymbol -> Bool
-isProtocolRefToken (AssetClass (cs, tn)) cs' = cs == cs' && isRefTokenName tn
+-- __Its last three callers were ASSERTIONS__, in @UnitTests.MintInputs@, which is why an audit row
+-- reading "zero callers" was not enough to act on: deleting the binding would have stopped the test
+-- module compiling. The three now assert the same predicate under its live name, in the same commit.
+--
+-- Hash-neutral for the reason it was dead: @INLINEABLE@ makes an unfolding AVAILABLE to the PlutusTx
+-- plugin, it does not make the plugin take it, and no @compile@ splice's call graph reached this
+-- binding. Commit @3654f57@ demonstrated the same thing by deleting nine such bindings from these
+-- very modules without moving a single pinned script size. 'isRefTokenName' above is the half that
+-- IS load-bearing — @P7@ passes it to 'Palmares.Onchain.Utils.isUnbackedDatum' — and stays.
 
 -------------------------------------------------------------------------------
 
@@ -253,7 +260,7 @@ isProtocolRefToken (AssetClass (cs, tn)) cs' = cs == cs' && isRefTokenName tn
 --
 -- __Why private use and not a new registered label.__ CIP-67 reserves labels 0-15 for private use,
 -- which is the spec's own answer for a protocol that needs its own classes; and the policy id already
--- scopes every check here ('isProtocolRefToken' compares the currency symbol), so a private label
+-- scopes every check here (each predicate compares the currency symbol), so a private label
 -- under our own policy is unambiguous. Profiles keep 100/222 because a profile genuinely IS a CIP-68
 -- pair — it has a user token and a wallet should see it as one. An attestation and a dispute have no
 -- user token, so CIP-68 pairing is meaningless for them and squatting its labels would say something
@@ -267,7 +274,8 @@ isAttestationTokenName (TokenName bs) = sliceByteString 0 4 bs == attestationTok
 isDisputeTokenName :: TokenName -> Bool
 isDisputeTokenName (TokenName bs) = sliceByteString 0 4 bs == disputeTokenPrefixBS
 
--- | Right policy AND a profile id: the typed replacement for 'isProtocolRefToken' wherever the thing
+-- | Right policy AND a profile id: the typed replacement for the untyped ancestor named above,
+-- wherever the thing
 -- being named must be a PROFILE.
 {-# INLINEABLE isProfileId #-}
 isProfileId :: AssetClass -> CurrencySymbol -> Bool

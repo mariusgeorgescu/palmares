@@ -225,5 +225,29 @@ else
   echo "ok   no schema file applied whole contains a '?'"
 fi
 
+# ---------------------------------------------------------------------------------------------
+# The ONE parse failure this project writes to be published, and the marker that publishes it.
+#
+# `FromJSON AdminActionType` always fails, and its message says where admin actions belong — it is a
+# 400 body a client reads. `WebAPI/Errors.hs` replaces every other aeson failure with a generic
+# message, because those name Haskell constructors and record fields; it passes THIS one through by
+# recognising the type name the instance leads with.
+#
+# The two sides cannot share a constant: webapi-lib depends on no project library, by design. So the
+# convention is held here. Lose either end and the 400 silently goes back to sending a client to look
+# at the query string for a refused admin action — measured, by the interaction-api smoke.
+echo
+amsg='src/lib/offchain-lib/Palmares/DomainTypes/Core/Actions.hs'
+amark='src/lib/webapi-lib/Palmares/WebAPI/Errors.hs'
+if grep -q '"AdminActionType: admin actions are not accepted over HTTP' "$amsg" \
+  && grep -q 'publishableMarker = "AdminActionType: "' "$amark"; then
+  echo "ok   the admin-action refusal is written to be read, and the formatter still publishes it"
+else
+  echo "FAIL the publishable admin-action refusal lost one of its two ends:"
+  echo "       $amsg must \`fail\` with a message beginning \"AdminActionType: \""
+  echo "       $amark must keep publishableMarker = \"AdminActionType: \""
+  fail=1
+fi
+
 if [ "$fail" = 0 ]; then echo "vocabulary OK"; else echo "vocabulary FAILED"; fi
 exit $fail

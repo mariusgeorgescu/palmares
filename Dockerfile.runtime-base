@@ -55,3 +55,14 @@ RUN apk add --no-cache --virtual .blst-deps build-base git && \
 
 # Clean up all build deps
 RUN apk del .build-deps .secp-deps .blst-deps 2>/dev/null || true
+
+# NO `USER` HERE, DELIBERATELY — TD-11 is closed in the four service images instead, each of which
+# ends `USER nobody`. Two reasons it belongs there and not here. This image is only ever a `FROM`
+# target: it has no entrypoint and nothing starts it as a container, while every `RUN` above does
+# `make install` into `/usr` and needs root. And setting it here would silently demote the children's
+# own `WORKDIR`, `COPY --from` and `mkdir` steps, which is a build-time behaviour change nobody can
+# verify without running the four builds.
+#
+# The account the children use is `nobody` (uid/gid 65534) out of alpine's baselayout `/etc/passwd`,
+# so no `adduser` is needed; if a dedicated uid is ever wanted for volume ownership, this is the file
+# that grows the `adduser` line and the four `USER` lines that follow it.

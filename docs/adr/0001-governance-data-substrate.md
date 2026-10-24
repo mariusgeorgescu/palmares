@@ -9,9 +9,15 @@ Date: 2026-10-20
 Governance data comes from **cardano-db-sync 13.7.1.0** (image `ghcr.io/blinklabs-io/cardano-db-sync`,
 pinned by digest; arm64), with `preset: only_governance`, `ledger: enable`, `shelley: enable: true` and
 `offchain_vote_data: enable`. Our layer adds two schemas to db-sync's own `cexplorer` database —
-`palmares` (nineteen read-only views, one materialized view, two SQL functions and one single-row
-`schema_fingerprint` table that gates the boot DDL) and `palmares_attest` — and no governance
-projection tables.
+`palmares` (read-only views, the materialized views and SQL functions `sql/` declares, and one
+single-row `schema_fingerprint` table that gates the boot DDL) and `palmares_attest` — and no
+governance projection tables.
+
+The object counts are deliberately not written out here. `sql/` is the authority and
+`SELECT matviewname FROM pg_matviews WHERE schemaname='palmares'` is the live check; the matview count
+in particular was stated as one in four documents while the schema had held two since
+`vote_partition` (`sql/020_views.sql`), which is the whole reason this paragraph now points instead of
+counting.
 
 The sync is run **from genesis**. This is a correctness requirement, not a completeness one: db-sync's
 13.6.0.4 Known Issue states that pre-upgrade `drep_distribution` values "are not well defined and could
@@ -58,7 +64,7 @@ two memory readings interesting rather than redundant.
 | wall-clock to tip (preprod, from genesis) | **≤ 7 h** — caught up at ≈9× real time, then followed live at 1:1 (114 slots per 114 s of wall clock). The exact crossover was not logged. | Experiment A |
 | database size | 5,909 MB logical / 10.43 GB volume | **6,260 MB** logical / **10.26 GB** volume |
 | top relations | `block` 2,323 · `tx` 1,759 · `epoch_stake` 747 · `voting_procedure` 331 · `reward` 324 · `stake_address` 145 · `committee_hash` 135 · `committee_registration` 56 (MB) | `block` **2,530** · `tx` 1,765 · `epoch_stake` 747 · `voting_procedure` **410** · `reward` 324 · `stake_address` 146 · `committee_hash` 135 · `committee_registration` **110** |
-| __our own schema__ | not measured | **0 tables, 19 views, 1 materialized view, 680 kB** — 0.01% of the database, which is the "no governance projection tables" decision as a number |
+| __our own schema__ | not measured | **0 tables, 19 views, 1 materialized view, 680 kB** — 0.01% of the database, which is the "no governance projection tables" decision as a number. __Re-measured 2026-10-24: 1 table, 19 views, 2 materialized views, 1,104 kB — 0.017% of 6,294 MB.__ The second matview is `vote_partition`, the table is the single-row `schema_fingerprint` of `GV-01`; zero governance projection tables either way, which is the claim this row exists to make. Re-measure with one statement rather than trusting either reading: `SELECT c.relkind, count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='palmares' GROUP BY 1` |
 | db-sync ledger state on disk | 2.9 GiB (3 retained snapshots) | 2.9 GiB / **3.09 GB** volume |
 | node chain db | 20.18 GB | **21.28 GB** |
 | peak RSS of db-sync | **5.90 GiB anon** against a 6 GiB cap, **4,183** `max` reclaim events, 0 OOM kills | **5.06 GiB anon** against the same cap, **35** reclaim events, 0 OOM kills |
@@ -105,9 +111,11 @@ chain.
   (2,530 MB) and `tx` (1,765 MB) are, and together they are 69% of the database. So pruning `epoch_stake`
   buys only **11.9%** of the disk and is a weak first fallback; on preprod the whole database is small
   enough that none of this matters, and on mainnet the lever is hardware, not pruning.
-- The read layer this product adds is **680 kB**: nineteen views, one materialized view, zero
-  governance tables, and (since `GV-01`) one single-row `schema_fingerprint` table that gates the
-  boot DDL. Whatever the substrate costs, it is not us.
+- The read layer this product adds was **680 kB** at the 2026-10-21 reading and is **1,104 kB** at
+  2026-10-24: nineteen views, **two** materialized views (`drep_metrics` 456 kB, `vote_partition`
+  280 kB — the matviews are most of it), zero governance tables, and (since `GV-01`) one single-row
+  `schema_fingerprint` table that gates the boot DDL. Whatever the substrate costs, it is not us: the
+  ratio moved from 0.01% to 0.017% of a 6,294 MB database.
 - `tx.fee` is `0` under this preset (`tx_out: disable`), `off_chain_pool_data` is empty (SPO pages show
   hashes, not tickers), and constitution anchors are never fetched. These are accepted limitations.
 - Mainnet needs a 48–64 GB x86_64 host; the arm64 Pi cluster is preprod-only for this workload.
