@@ -508,6 +508,18 @@ assert "/attestations/$ATT" '.disputes[0].verdict' '"upheld"'
 # An upheld dispute does not delete or hide the attestation, and does not un-accept it.
 assert "/attestations/$ATT" '.attestation.accepted' 'true'
 assert "/profiles/$SUBJECT/attestations" '.total' '2'
+# `RL-3`: and the LIST surfaces say so too. This is the assertion that was missing while the
+# promise was broken — `accepted: true` with an upheld dispute and no marker was exactly what
+# `GET /attestations` and the track record published, because only the detail route inlined the
+# disputes. Asserted on BOTH list routes and on the detail row, from one SQL expression.
+assert "/attestations?subject=$SUBJECT&limit=50" \
+  "[.items[] | select(.id == \"$ATT\") | [.accepted, .dispute_count, .open_dispute_count, .upheld_dispute_count]][0]" \
+  '[true,1,0,1]'
+assert "/profiles/$SUBJECT/attestations" \
+  "[.items[] | select(.id == \"$ATT\") | [.dispute_count, .upheld_dispute_count]][0]" '[1,1]'
+assert "/attestations/$ATT" '[.attestation.dispute_count, .attestation.open_dispute_count, .attestation.upheld_dispute_count]' '[1,0,1]'
+# The other attestation of this subject has none, so the count is per row and not per page.
+assert "/profiles/$SUBJECT/attestations" '[.items[] | .dispute_count] | add' '1'
 
 # ---------------------------------------------------------------------------------------------
 step 7 "the level-1 anchor — money linked to delivery, and a pointer that resolves to nothing"

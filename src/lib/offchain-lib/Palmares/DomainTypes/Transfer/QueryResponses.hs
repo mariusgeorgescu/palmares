@@ -1891,6 +1891,20 @@ data AttestProfileRow = AttestProfileRow
     attestProfileKind :: Core.ProfileType,
     attestProfileCredential :: Maybe Text,
     attestProfileCredentialIsScript :: Maybe Bool,
+    -- | How many profiles claim this row's credential, this one included — @1@ when nobody else
+    -- does, and @null@ when the row claims no credential at all.
+    --
+    -- __`RL-6`: the ingest path does not refuse a second claim, it reports the contest__ — and the
+    -- contest was reportable from one direction only. @GET \/profiles\/by-credential\/{id}@ answers
+    -- @total > 1@, so a screen that starts from a CREDENTIAL could see it; a screen that starts from
+    -- a PROFILE, which is the normal direction for a verification page, could not see it at all.
+    -- Measured on preprod: six profiles claim one DRep credential and every one of their rows
+    -- published the credential as if it were theirs alone.
+    --
+    -- __@null@ rather than @0@ or @1@ for an unclaimed row.__ \"How many claim nothing\" is not a
+    -- question with an answer, and @1@ would read as \"one profile claims this credential\" about a
+    -- profile that claims none. @null@ here means the same as @credential: null@ beside it.
+    attestProfileClaimantCount :: Maybe Int,
     attestProfileSlot :: Integer,
     attestProfileBlockHash :: Text
   }
@@ -1931,7 +1945,29 @@ data AttestationRow = AttestationRow
     attestationRowSlot :: Integer,
     attestationRowBlockHash :: Text,
     attestationRowTxHash :: Text,
-    attestationRowOutputIndex :: Int
+    attestationRowOutputIndex :: Int,
+    -- | Disputes ever opened against this attestation, whatever became of them. @0@ for almost
+    -- every row.
+    --
+    -- __`RL-3`: the list surface broke a promise the protocol keeps.__ A disputed attestation is
+    -- never hidden or deleted — the projection is upsert-only and no route removes one — and the
+    -- dispute is meant to be shown BESIDE it. That held on @GET \/attestations\/{id}@, which inlines
+    -- the disputes, and nowhere else: a list row for an attestation with an __upheld__ dispute
+    -- published @accepted: true@ and not one word about the challenge. Both @GET \/attestations@ and
+    -- the track record @GET \/profiles\/{id}\/attestations@ go through the same query, so both
+    -- surfaces showed a contested record as a clean one.
+    attestationRowDisputeCount :: Int,
+    -- | Disputes with no verdict yet — someone has challenged this and nobody has decided.
+    attestationRowOpenDisputeCount :: Int,
+    -- | Disputes decided AGAINST the attestation.
+    --
+    -- __The third count, and the one the two others cannot substitute for.__ With only a total and
+    -- an open count, @1@ and @0@ is indistinguishable between upheld, rejected and expired — and
+    -- those mean opposite things about the record. @expired@ in particular is explicitly not a
+    -- verdict on the merits (D-A): the clock ran out and nobody decided, so counting it as
+    -- contested-and-proven would publish a conclusion nobody reached. Only this field says the
+    -- challenge was sustained, which is the fact `RL-3` is about.
+    attestationRowUpheldDisputeCount :: Int
   }
   deriving stock (Show, Eq, Generic)
   deriving (FromJSON, ToJSON)

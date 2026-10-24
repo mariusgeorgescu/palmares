@@ -39,8 +39,19 @@ echo "== swagger metadata"
 # 1.8.0 adds `route_not_found`, which is the third of those router refusals and the last one that
 # answered with zero bytes and no content type. 1.9.0 adds `unknown_dreps` to the dashboard, the
 # field that makes its three registered counts sum to `total_dreps`. 1.10.0 adds
-# `/status.missing_indexes`, which names the index set a db-sync re-sync dropped.
-check "version is 1.10.0" '.info.version == "1.10.0"'
+# `/status.missing_indexes`, which names the index set a db-sync re-sync dropped. 1.11.0 adds the
+# three dispute counts to `AttestationRow` (`RL-3`).
+check "version is 1.12.0" '.info.version == "1.12.0"'
+# `RL-6`: optional, so x-nullable — a profile that claims no credential has no claimant count, and
+# `0` or `1` there would both be a claim about a credential that does not exist.
+check "a profile row carries claimant_count, nullable" \
+  '(.definitions.AttestProfileRow.properties.claimant_count["x-nullable"] == true)
+     and (.definitions.AttestProfileRow.required | index("claimant_count") == null)'
+# All three, and required: `0` is the answer for almost every attestation and is a measurement. A
+# nullable count would let a client read "unknown" as "clean", which is the defect `RL-3` names.
+check "an attestation row carries all three dispute counts, none of them nullable" \
+  '[.definitions.AttestationRow.required[] | select(test("dispute_count"))] | sort
+     == ["dispute_count","open_dispute_count","upheld_dispute_count"]'
 # D-A. A client that SWITCHES on the verdict gains a case here, and one that renders `expired` as a
 # finding is wrong — which is the whole reason the value is in the published enum rather than left
 # to a null and a comment.
@@ -304,17 +315,18 @@ echo "== nullability"
 #
 # What this fixed: the document had NO `x-nullable` at all, so a generated TypeScript client typed
 # 127 properties across 61 definitions as non-null and threw on the first row that carried a `null`.
-# (132 now: `level1_anchor` and the four nullable fields of the two anchor schemas behind it.)
+# (133 now: `level1_anchor` and the four nullable fields of the two anchor schemas behind it, plus
+# `claimant_count` on `AttestProfileRow` — `RL-6`, null for a profile that claims no credential.)
 # The encoders always emit the key (`UnitTests.GovDto` pins that), so every one of those fields is
 # reachable as `null` by a client that did nothing wrong.
 check "every property absent from required carries x-nullable" \
   '[.definitions | to_entries[] | (.value.required // []) as $req | (.value.properties // {}) | to_entries[] | .key as $k | select(($req | index($k)) == null) | (.value["x-nullable"] == true)] | all'
 check "and no required property carries it" \
   '[.definitions | to_entries[] | (.value.required // []) as $req | (.value.properties // {}) | to_entries[] | .key as $k | select(($req | index($k)) != null) | (.value | has("x-nullable") | not)] | all'
-# The COUNT, for the same reason the path count is here: 132 is what is measured today, and a change to
+# The COUNT, for the same reason the path count is here: 133 is what is measured today, and a change to
 # it is a wire-contract change that should arrive as a reviewed diff rather than as nothing.
-check "132 nullable properties" \
-  '[.definitions | to_entries[] | (.value.required // []) as $req | (.value.properties // {}) | to_entries[] | .key as $k | select(($req | index($k)) == null)] | length == 132'
+check "133 nullable properties" \
+  '[.definitions | to_entries[] | (.value.required // []) as $req | (.value.properties // {}) | to_entries[] | .key as $k | select(($req | index($k)) == null)] | length == 133'
 # Three by name, because they are the ones a client meets first: the envelope's own `total` (null on
 # the cursor-paged feed and nowhere else), a scalar inside a row, and a whole nested object behind a
 # `$ref` — the case a strict Swagger 2.0 reader may ignore and the reason the document says so.

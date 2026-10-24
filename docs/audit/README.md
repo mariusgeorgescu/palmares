@@ -529,7 +529,9 @@ The 25 genuinely open rows are concentrated in two places and neither blocks a d
 `CREATE OR REPLACE` idempotence that is a `DROP SCHEMA … CASCADE`, a one-of-two parameterised scripts
 claim and an ~80-line validator bound that two of four validators exceed by 35 and 57 lines; and the
 product gaps that were always F2 — no explorer, no CIP-95 wallet flow exercised, no rate limiting, no
-Prometheus endpoint, no `dispute_count` on list rows. Three rows fail something: `NEW-DC-3`
+Prometheus endpoint, no `dispute_count` on list rows. **All of the `CLAUDE.md` half, and `RL-3`, closed
+on 2026-10-24 — see "Closed since this pass" below**; the paragraph stays as what the pass found.
+Three rows fail something: `NEW-DC-3`
 (`scripts/smoke_interaction_api.sh:72` asserts Swagger `3.3.0` against a served `3.5.0`, so F1 check
 12's smoke half fails on a correct deployment), `NEW-DC-17`/`NEW-DC-18` (the smoke runbook's step table
 predates `/claim-credential`).
@@ -576,5 +578,30 @@ were behind their Mermaid source. Re-rendering all ten blocks at HEAD changed **
 (`-04`, the governance read path, the matview count). The other nine came out byte-identical. A
 staleness count asserted without re-running the renderer, which reads as six diagrams not to trust.
 
-What remains of the 25 is the product gaps that were always F2: no explorer, no CIP-95 wallet flow
-exercised, no rate limiting, no Prometheus endpoint, no `dispute_count` on list rows.
+**`RL-3` closed too, and it was not a gap — it was a broken promise.** The specification says a
+disputed attestation is never hidden or deleted and the dispute is shown BESIDE it. That held on
+`GET /attestations/{id}`, which inlines the disputes, and nowhere else: a list row for an attestation
+with an **upheld** dispute published `accepted: true` and not one word about the challenge, on
+`GET /attestations` and on the track record `GET /profiles/{id}/attestations` alike. `AttestationRow`
+now carries `dispute_count`, `open_dispute_count` and `upheld_dispute_count` from one
+`LEFT JOIN LATERAL` shared by the list and detail queries, so the two cannot disagree about whether a
+record is contested. The third count is beyond what `PG-15` asked for and is the one that matters:
+`1` total with `0` open is indistinguishable between upheld, rejected and expired, and `expired` is
+explicitly **not** a verdict on the merits (D-A), so counting it as contested-and-proven would publish
+a conclusion nobody reached. Measured on preprod: four rows with `accepted: true` and
+`upheld_dispute_count: 1`. Swagger 1.11.0, gated; asserted on both list routes and the detail row by
+`smoke_attest_flow.sh` step 6 and by `smoke_query_api.sh`.
+
+**`RL-6` with it, which is the same promise from the other side.** The specification says a duplicate
+credential claim is *reported as contested* rather than refused at ingest — so the report has to exist.
+It existed in one direction: `GET /profiles/by-credential/{id}` answers `total > 1`, which a screen
+that starts from a CREDENTIAL can read. A verification screen starts from a PROFILE, and from there
+the contest was invisible. `AttestProfileRow.claimant_count` now says it, `null` when the row claims
+no credential, from a lateral shared by the list and by-id queries. Measured on preprod: six profiles
+claim one DRep credential, and the smoke asserts that `by-credential`'s `.total` equals the number
+every one of its rows publishes — the two directions are now one fact. Swagger 1.12.0, gated,
+including the pinned nullable-property count, which went 132 → 133 and caught the addition by itself.
+
+So `PG-15` is closed in both halves. What remains of the 25 is the product gaps that were always F2:
+no explorer, no CIP-95 wallet flow exercised, no rate limiting (query-api is public and rate limiting
+is the BFF's job by its own design note), and no Prometheus endpoint.

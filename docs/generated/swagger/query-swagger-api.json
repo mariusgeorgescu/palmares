@@ -163,6 +163,12 @@
                 "block_hash": {
                     "type": "string"
                 },
+                "claimant_count": {
+                    "maximum": 9223372036854775807,
+                    "minimum": -9223372036854775808,
+                    "type": "integer",
+                    "x-nullable": true
+                },
                 "credential": {
                     "type": "string",
                     "x-nullable": true
@@ -266,6 +272,11 @@
                 "description": {
                     "type": "string"
                 },
+                "dispute_count": {
+                    "maximum": 9223372036854775807,
+                    "minimum": -9223372036854775808,
+                    "type": "integer"
+                },
                 "id": {
                     "$ref": "#/definitions/GYAssetClass"
                 },
@@ -280,6 +291,11 @@
                 },
                 "name": {
                     "type": "string"
+                },
+                "open_dispute_count": {
+                    "maximum": 9223372036854775807,
+                    "minimum": -9223372036854775808,
+                    "type": "integer"
                 },
                 "other_metadata": {
                     "items": {
@@ -310,6 +326,11 @@
                 },
                 "tx_hash": {
                     "type": "string"
+                },
+                "upheld_dispute_count": {
+                    "maximum": 9223372036854775807,
+                    "minimum": -9223372036854775808,
+                    "type": "integer"
                 }
             },
             "required": [
@@ -326,7 +347,10 @@
                 "slot",
                 "block_hash",
                 "tx_hash",
-                "output_index"
+                "output_index",
+                "dispute_count",
+                "open_dispute_count",
+                "upheld_dispute_count"
             ],
             "type": "object"
         },
@@ -2906,7 +2930,7 @@
             "name": "Apache-2.0"
         },
         "title": "Palmares Query API",
-        "version": "1.10.0"
+        "version": "1.12.0"
     },
     "paths": {
         "/activity": {

@@ -36,7 +36,11 @@ PlutusTx on-chain code. No off-chain imports (no Aeson, Servant, Swagger). Plutu
   path. `Protocol/Id.hs` used to hold a second one with zero callers and has been deleted; if you are
   reading an older commit, that module is not where a new derivation goes.
 - **Datum optimization**: Derive IDs from datum fields, don't store derivable IDs. Reduces datum size and min-ADA.
-- **ProtocolParams**: Carried in datums for unparameterized validators. Only MintingPolicy is parameterized.
+- **ProtocolParams**: Carried in datums for unparameterized validators. **TWO of the six scripts are
+  parameterized**, not one: `MintingPolicy` by `ProtocolParams` (the three validator hashes + the oracle
+  token's `AssetClass`) and `OracleNFTPolicy` by a `TxOutRef` (the seed that makes it one-shot). Those
+  two are exactly the scripts the CIP-57 blueprint publishes **no hash** for, because each deployment
+  applies different arguments — the other four publish theirs and those four are frozen on preprod.
 - **Address resolution**: ProfilesValidator, AttestationsValidator and DisputesValidator are
   **unparameterized**, and none of them resolves a sibling validator's address at all — the only field
   any of them reads out of `protocolParams` is `oracleToken`. The three script hashes are read by the

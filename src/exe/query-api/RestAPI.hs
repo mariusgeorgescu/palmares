@@ -1986,7 +1986,17 @@ apiSwagger =
     -- empty when healthy. `GV-17` — the 23 index definitions live in db-sync's own `public` schema,
     -- so its migrations take them along and nothing here re-applies them; the service then answers
     -- every committee query with a 30 s 503 and nothing said why.
-    & info . Data.Swagger.version .~ "1.10.0"
+    --
+    -- 1.11.0 adds three counts to `AttestationRow`: `dispute_count`, `open_dispute_count` and
+    -- `upheld_dispute_count`. `RL-3` — a disputed attestation is never hidden and the dispute is
+    -- shown beside it, which held on the detail route and nowhere else: a list row for an
+    -- attestation with an UPHELD dispute published `accepted: true` and nothing about the challenge.
+    --
+    -- 1.12.0 adds `claimant_count` to `AttestProfileRow`: how many profiles claim this row's
+    -- credential, `null` when it claims none. `RL-6` — the ingest path reports a duplicate claim as
+    -- contested rather than refusing it, and the contest was visible from the credential direction
+    -- only. Measured on preprod: six profiles claim one DRep credential.
+    & info . Data.Swagger.version .~ "1.12.0"
     & info . Data.Swagger.description
       ?~ "Read-only queries over the Cardano governance record: DReps, governance actions, votes, \
          \delegations, the constitutional committee and treasury withdrawals. Every row comes from \

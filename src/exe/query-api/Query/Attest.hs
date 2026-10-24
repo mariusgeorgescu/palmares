@@ -240,6 +240,55 @@ profileTable = "palmares_attest.profile_projection"
 attestationTable = "palmares_attest.attestation_projection"
 disputeTable = "palmares_attest.dispute_projection"
 
+-- | How many profiles claim this row's credential — `RL-6`.
+--
+-- Same shape and same reason as 'disputeTallyLateral': one fragment for the list query and the
+-- by-id query, one index scan per returned row against @profile_projection_credential_idx@, and
+-- @NULL@ propagates on its own for a row that claims no credential — the lateral's @WHERE@ compares
+-- @p.profile_credential = profile_projection.profile_credential@, which is never true of @NULL@, so
+-- @count(*)@ over no rows would be @0@. It is lifted to @NULL@ in Haskell instead, where the
+-- distinction between "nobody else claims it" and "there is nothing to claim" is a @Maybe@ and not
+-- a magic number.
+--
+-- No bound parameter, so there is no @claimantParams@: the comparison is column to column.
+claimantLateral :: Text
+claimantLateral =
+  " LEFT JOIN LATERAL (SELECT count(*) AS claimants FROM "
+    <> profileTable
+    <> " p WHERE p.profile_credential = profile_projection.profile_credential) cc ON TRUE "
+
+-- | The three dispute counts every attestation row carries — `RL-3`.
+--
+-- __One fragment, used by the list query and by the detail query__, so the two cannot disagree about
+-- whether a record is contested. The detail route could have counted the disputes it already inlines,
+-- and that would be wrong above 'inlineDisputeLimit': a truncated list of fifty would publish
+-- @dispute_count: 50@ for an attestation with a thousand. Counting in SQL both times is also the only
+-- version where the number on a list row and the number on the detail page come from one expression.
+--
+-- __@LEFT JOIN LATERAL@ and not three correlated subqueries or a grouped join.__ The lateral runs one
+-- index scan per returned row against @dispute_projection_target_idx@ and reads three counts off it;
+-- a grouped subquery would aggregate the whole dispute table per request, which is free at three rows
+-- and a sequential scan at a million.
+--
+-- __The verdict travels as a BOUND PARAMETER__, which is why this comes with 'disputeTallyParams'.
+-- @DisputeVerdict@ is persisted through @derivePersistFieldJSON@, so the stored value is @\"upheld\"@
+-- __with the quotes__ and the literal in SQL would have to be @\'\"upheld\"\'@. Binding it instead makes
+-- the comparison use the same 'PersistField' instance that wrote the row, so a change to the encoding
+-- cannot leave this silently counting zero.
+disputeTallyLateral :: Text
+disputeTallyLateral =
+  " LEFT JOIN LATERAL (SELECT count(*) AS total, \
+  \count(*) FILTER (WHERE d.verdict IS NULL) AS open_count, \
+  \count(*) FILTER (WHERE d.verdict = ?) AS upheld_count \
+  \FROM "
+    <> disputeTable
+    <> " d WHERE d.target_attestation_id = attestation_projection.attestation_id) dc ON TRUE "
+
+-- | The one parameter 'disputeTallyLateral' binds. Positional: it precedes every filter parameter,
+-- because the lateral is written before the @WHERE@ clause.
+disputeTallyParams :: [PersistValue]
+disputeTallyParams = [toPersistValue Core.VerdictUpheld]
+
 -- | A clause with one bound parameter, contributed only when the filter value is present.
 one :: (PersistField a) => Text -> Maybe a -> [(Text, [PersistValue])]
 one sql = maybe [] (\v -> [(sql, [toPersistValue v])])
@@ -342,9 +391,10 @@ listProfiles ::
   SqlPersistT IO (Page AttestProfileRow)
 listProfiles f (ob, so) (lim, off) = do
   rows <-
-    rawSql
-      ( "SELECT ?? FROM "
+    rawSql @(Entity ProfileProjection, Single Int)
+      ( "SELECT ??, cc.claimants FROM "
           <> profileTable
+          <> claimantLateral
           <> whereSql
           <> " "
           <> orderClause (profileSortSpec ob) so
@@ -352,7 +402,7 @@ listProfiles f (ob, so) (lim, off) = do
       )
       (params <> [toPersistValue lim, toPersistValue off])
   total <- countIn profileTable whereSql params
-  pure (Page (map (toProfileRow . entityVal) rows) (Just total) lim off Nothing)
+  pure (Page (map profileWithClaimants rows) (Just total) lim off Nothing)
   where
     (whereSql, params) = profileWhere f
 
@@ -360,13 +410,21 @@ listProfiles f (ob, so) (lim, off) = do
 profileById :: Core.ProfileRefAC -> SqlPersistT IO (Maybe AttestProfileRow)
 profileById pid = do
   rows <-
-    rawSql
-      ("SELECT ?? FROM " <> profileTable <> " WHERE profile_projection.profile_id = ? LIMIT 1")
+    rawSql @(Entity ProfileProjection, Single Int)
+      ( "SELECT ??, cc.claimants FROM "
+          <> profileTable
+          <> claimantLateral
+          <> " WHERE profile_projection.profile_id = ? LIMIT 1"
+      )
       [toPersistValue pid]
-  pure (case rows of (r : _) -> Just (toProfileRow (entityVal r)); [] -> Nothing)
+  pure (case rows of (r : _) -> Just (profileWithClaimants r); [] -> Nothing)
 
-toProfileRow :: ProfileProjection -> AttestProfileRow
-toProfileRow p =
+-- | Decode one joined profile row: the projection plus the claimant count 'claimantLateral' gave.
+profileWithClaimants :: (Entity ProfileProjection, Single Int) -> AttestProfileRow
+profileWithClaimants (Entity _ p, Single claimants) = toProfileRow (Just claimants) p
+
+toProfileRow :: Maybe Int -> ProfileProjection -> AttestProfileRow
+toProfileRow claimants p =
   AttestProfileRow
     { attestProfileId = profileProjectionProfileId p,
       attestProfileName = profileProjectionProfileName p,
@@ -376,6 +434,13 @@ toProfileRow p =
       attestProfileCredential = profileProjectionProfileCredential p,
       -- Decoded from the stored identifier's header byte, never inferred: see 'credentialIsScript'.
       attestProfileCredentialIsScript = profileProjectionProfileCredential p >>= credentialIsScript,
+      -- `RL-6`. Lifted to `Nothing` when the row claims no credential: the lateral's column-to-column
+      -- comparison is never true of NULL, so it counts zero rows, and `0` would read as a measurement
+      -- of a question nobody asked. Tied to the credential field itself, so the two cannot disagree.
+      attestProfileClaimantCount =
+        case profileProjectionProfileCredential p of
+          Nothing -> Nothing
+          Just _ -> claimants,
       attestProfileSlot = profileProjectionCreatedAtSlot p,
       attestProfileBlockHash = profileProjectionCreatedAtHash p
     }
@@ -482,17 +547,21 @@ listAttestations ::
   SqlPersistT IO (Page AttestationRow)
 listAttestations f (spec, so) (lim, off) = do
   rows <-
-    rawSql
-      ( "SELECT ?? FROM "
+    rawSql @(Entity AttestationProjection, Single Int, Single Int, Single Int)
+      ( "SELECT ??, dc.total, dc.open_count, dc.upheld_count FROM "
           <> attestationTable
+          <> disputeTallyLateral
           <> whereSql
           <> " "
           <> orderClause spec so
           <> " LIMIT ? OFFSET ?"
       )
-      (params <> [toPersistValue lim, toPersistValue off])
+      (disputeTallyParams <> params <> [toPersistValue lim, toPersistValue off])
+  -- `countIn` keeps the bare table: the lateral cannot change the row count (it is a LEFT JOIN on
+  -- TRUE, so exactly one row per attestation), and joining it into the count would pay for an index
+  -- scan per row to learn a number the join already guarantees.
   total <- countIn attestationTable whereSql params
-  pure (Page (map (toAttestationRow . entityVal) rows) (Just total) lim off Nothing)
+  pure (Page (map rowWithTally rows) (Just total) lim off Nothing)
   where
     (whereSql, params) = attestationWhere f
 
@@ -505,18 +574,21 @@ listAttestations f (spec, so) (lim, off) = do
 attestationById :: Core.AttestationAC -> SqlPersistT IO (Maybe AttestationDetailResponse)
 attestationById aid = do
   rows <-
-    rawSql
-      ( "SELECT ?? FROM "
+    rawSql @(Entity AttestationProjection, Single Int, Single Int, Single Int)
+      ( "SELECT ??, dc.total, dc.open_count, dc.upheld_count FROM "
           <> attestationTable
+          <> disputeTallyLateral
           <> " WHERE attestation_projection.attestation_id = ? LIMIT 1"
       )
-      [toPersistValue aid]
+      (disputeTallyParams <> [toPersistValue aid])
   case rows of
     [] -> pure Nothing
     (r : _) -> do
       ds <- disputesFor aid
-      anchor <- resolveLevelOneAnchor (otherMetadataOf (entityVal r))
-      pure (Just (AttestationDetailResponse (toAttestationRow (entityVal r)) ds anchor))
+      anchor <- resolveLevelOneAnchor (otherMetadataOf (fstOf4 r))
+      pure (Just (AttestationDetailResponse (rowWithTally r) ds anchor))
+  where
+    fstOf4 (Entity _ v, _, _, _) = v
 
 -- | The caller-supplied metadata of a projected attestation, as a plain association list.
 otherMetadataOf :: AttestationProjection -> [(Text, Text)]
@@ -613,8 +685,13 @@ anchorStatusOf actionFound withdrawalFound addr
   | actionFound && (isNothing addr || withdrawalFound) = Core.L1Resolved
   | otherwise = Core.L1Unresolved
 
-toAttestationRow :: AttestationProjection -> AttestationRow
-toAttestationRow a =
+-- | Decode one joined row: the projection plus the three counts 'disputeTallyLateral' produced.
+rowWithTally :: (Entity AttestationProjection, Single Int, Single Int, Single Int) -> AttestationRow
+rowWithTally (Entity _ a, Single total, Single open, Single upheld) =
+  toAttestationRow total open upheld a
+
+toAttestationRow :: Int -> Int -> Int -> AttestationProjection -> AttestationRow
+toAttestationRow disputes openDisputes upheldDisputes a =
   AttestationRow
     { attestationRowId = attestationProjectionAttestationId a,
       attestationRowSubject = attestationProjectionSubjectProfileId a,
@@ -640,7 +717,12 @@ toAttestationRow a =
       attestationRowSlot = attestationProjectionCreatedAtSlot a,
       attestationRowBlockHash = attestationProjectionCreatedAtHash a,
       attestationRowTxHash = attestationProjectionCreatedTxId a,
-      attestationRowOutputIndex = attestationProjectionCreatedOutputIndex a
+      attestationRowOutputIndex = attestationProjectionCreatedOutputIndex a,
+      -- `RL-3`. Counted in SQL on both routes rather than derived from the inlined list, which is
+      -- truncated at `inlineDisputeLimit` — see 'disputeTallyLateral'.
+      attestationRowDisputeCount = disputes,
+      attestationRowOpenDisputeCount = openDisputes,
+      attestationRowUpheldDisputeCount = upheldDisputes
     }
 
 -- ---------------------------------------------------------------------------------------------

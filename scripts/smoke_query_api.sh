@@ -900,6 +900,27 @@ echo
 # is a branch a generated client carries for a response it can never receive. `by-user-token` is the
 # other direction of the same screen: a wallet holds a CIP-68 USER token and had no way to find the
 # profile it owns, because the registry's ids are the REFERENCE form.
+# `RL-6`: a profile row says how many profiles claim its credential — the contest was visible from
+# the credential direction only, and a verification screen starts from a profile. The two directions
+# must agree: `/profiles/by-credential/{id}`'s `.total` is the same number every row publishes.
+assert '/profiles?limit=50' '[.items[] | (.credential == null) == (.claimant_count == null)] | unique' '[true]'
+assert '/profiles?limit=50' '[.items[] | select(.credential != null) | .claimant_count >= 1] | unique' '[true]'
+cred=$(j '/profiles?limit=50' '[.items[] | select(.credential != null)][0].credential' | tr -d '"')
+check "the profile and credential directions agree on how many claim it" \
+  "$(j "/profiles/by-credential/$cred" '.total')" \
+  "$(j "/profiles/by-credential/$cred" '[.items[].claimant_count] | unique | .[0]')"
+
+# `RL-3`: every attestation row carries the three dispute counts, and a row with an UPHELD dispute
+# is marked as such on the LIST surface. The published figure is what the preprod projection holds:
+# four attestations carry one upheld dispute each, from the smoke runs, and `accepted` stays true on
+# all of them — an upheld dispute neither hides nor un-accepts the record, it stands beside it.
+assert '/attestations?limit=200' '[.items[] | [has("dispute_count"), has("open_dispute_count"), has("upheld_dispute_count")]] | unique' '[[true,true,true]]'
+assert '/attestations?limit=200' '[.items[] | select(.upheld_dispute_count > 0) | .accepted] | unique' '[true]'
+assert_min '/attestations?limit=200' '[.items[] | select(.dispute_count > 0)] | length' '4'
+# total >= open + upheld for every row: `rejected` and `expired` are the slack, and `expired` is
+# explicitly not a verdict on the merits (D-A), so it must not be counted as upheld.
+assert '/attestations?limit=200' '[.items[] | .dispute_count >= .open_dispute_count + .upheld_dispute_count] | unique' '[true]'
+
 echo "== the single-record routes"
 DID=$(j '/disputes?limit=1' '.items[0].id // empty' | tr -d '"' || true)
 if [ -n "$DID" ]; then
