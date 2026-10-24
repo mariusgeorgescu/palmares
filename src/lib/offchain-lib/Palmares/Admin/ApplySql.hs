@@ -31,6 +31,7 @@ module Palmares.Admin.ApplySql
     applyIndexes,
     declaredIndexes,
     assertIndexesValid,
+    indexProblems,
     applyRoles,
   )
 where
@@ -206,7 +207,33 @@ declaredIndexes = mapMaybe nameOf (splitStatements (TE.decodeUtf8 indexesSql))
 -- coming from the SQL file and nowhere else. An invalid index that is NOT ours stays db-sync's
 -- business to report.
 assertIndexesValid :: ConnectionPool -> IO [Text]
-assertIndexesValid pool = do
+assertIndexesValid pool = map explain <$> indexProblems pool
+  where
+    explain (n, "missing") =
+      n
+        <> ": MISSING — no index of that name exists in schema public. Re-run `admin apply-indexes`; \
+           \every statement is CREATE INDEX CONCURRENTLY IF NOT EXISTS, so the ones already there cost a \
+           \catalogue lookup each."
+    explain (n, _) =
+      n
+        <> ": INVALID — the index exists, the planner ignores it, and IF NOT EXISTS will skip it \
+           \for ever. DROP INDEX CONCURRENTLY it and then re-run `admin apply-indexes` — a retry on \
+           \its own will not fix it, and dropping without re-running leaves it MISSING."
+
+-- | The same comparison as 'assertIndexesValid', as data: each declared index that is absent or
+-- unusable, paired with @\"missing\"@ or @\"invalid\"@.
+--
+-- Separate from the prose because two callers want two shapes. @admin apply-indexes@ wants the
+-- sentence that says what to DO about each one and then dies; @GET \/status@ wants the names, so a
+-- reader can see that a db-sync re-sync from genesis dropped the index set — @public@ is db-sync's
+-- schema, so its own migrations take our indexes with them and nothing in this repository re-applies
+-- the file (`GV-17`, ADR 0001). Without @gov_idx_committee_reg_hot@ the CC arm of @palmares.vote@
+-- never finishes, and query-api boots perfectly and answers every committee query with a 30 s 503.
+--
+-- The read is a catalogue scan of @public@ and needs no privilege a reader lacks: @pg_class@ and
+-- @pg_index@ are world-readable, which is why the probe can run as @palmares_ro@.
+indexProblems :: ConnectionPool -> IO [(Text, Text)]
+indexProblems pool = do
   rows <-
     runSqlPoolNoTransaction
       ( rawSql @(Single Text, Single Bool)
@@ -221,18 +248,8 @@ assertIndexesValid pool = do
       Nothing
   let present = [(unSingle n, unSingle v) | (n, v) <- rows]
   return $
-    [ n <> ": MISSING — no index of that name exists in schema public. Re-run `admin apply-indexes`; \
-      \every statement is CREATE INDEX CONCURRENTLY IF NOT EXISTS, so the ones already there cost a \
-      \catalogue lookup each."
-    | n <- declaredIndexes,
-      n `notElem` map fst present
-    ]
-      <> [ n <> ": INVALID — the index exists, the planner ignores it, and IF NOT EXISTS will skip it \
-           \for ever. DROP INDEX CONCURRENTLY it and then re-run `admin apply-indexes` — a retry on \
-           \its own will not fix it, and dropping without re-running leaves it MISSING."
-         | (n, False) <- present,
-           n `elem` declaredIndexes
-         ]
+    [(n, "missing") | n <- declaredIndexes, n `notElem` map fst present]
+      <> [(n, "invalid") | (n, False) <- present, n `elem` declaredIndexes]
 
 -- | Apply @sql\/050_roles.sql@, then set the two passwords.
 --

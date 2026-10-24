@@ -16,13 +16,21 @@ module Query.ServiceStatus
   ( getHealthProbe,
     getReadyProbe,
     getStatusQuery,
+    startIndexWatch,
   )
 where
 
-import Control.Concurrent.STM (readTVarIO)
+import Control.Concurrent (ThreadId, forkIO, threadDelay)
+import Control.Exception (SomeException, try)
+import Control.Monad (forever, unless)
+import Control.Concurrent.STM (TVar, atomically, newTVarIO, readTVarIO, writeTVar)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (asks)
 import Data.Text (Text, pack)
+import Data.Text qualified as T
+import Database.Persist.Sql (ConnectionPool)
+import Palmares.Admin.ApplySql (declaredIndexes, indexProblems)
+import System.IO (hPutStrLn, stderr)
 import Palmares.Constants (appVersion)
 import Data.Time (diffUTCTime, getCurrentTime)
 import Palmares.DomainTypes.Transfer.QueryResponses (AttestationStatus (..), StatusResponse (..))
@@ -75,6 +83,7 @@ getStatusQuery = do
           attest <- currentAttest
           amber <- asks amberLag
           metricsEpoch <- runRead metricsAsOfEpochQuery
+          missing <- asks missingIndexes >>= liftIO . readTVarIO
           pure
             StatusResponse
               { statusNetwork = net,
@@ -98,8 +107,60 @@ getStatusQuery = do
                 statusAmberLagSeconds = amber,
                 statusReadyMaxLagSeconds = maxLag,
                 statusMetricsAsOfEpoch = metricsEpoch,
+                -- `GV-17`: the declared indexes that are absent or unusable. Empty is the healthy
+                -- answer and the common one; a non-empty list is why a committee query times out,
+                -- published so the cause is readable instead of only the symptom.
+                statusMissingIndexes = missing,
                 statusEpochParams = params
               }
+
+-- | Watch the declared index set, seeded synchronously so a boot that is missing it says so.
+--
+-- __Why a watcher and not a query per request.__ The 23 indexes live in @public@, which is
+-- db-sync's schema: a db-sync migration or a re-sync from genesis recreates its tables and takes our
+-- indexes with them, and nothing in this repository re-applies the file (ADR 0001). query-api then
+-- boots perfectly and answers every committee query with a 30 s @503 db_unavailable@, because
+-- without @gov_idx_committee_reg_hot@ the CC arm of @palmares.vote@ never finishes. So the fact has
+-- to be published — but it changes on the timescale of a migration, not of a request, and @\/status@
+-- is a probe a dashboard polls. One poller, one 'TVar', nothing on the hot path: the same shape the
+-- freshness poll already uses, and for the same reason.
+--
+-- Sixty seconds, and no environment variable for it: the quantity being watched changes when an
+-- operator runs a migration, and a minute is already far faster than anyone could react. A knob
+-- nobody would turn is a knob to document, test and get wrong.
+--
+-- __Warns, never dies__ (`GV-17`). A reader with no indexes is slow; a reader that refuses to boot
+-- is absent, and absent is worse. The remedy is a Job in another repository, so the process that
+-- notices cannot be the process that fixes it.
+startIndexWatch :: ConnectionPool -> IO (TVar [Text], ThreadId)
+startIndexWatch pool = do
+  tv <- newTVarIO []
+  check tv
+  tid <- forkIO . forever $ do
+    threadDelay (indexWatchSeconds * 1000000)
+    check tv
+  pure (tv, tid)
+  where
+    indexWatchSeconds = 60
+
+    check tv = do
+      r <- try (indexProblems pool)
+      case r of
+        Right problems -> do
+          atomically (writeTVar tv (map fst problems))
+          unless (null problems) $
+            hPutStrLn stderr $
+              "[indexes] "
+                <> show (length problems)
+                <> " of "
+                <> show (length declaredIndexes)
+                <> " declared indexes are MISSING or INVALID — run `admin apply-indexes`. Committee \
+                   \queries will time out until then: "
+                <> T.unpack (T.intercalate ", " [n <> " (" <> p <> ")" | (n, p) <- problems])
+        -- A catalogue read that fails says nothing about the index set, so the previous answer
+        -- stands rather than being replaced by an empty list that reads as "all present".
+        Left (e :: SomeException) ->
+          hPutStrLn stderr ("[indexes] check failed, keeping the previous value: " <> show e)
 
 currentFreshness :: QueryAppMonad (Maybe Freshness)
 currentFreshness = asks freshness >>= liftIO . readTVarIO

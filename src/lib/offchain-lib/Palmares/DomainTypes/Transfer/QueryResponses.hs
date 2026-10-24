@@ -648,6 +648,21 @@ data StatusResponse = StatusResponse
     -- | The epoch @palmares.drep_metrics@ was last refreshed for. Every metric on a DRep response is
     -- "as of" this epoch, and it can trail @governance.epoch@ by the refresh interval (`GV-23`).
     statusMetricsAsOfEpoch :: Maybe Int,
+    -- | Declared indexes that are absent, or present and @INVALID@ — the planner ignores an invalid
+    -- index and @CREATE INDEX … IF NOT EXISTS@ skips it for ever, so both mean "no usable index of
+    -- that name". Empty is healthy and is the common answer.
+    --
+    -- Published because the failure it names is otherwise unattributable (`GV-17`). The 23 indexes
+    -- live in @public@, which is db-sync's schema: a migration or a re-sync from genesis recreates
+    -- its tables and takes them along, nothing in this service re-applies them, and query-api then
+    -- boots perfectly while every committee query times out — the CC arm of @palmares.vote@ does
+    -- not finish without @gov_idx_committee_reg_hot@. A reader seeing a name here knows to run
+    -- @admin apply-indexes@ instead of hunting a query bug.
+    --
+    -- Which of the two problems each name has is NOT published: @admin apply-indexes@ prints that,
+    -- with the remedy, and the remedies differ (an INVALID index must be dropped first). This field
+    -- answers "is the index set intact", which is the question a dashboard can act on.
+    statusMissingIndexes :: [Text],
     statusEpochParams :: EpochParamsSummary
   }
   deriving stock (Show, Eq, Generic)

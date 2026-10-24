@@ -1981,7 +1981,12 @@ apiSwagger =
     -- it closes an arithmetic hole rather than adding a figure — `total_dreps` counts the three
     -- registered statuses, so without this field the dashboard's own numbers accounted for 204 of
     -- 294 and named no reason for the other 90. No route changed.
-    & info . Data.Swagger.version .~ "1.9.0"
+    --
+    -- 1.10.0 adds `missing_indexes` to `/status`: the declared indexes that are absent or INVALID,
+    -- empty when healthy. `GV-17` — the 23 index definitions live in db-sync's own `public` schema,
+    -- so its migrations take them along and nothing here re-applies them; the service then answers
+    -- every committee query with a 30 s 503 and nothing said why.
+    & info . Data.Swagger.version .~ "1.10.0"
     & info . Data.Swagger.description
       ?~ "Read-only queries over the Cardano governance record: DReps, governance actions, votes, \
          \delegations, the constitutional committee and treasury withdrawals. Every row comes from \

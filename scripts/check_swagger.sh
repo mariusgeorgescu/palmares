@@ -38,8 +38,9 @@ echo "== swagger metadata"
 # `limit`/`offset` bounds, and a `{code, message}` body on the 405 and 406 the router answered empty.
 # 1.8.0 adds `route_not_found`, which is the third of those router refusals and the last one that
 # answered with zero bytes and no content type. 1.9.0 adds `unknown_dreps` to the dashboard, the
-# field that makes its three registered counts sum to `total_dreps`.
-check "version is 1.9.0" '.info.version == "1.9.0"'
+# field that makes its three registered counts sum to `total_dreps`. 1.10.0 adds
+# `/status.missing_indexes`, which names the index set a db-sync re-sync dropped.
+check "version is 1.10.0" '.info.version == "1.10.0"'
 # D-A. A client that SWITCHES on the verdict gains a case here, and one that renders `expired` as a
 # finding is wrong — which is the whole reason the value is in the published enum rather than left
 # to a null and a comment.
@@ -258,9 +259,15 @@ check "/status publishes the attestation projector's lag separately" \
 # Asserted as the WHOLE required set rather than as `index(…) == null`, which would also pass if the
 # `required` array disappeared entirely: `null | index("x")` is null in jq, and null == null is true.
 check "attest_lag_seconds is not in required (optional, and published x-nullable)" \
-  '.definitions.StatusResponse.required == ["network","governance","amber_lag_seconds","ready_max_lag_seconds","epoch_params"]'
+  '.definitions.StatusResponse.required == ["network","governance","amber_lag_seconds","ready_max_lag_seconds","missing_indexes","epoch_params"]'
 check "and it carries x-nullable, like every other Maybe field" \
   '.definitions.StatusResponse.properties.attest_lag_seconds["x-nullable"] == true'
+# `missing_indexes` is in that list on purpose and is the only addition to it: an EMPTY ARRAY is the
+# healthy answer, so the field is always present and never null. `null` would be a third state the
+# field does not have, and a client treating absence as "fine" is exactly the reading `GV-17` is
+# about — the whole defect was a green line about a check that had not run.
+check "missing_indexes is required and not nullable: [] is the healthy answer" \
+  '.definitions.StatusResponse.properties.missing_indexes | (.type == "array") and (has("x-nullable") | not)'
 
 # `CS-07`: the projector's own report, which is what tells "no pipeline here" from "behind". The
 # block is optional for the same reason `attest_lag_seconds` is — a governance-only deployment has

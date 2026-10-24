@@ -106,6 +106,15 @@ chain.
 
 - `shelley: enable: true` must be in the config **before the first sync starts**; flipping it later costs
   a full re-sync.
+- **A re-sync takes the 23 index definitions with it, and nothing here re-applies them.** They live in
+  `public`, which is db-sync's schema, so recreating its tables drops them; `admin apply-indexes` is a
+  one-shot Job outside this repository and is not part of a re-sync. Run it as the **last step** of any
+  re-sync, and of any db-sync migration that recreated a table. Until then query-api boots perfectly and
+  every committee query is a 30 s `503 db_unavailable`, because the CC arm of `palmares.vote` does not
+  finish without `gov_idx_committee_reg_hot`. Since `GV-17` the omission is visible rather than
+  diagnosable: query-api checks the declared set at boot and every 60 s, warns on stderr (`[indexes] …`)
+  and publishes the names in `GET /status.missing_indexes`. It warns and does not die — a slow reader is
+  better than an absent one, and the remedy is in another repository anyway.
 - `epoch_stake` is inserted unconditionally whenever the ledger is enabled and is unused by this product.
   Measured: 4,726,567 rows / 747 MB — **not** the largest table, as this ADR originally assumed. `block`
   (2,530 MB) and `tx` (1,765 MB) are, and together they are 69% of the database. So pruning `epoch_stake`

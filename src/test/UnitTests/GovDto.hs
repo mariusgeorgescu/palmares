@@ -64,7 +64,7 @@ statusObject lag = statusObjectWith lag Nothing
 -- | The same body with the projector's own report chosen — `CS-07`.
 statusObjectWith :: Maybe Int -> Maybe AttestationStatus -> KM.KeyMap Value
 statusObjectWith lag attest =
-  case toJSON (StatusResponse "preprod" sync lag attest (Just 319) 120 300 (Just 320) params) of
+  case toJSON (StatusResponse "preprod" sync lag attest (Just 319) 120 300 (Just 320) [] params) of
     Object o -> o
     v -> error ("StatusResponse did not encode as a JSON object: " <> show v)
   where

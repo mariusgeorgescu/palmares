@@ -45,7 +45,11 @@ data QueryAppContext = QueryAppContext
     -- | @PALMARES_READY_MAX_LAG_SECONDS@: the lag at which @\/ready@ turns red.
     readyMaxLag :: Int,
     -- | @PALMARES_AMBER_LAG_SECONDS@: the lag at which a UI should warn. A band, never the probe.
-    amberLag :: Int
+    amberLag :: Int,
+    -- | The declared indexes that are absent or INVALID, refreshed by @startIndexWatch@. A 'TVar'
+    -- and not a query per request: these live in db-sync's own @public@ schema and change when a
+    -- migration recreates a table, not when someone asks (`GV-17`).
+    missingIndexes :: TVar [Text]
   }
 
 newtype QueryAppMonad a = QueryAppMonad {unAppMonad :: ReaderT QueryAppContext Servant.Handler a}

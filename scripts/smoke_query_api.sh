@@ -95,6 +95,12 @@ assert '/status' '.governance.epoch >= 320' 'true'
 assert '/status' '.governance.lag_seconds < 120' 'true'
 # preprod's own value. This is the PARAMETER, not the voting window: the ledger sets
 # expiration = proposed_epoch + lifetime + 1, so the observed delta on all 131 actions is 7.
+# `GV-17`. Empty is the healthy answer, and the one this deployment gives: the 23 indexes are applied
+# and valid. A NAME here is why a committee query times out — the index set lives in db-sync's own
+# `public` schema, so a re-sync or a migration drops it and nothing in this service re-applies it. The
+# field is asserted as an empty ARRAY and not merely present: `null` or a missing key would let the
+# check pass on a service that never looked.
+assert /status '.missing_indexes' '[]'
 assert /status '.epoch_params.gov_action_lifetime' '6'
 assert /status '.epoch_params.drep_activity' '20'
 assert /status '.epoch_params.committee_min_size' '3'

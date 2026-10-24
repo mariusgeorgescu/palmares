@@ -22,6 +22,7 @@ import Query.Gov
     startFreshnessPoll,
   )
 import Query.Refresh (runRefreshThread)
+import Query.ServiceStatus (startIndexWatch)
 import Query.Views (applyPalmaresSchema)
 import QueryAppMonad (QueryAppContext (..))
 import RestAPI (apiSwaggerDoc, mkWebApp)
@@ -113,6 +114,9 @@ serve = do
   -- One freshness poller, seeded synchronously, feeding /ready, /status and the response headers.
   pollMs <- freshnessPollMsFromEnv
   (freshTv, attestTv, freshTid) <- startFreshnessPoll pool pollMs
+  -- `GV-17`: seeded synchronously, so an operator who starts this against a database whose index
+  -- set a db-sync migration dropped reads it in the boot log rather than in a 30 s timeout.
+  (missingTv, indexTid) <- startIndexWatch pool
   network <- expectedNetworkFromEnv
   maxLag <- readyMaxLagFromEnv
   amber <- amberLagFromEnv
@@ -124,7 +128,8 @@ serve = do
             attestLag = attestTv,
             expectedNetwork = network,
             readyMaxLag = maxLag,
-            amberLag = amber
+            amberLag = amber,
+            missingIndexes = missingTv
           }
       host = "0.0.0.0"
   port <- getPortFromEnvOrDefault 8083
@@ -149,7 +154,15 @@ serve = do
   putStrLn $ "Started Query API server at " <> host <> " " <> show port
   putStrLn $ "Postgres: " <> redactConnStr connStr
   putStrLn $ "Network: " <> T.unpack network <> "; ready above " <> show maxLag <> "s lag, amber above " <> show amber <> "s"
-  putStrLn $ "Threads: refresh " <> show refreshTid <> ", freshness " <> show freshTid <> " (every " <> show pollMs <> "ms)"
+  putStrLn $
+    "Threads: refresh "
+      <> show refreshTid
+      <> ", freshness "
+      <> show freshTid
+      <> " (every "
+      <> show pollMs
+      <> "ms), indexes "
+      <> show indexTid
   putStrLn $ "Swagger-UI available at : http://" <> host <> ":" <> show port <> "/swagger-ui"
 
   runSettings settings webApp
