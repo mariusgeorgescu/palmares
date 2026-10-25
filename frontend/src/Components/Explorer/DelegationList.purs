@@ -14,6 +14,7 @@ module Components.Explorer.DelegationList
   , component
   , isStandingChoice
   , standingLabel
+  , bareStandingChoice
   ) where
 
 import Prelude
@@ -26,6 +27,7 @@ import Data.Array (length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.String (Pattern(..), stripPrefix)
 import Format (formatAda, formatDay, matchLine, pluralize)
 import Halogen as H
 import Halogen.HTML as HH
@@ -44,14 +46,24 @@ import Type.Proxy (Proxy(..))
 -- | prefix. Fără prefix verificarea nu prinde nimic, iar ecranul linkează 124 din 200 de rînduri
 -- | către o pagină de DRep care nu există.
 isStandingChoice :: String -> Boolean
-isStandingChoice t = t == "drep_always_abstain" || t == "drep_always_no_confidence"
+isStandingChoice t = bareStandingChoice t /= ""
+
+-- | Aceeași alegere e scrisă DIFERIT de două rute ale aceluiași server: `/delegations` o dă ca
+-- | `drep_always_abstain`, iar `/activity` ca `always_abstain`. Amândouă sunt măsurate, deci
+-- | prefixul se taie înainte de comparație și niciun ecran nu depinde de care rută a adus rândul.
+bareStandingChoice :: String -> String
+bareStandingChoice t = case stripPrefix (Pattern "drep_") t of
+  Just rest -> keep rest
+  Nothing -> keep t
+  where
+  keep s = if s == "always_abstain" || s == "always_no_confidence" then s else ""
 
 -- | Numele în cuvinte. Identificatorul din protocol e corect dar nu se citește.
 standingLabel :: String -> String
-standingLabel = case _ of
-  "drep_always_abstain" -> "always abstain"
-  "drep_always_no_confidence" -> "always no confidence"
-  other -> other
+standingLabel t = case bareStandingChoice t of
+  "always_abstain" -> "always abstain"
+  "always_no_confidence" -> "always no confidence"
+  _ -> t
 
 type Slot = H.Slot (Const Void) Output Unit
 

@@ -117,11 +117,18 @@ spec = do
           any (\(DelegationRow d) -> isStandingChoice d.target) p.items `shouldEqual` true
           length (filter (\(DelegationRow d) -> d.lovelace == Nothing) p.items) `shouldEqual` 1
 
-    it "names the standing choices in words" do
+    it "names the standing choices in words, however the server spells them" do
+      -- Masurat: `/delegations` scrie `drep_always_abstain`, `/activity` scrie `always_abstain`.
+      -- Aceeasi alegere, doua rute ale aceluiasi server. Pe ecranul de activitate, varianta fara
+      -- prefix cadea pe ramura „credential" si scria „credential always_abstain".
       standingLabel "drep_always_abstain" `shouldEqual` "always abstain"
+      standingLabel "always_abstain" `shouldEqual` "always abstain"
       standingLabel "drep_always_no_confidence" `shouldEqual` "always no confidence"
-      -- Un identificator necunoscut se scrie așa cum e, nu se înlocuiește cu o ghicire.
+      standingLabel "always_no_confidence" `shouldEqual` "always no confidence"
+      isStandingChoice "always_abstain" `shouldEqual` true
+      -- Un identificator necunoscut se scrie asa cum e, nu se inlocuieste cu o ghicire.
       standingLabel "drep1abc" `shouldEqual` "drep1abc"
+      isStandingChoice "drep1abc" `shouldEqual` false
 
   describe "ActivityPage decoding" do
     it "survives the four events that have no slot and no transaction" do
