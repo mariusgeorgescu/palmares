@@ -130,6 +130,42 @@ test.describe('the deployed site', () => {
     await expect(page.getByText(/cannot tell whether this protocol is paused/)).toHaveCount(0);
   });
 
+  // Simptomul pe care îl vede un om, și cauza lui.
+  //
+  // Ecranul `/votes` scria „No votes have been recorded yet." pe un lanț cu 3.243.997 de voturi.
+  // Nu era gol: ecranul cere `?is_final=true` (filtrul „Final vote only", cel implicit), iar
+  // `is_final` e un semi-join pe matview-ul `palmares.vote_partition` — care avea ZERO rânduri,
+  // fiindcă bucla de refresh cădea la fiecare tick. `REFRESH MATERIALIZED VIEW CONCURRENTLY`
+  // construiește conținutul nou într-o tabelă TEMPORARY, iar `palmares_owner` nu avea dreptul:
+  // `REVOKE ALL ON DATABASE ... FROM PUBLIC` din `sql/050_roles.sql` îl luase. `drep_metrics` se
+  // reîmprospătează PRIMUL și eșecul scurtcircuitează restul, deci o singură permisiune lipsă
+  // golea ambele matview-uri.
+  //
+  // Testul afirmă relația, nu un număr: dacă există voturi, filtrul implicit nu poate întoarce
+  // zero. Un prag fix ar fi expirat odată cu lanțul.
+  test('the default votes filter is not empty while votes exist', async ({ request, baseURL }) => {
+    const all = await (await request.get(`${baseURL}/api/query/votes?limit=1`)).json();
+    if (all.total === 0) {
+      test.skip(true, 'No votes on this chain yet — nothing for the filter to lose.');
+    }
+    const final = await (await request.get(`${baseURL}/api/query/votes?is_final=true&limit=1`)).json();
+    expect(
+      final.total,
+      `${all.total} votes exist but the default filter returns ${final.total}: ` +
+        'palmares.vote_partition is probably empty, which means the matview refresh is failing.'
+    ).toBeGreaterThan(0);
+    // Și e un SUBSET: un vot final per (rol, votant, acțiune), deci strict mai puțin decât tot.
+    expect(final.total).toBeLessThanOrEqual(all.total);
+  });
+
+  test('the metrics have been computed at least once', async ({ request, baseURL }) => {
+    // `metrics_as_of_epoch: null` e cealaltă față a aceluiași defect, și singurul loc din API care
+    // spune „matview-urile nu s-au reîmprospătat niciodată".
+    const st = await (await request.get(`${baseURL}/api/query/status`)).json();
+    expect(st.metrics_as_of_epoch, 'null means the drep_metrics refresh has never succeeded')
+      .not.toBeNull();
+  });
+
   test.describe('at phone width', () => {
     test.use({ viewport: { width: 390, height: 844 } });
     for (const [path] of ROUTES) {
