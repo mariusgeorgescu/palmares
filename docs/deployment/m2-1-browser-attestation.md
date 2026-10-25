@@ -28,47 +28,40 @@
 > ireversibilă, iar fără reluare fiecare defect de test ar fi cerut re-mintarea a tot ce era deja pe
 > lanț.
 
-## Cele nouă fluxuri: unde ajunge fiecare, și de ce nu mai departe
+## Cele nouă fluxuri: unde ajunge fiecare
 
-Măsurat pe deploy la 2026-10-25. „Ultima margine" înseamnă: construit de serverul adevărat, decodat
-în browser, **semnat cu cheia portofelului**, iar `POST /submit-tx` interceptat — singurul pas care
-nu se poate lua înapoi.
+Măsurat pe deploy la 2026-10-25. **Șapte din nouă sînt pe lanț, din browser.** Celelalte două sînt
+acoperite cât se poate, iar forma acoperirii lor e tot ce se poate afirma — amândouă prin design.
 
-| fluxul | cât de departe | ce îl oprește |
+| fluxul | unde ajunge | tranzacția |
 | --- | --- | --- |
-| `claim-profile` | **pe lanț** | — |
-| `issue-attestation` | **pe lanț** | — |
-| `accept-attestation` | **pe lanț** | — |
-| `update-profile` | ultima margine | doar autorizarea de a trimite |
-| `claim-credential` | ultima margine | doar autorizarea de a trimite |
-| `open-dispute` | ultima margine | autorizarea, plus **5 tADA blocate** până la o decizie |
-| `withdraw-credential` | nu se poate construi | cere o revendicare de credențială DEJA pe lanț |
-| `resolve-dispute` | nu se poate construi | cere o dispută nedecisă **și cheia adminului oracolului** |
-| `expire-dispute` | nu se poate construi | cere o dispută nedecisă trecută de termen: **30 de zile** |
+| `claim-profile` | **pe lanț** | `773d343a…b9c2d21c` (subiect), `80f97ede…08c403bb` (emitent) |
+| `issue-attestation` | **pe lanț** | `e0a360a1…ca04ccf93` |
+| `accept-attestation` | **pe lanț** | `a2ccfdbc…db877d69` |
+| `update-profile` | **pe lanț** | `e01b7b28…7fed1b9a` · proiectat în 30 s |
+| `claim-credential` | **pe lanț** | `871750b8…cb1041a67` · proiectat în 15 s |
+| `withdraw-credential` | **pe lanț** | `fe7bf7a1…ad62c2d3` · proiectat în 75 s |
+| `open-dispute` | **pe lanț** | `3854e09d…312701fb` · proiectat în 15 s · 5 tADA blocate |
+| `resolve-dispute` | se construiește, nu se semnează | semnătura e a adminului oracolului |
+| `expire-dispute` | se refuză corect | `DisputeNotStaleYet`: termenul e la 30 de zile |
 
-Cele trei de jos nu sînt o lipsă de acoperire din neglijență, sînt **dependențe**, iar două dintre
-ele sînt dependențe prin design:
+Latențele de proiecție măsurate: **15–75 de secunde**, iar cea de 45 s de la acceptare e în mijloc.
+Nu există lentoare de proiecție — ce părea lentoare era pagina care nu reinterogează.
 
-* `resolve-dispute` întoarce deliberat o tranzacție **nesemnată**, fiindcă validatorul oracolului
-  cere semnătura adminului și *„no admin action is accepted over HTTP"* (`RestAPI.hs`). Un browser
-  obișnuit nu o poate încheia — asta e intenția, nu un defect.
-* `expire-dispute` *„needs no authority at all — that is the point, since an exit the oracle admin
-  can gate is not an exit"*, dar cere ca termenul să fi trecut: `dispute_timeout_ms` e
-  2.592.000.000 ms, **30 de zile**. Nu se poate exersa azi, oricâtă autorizare ar exista.
-* `withdraw-credential` cere o revendicare pe lanț. O singură trimitere (`claim-credential`) o
-  deblochează.
+**`resolve-dispute`** ajunge la o tranzacție adevărată și la sumarul ei decodat, iar sumarul spune
+singurul lucru care explică de ce fluxul nu se poate încheia dintr-un browser obișnuit:
+*„1 signature required beyond the inputs"*. Ruta întoarce deliberat o tranzacție **nesemnată**,
+fiindcă validatorul oracolului cere adminul și *„no admin action is accepted over HTTP"*
+(`RestAPI.hs`). Semnarea ar cere `operation.prv`.
 
-Cele cinci dispute existente pe preprod sînt toate `verdict: upheld`, deci nici `resolve` nici
-`expire` nu au pe ce lucra.
+**`expire-dispute`** nu cere nicio autoritate — *„that is the point, since an exit the oracle admin
+can gate is not an exit"* — dar cere ca termenul să fi trecut. Serverul refuză cu
+`DisputeNotStaleYet`, „its deadline has not passed", iar ecranul arată motivul în cuvinte. Refuzul
+ăsta e o afirmație la fel de bună ca o reușită, și e singura posibilă azi: disputa deschisă mai sus
+devine expirabilă pe 2026-11-24.
 
-**Ce ar debloca ce, dacă vrei mai departe:**
-
-1. trimite `claim-credential` → `withdraw-credential` devine construibil ȘI trimisibil. Una
-   tranzacție, taxă normală.
-2. trimite `open-dispute` → `resolve-dispute` devine construibil, dar semnătura rămâne a ta
-   (`operation.prv`); `expire-dispute` devine construibil **după 30 de zile**. Blochează 5 tADA.
-
-Suita: `e2e-wallet/all-flows-sign.spec.js`.
+Suitele: `all-flows-sign.spec.js` (toate nouă, fără trimitere), `m2-1-chain.spec.js` și
+`remaining-flows-chain.spec.js` (trimiterile, fiecare după un flag explicit).
 
 ## Cele șase defecte, niciunul prins de un test care trecea
 

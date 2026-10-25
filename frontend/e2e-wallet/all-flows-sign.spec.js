@@ -207,4 +207,65 @@ test.describe('every buildable write flow, signed but not submitted', () => {
     expect(build.attestation_id).toBe(attestationId);
     expect(build.opened_by_profile_id).toBe(profileId);
   });
+
+  // Cele două fluxuri de dispută, acoperite cât se poate — iar „cât se poate" e afirmația.
+  //
+  // Nu se semnează niciunul: la `resolve-dispute` semnătura e a adminului oracolului și nu o avem,
+  // iar la `expire-dispute` nu există tranzacție de semnat. Ce se afirmă aici e că ruta răspunde
+  // adevărul: o tranzacție pentru prima, un refuz numit pentru a doua.
+
+  const openDisputeId = async (request) => {
+    const d = await (await request.get('/api/query/disputes?limit=200')).json();
+    const undecided = d.items.find((x) => !x.verdict);
+    expect(undecided, 'needs an undecided dispute; run remaining-flows-chain.spec.js first')
+      .toBeTruthy();
+    return undecided.id;
+  };
+
+  test('resolve-dispute builds, and the summary says a signature we do not have is needed', async ({
+    page,
+    request,
+    wallet,
+  }) => {
+    const disputeId = await openDisputeId(request);
+
+    await withCip142(page);
+    await page.goto('/write?flow=resolve-dispute');
+    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await expect(page.getByText('ready', { exact: true })).toBeVisible();
+
+    await set(page, 'Dispute', disputeId);
+    await set(page, 'Verdict', 'upheld');
+    await page.getByRole('button', { name: /Build the transaction/ }).click();
+
+    // Tranzacția se construiește: ruta merge, iar sumarul se decodează. Atât se poate dovedi.
+    await expect(page.getByText('What this transaction does')).toBeVisible({ timeout: 180_000 });
+    await expect(page.getByText(/Pays a network fee of/)).toBeVisible();
+
+    // ȘI spune că e nevoie de o semnătură în plus. Linia aceea e singurul loc din interfață care
+    // explică de ce fluxul ăsta nu se poate încheia dintr-un browser obișnuit — validatorul
+    // oracolului cere adminul, iar sumarul o anunță înainte de orice semnătură.
+    await expect(page.getByText(/signature.? required beyond the inputs/)).toBeVisible();
+
+    // Și nu semnăm. Nu din precauție: n-avem cheia, iar o semnătură parțială ar fi respinsă de nod.
+    expect(await wallet.calls('signTx')).toHaveLength(0);
+  });
+
+  test('expire-dispute is refused while the deadline stands, and says so', async ({ page, request }) => {
+    const disputeId = await openDisputeId(request);
+
+    await withCip142(page);
+    await page.goto('/write?flow=expire-dispute');
+    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await expect(page.getByText('ready', { exact: true })).toBeVisible();
+
+    await set(page, 'Dispute', disputeId);
+    await page.getByRole('button', { name: /Build the transaction/ }).click();
+
+    // Refuzul, cu motivul, în cuvinte. Serverul întoarce `DisputeNotStaleYet` cu „its deadline has
+    // not passed" — iar un ecran care ar arăta doar „a eșuat" ar ascunde singurul lucru util.
+    await expect(page.getByText(/deadline has not passed/)).toBeVisible({ timeout: 180_000 });
+    // Și niciun sumar, deci nimic de semnat: refuzul vine înainte de orice tranzacție.
+    await expect(page.getByText('What this transaction does')).toHaveCount(0);
+  });
 });
