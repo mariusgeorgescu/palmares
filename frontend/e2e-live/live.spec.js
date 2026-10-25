@@ -92,6 +92,44 @@ test.describe('the deployed site', () => {
     await expect(page.getByRole('heading', { name: 'Participation rate' })).toBeVisible();
   });
 
+  // Calea de scriere, pe deploy. A existat în cod cu mult înainte să existe în cluster: pod-ul era
+  // la `replicas: 0`, deci `/write` arăta formularul și cădea pe butonul de construire. Testele de
+  // aici afirmă exact ce lipsea — că e un server adevărat în spate, cu providerul și scripturile
+  // lui, nu doar un ecran.
+  test('the write API is actually there, on the provider it claims', async ({ request, baseURL }) => {
+    const res = await request.get(`${baseURL}/api/interaction/status`);
+    expect(res.status()).toBe(200);
+    const body = await res.json();
+    expect(body.network).toBe('preprod');
+    // `node + Kupo`, nu `ogmios + kupo`: alegerea e măsurată, iar un provider schimbat pe furiș e
+    // exact lucrul care rupe construirea fără să schimbe niciun ecran.
+    expect(body.provider).toBe('node-kupo');
+    // Cele cinci scripturi de referință se rezolvă. Fără ele nicio tranzacție nu se poate construi,
+    // iar răspunsul ar fi un 200 care arată sănătos.
+    expect(body.deployed_scripts).toBe(true);
+    expect(typeof body.oracle_paused).toBe('boolean');
+    expect(body.oracle.min_utxo_lovelace).toBeGreaterThan(0);
+  });
+
+  test('the write screen asks for a wallet before it shows a form', async ({ page }) => {
+    await page.goto('/write?flow=claim-profile');
+    // Poarta întâi: niciun cîmp pînă nu se știe ce portofel și ce rețea.
+    await expect(page.getByRole('textbox')).toHaveCount(0);
+    // Textul ANUME, nu `/wallet/i`: biblioteca de dApp ține în pagină un card ascuns („You do not
+    // have any wallet installed yet !") pe care un regex larg îl prinde primul, și un test care
+    // afirmă ceva ascuns nu afirmă nimic.
+    await expect(page.getByText('No Cardano wallet is installed in this browser.')).toBeVisible();
+    await expect(page.getByText('Connect a wallet that can write here, and this form appears.'))
+      .toBeVisible();
+    // Și cele nouă fluxuri sînt acolo, fără portofel: ce POȚI scrie aici se citește înainte de a
+    // conecta ceva.
+    await expect(page.getByText('The nine things this registry lets you write', { exact: false }))
+      .toBeVisible();
+    // Și nu „nu se poate scrie acum": oracolul răspunde, deci ecranul nu trebuie să fie blocat pe
+    // necunoscut. Asta e ce s-ar vedea dacă interaction-api ar fi iar la zero replici.
+    await expect(page.getByText(/cannot tell whether this protocol is paused/)).toHaveCount(0);
+  });
+
   test.describe('at phone width', () => {
     test.use({ viewport: { width: 390, height: 844 } });
     for (const [path] of ROUTES) {
