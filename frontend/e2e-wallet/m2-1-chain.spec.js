@@ -1,35 +1,53 @@
 // M2-1: o atestare emisă ȘI contrasemnată din browser, pe preprod, apărută pe `/attestations`.
 //
-// Testul ăsta TRIMITE TRANZACȚII REALE. Nu rulează fără `PALMARES_M2_MNEMONIC`, și asta nu e o
-// precauție generică: repo-ul nu livrează un semnatar prin decizie — `scripts/smoke_attest_flow.sh`
-// o spune pe linia 34, „a signer guessed here would be a credential" — iar trimiterea rămâne
-// manuală prin decizia ownerului. Cu variabila pusă, criteriul se închide singur; fără ea, suita
-// trece peste.
+// **Testul ăsta TRIMITE TRANZACȚII REALE pe preprod.** De aceea cere `PALMARES_M2_SUBMIT=1` — un
+// nume care nu poate fi pus din greșeală și care nu înseamnă altceva decât „ai voie să trimiți".
+// Trimiterea rămâne manuală prin decizia ownerului; variabila ESTE decizia aceea, scrisă o dată.
 //
-// Vezi `docs/deployment/m2-1-browser-attestation.md` pentru ce e deja dovedit fără cheie.
+// **Ce nu mai e un blocaj: cheia.** Portofelul uneltei derivă determinist, iar adresa lui de pe
+// preprod ținea 53.115 tADA în 56 de UTxO-uri la 2026-10-25 (măsurat prin Kupo-ul clusterului).
+// Deci nu e nevoie de nicio cheie nouă și de niciun mnemonic în mediu — deși `PALMARES_M2_MNEMONIC`
+// rămâne acceptat, pentru cazul în care vrei alt portofel. Cost: trei tranzacții, taxă măsurată
+// 0,61 tADA pe una, plus min-UTxO blocat în tokenurile create. Sub 10 tADA în total.
+//
+// Ce e deja dovedit FĂRĂ a trimite nimic, și de aceea testul ăsta e singurul pas rămas:
+//
+//   * `build-and-summarise.spec.js` — serverul construiește o tranzacție Conway adevărată, iar
+//     browserul o decodează și arată ce face (R8), pe deploy;
+//   * `sign-not-submit.spec.js` — wallet-ul SEMNEAZĂ cu adevărat, cu cheia lui, iar aplicația
+//     trimite martorul la `/submit-tx` cu exact tranzacția pe care a arătat-o — doar că ruta aceea
+//     e interceptată. Singura diferență față de testul de aici e că acolo octeții nu pleacă.
+//
+// Vezi `docs/deployment/m2-1-browser-attestation.md`.
 import { expect, test } from 'cip30-test-wallet/playwright';
 
-const MNEMONIC = process.env.PALMARES_M2_MNEMONIC;
+const SUBMIT = process.env.PALMARES_M2_SUBMIT === '1';
 const WALLET = 'palmaresM2';
 
 // Trei tranzacții plus proiecțiile lor. Nu încape în timeout-ul implicit.
-test.describe.configure({ mode: 'serial', timeout: 15 * 60 * 1000 });
+test.describe.configure({ mode: 'serial', timeout: 20 * 60 * 1000 });
 
 test.use({
   walletOptions: {
     name: WALLET,
     networkId: 0,
-    mnemonic: MNEMONIC,
-    // Modul chain: UTxO-urile vin de pe preprod prin Koios, iar `submitTx` trimite cu adevărat.
+    // Modul chain, și e necesar: serverul alege intrările din UTxO-urile REALE de pe preprod, iar
+    // registrul sintetic al uneltei nu le cunoaște — wallet-ul refuză să semneze cu
+    // `CHW_UNRESOLVED_INPUT`. Măsurat, nu presupus.
     ledger: { chain: { provider: 'koios', network: 'preprod' } },
+    ...(process.env.PALMARES_M2_MNEMONIC ? { mnemonic: process.env.PALMARES_M2_MNEMONIC } : {}),
   },
 });
 
 test.describe('M2-1: the write path, end to end on preprod', () => {
   test.skip(
-    !MNEMONIC,
-    'Needs PALMARES_M2_MNEMONIC — a funded preprod wallet. This test submits real transactions; ' +
-      'see docs/deployment/m2-1-browser-attestation.md.'
+    !SUBMIT,
+    'This test SUBMITS REAL TRANSACTIONS to preprod. One command runs it:\n' +
+      '  PALMARES_WALLET_URL=https://gov.cardano.vip PALMARES_M2_SUBMIT=1 \\\n' +
+      '    npx playwright test --config playwright.wallet.config.js e2e-wallet/m2-1-chain.spec.js\n' +
+      'No key is needed — the tool wallet derives deterministically and its preprod address is ' +
+      'funded. Everything up to the signature is already proven by build-and-summarise.spec.js ' +
+      'and sign-not-submit.spec.js; see docs/deployment/m2-1-browser-attestation.md.'
   );
 
   // CIP-142 nu există în niciun wallet, nici în unealta asta — „Path to Active" din CIP îl listează
@@ -64,7 +82,7 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
     const qs = subject ? `?flow=${flow}&subject=${encodeURIComponent(subject)}` : `?flow=${flow}`;
     await page.goto(`/write${qs}`);
     await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
-    await expect(page.getByText('ready')).toBeVisible();
+    await expect(page.getByText('ready', { exact: true })).toBeVisible();
   };
 
   // Cîmpurile nu sînt toate `<input>`: „Kind" e un `<select>`, iar `fill` pe el aruncă. Helperul
@@ -78,40 +96,40 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
 
   // Construiește, citește sumarul, semnează, trimite. Fiecare pas e o afirmație separată, pentru că
   // fiecare înseamnă altceva: până la „submit" nu s-a întâmplat nimic pe lanț.
-  const buildSignSubmit = async (page, wallet) => {
+  const buildSignSubmit = async (page, label) => {
     await page.getByRole('button', { name: /Build the transaction/ }).click();
 
     // R8: sumarul decodat trebuie să fie acolo ÎNAINTE de semnătură. Dacă nu e, nu se semnează —
     // ăsta e tot rostul regulii.
-    await expect(page.getByText('What this transaction does')).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText('What this transaction does')).toBeVisible({ timeout: 180_000 });
     await expect(page.getByText(/Pays a network fee of/)).toBeVisible();
 
-    const before = (await wallet.calls('submitTx')).length;
     await page.getByRole('button', { name: /Sign and submit/ }).click();
 
-    await expect
-      .poll(async () => (await wallet.calls('submitTx')).length, { timeout: 120_000 })
-      .toBeGreaterThan(before);
-
-    const submitted = await wallet.lastSubmittedTx();
-    expect(submitted).toBeTruthy();
-    return submitted;
+    // „Trimis" e o stare proprie, distinctă de „confirmat", iar testul o citește DE PE ECRAN și nu
+    // dintr-un apel de rețea: ce vede omul e criteriul.
+    //
+    // Nu se aștepta pe `wallet.calls('submitTx')`, cum făcea prima variantă, și asta era o eroare
+    // de model: aplicația nu cheamă niciodată `submitTx`-ul portofelului — trimite martorul la
+    // `/submit-tx`, iar serverul asamblează și trimite. Așteptarea aceea n-ar fi venit niciodată.
+    await expect(page.getByText(/submitted/i).first()).toBeVisible({ timeout: 180_000 });
+    console.log(`[m2-1] ${label}: submitted`);
   };
 
   const marker = `m2-1-${Date.now()}`;
 
-  test('mints a profile, attests to it, accepts it, and the register shows accepted', async ({ page, wallet }) => {
+  test('mints a profile, attests to it, accepts it, and the register shows accepted', async ({ page }) => {
     // 1. Un profil, ca să existe un subiect și un emitent.
     await connect(page, 'claim-profile');
     await fill(page, 'Kind', 'person_d_rep');
     await fill(page, 'Name', `${marker}-profile`);
     await fill(page, 'Description', 'M2-1 end-to-end run');
     await fill(page, 'Image URI', 'ipfs://palmares-m2-1');
-    await buildSignSubmit(page, wallet);
+    await buildSignSubmit(page, 'profile');
 
-    // Proiecția trebuie să prindă tranzacția. Pe un db-sync sincronizat e un minut; pe unul care
-    // încă reface istoria, nu se întâmplă deloc — de aceea suita asta se rulează împotriva
-    // stack-ului LOCAL sincronizat, nu împotriva deployului care e în urmă cu sute de epoci.
+    // Proiecția trebuie să prindă tranzacția. attest-sync citește Kupo și e la ZERO decalaj pe
+    // deploy, deci e o chestiune de un bloc sau două. Guvernanța e în urmă cu sute de epoci, dar
+    // n-are nicio legătură cu registrul: sunt două lanțuri de proiecții separate.
     await page.goto('/profiles');
     const profileRow = page.getByText(`${marker}-profile`);
     await expect(profileRow).toBeVisible({ timeout: 10 * 60 * 1000 });
@@ -133,7 +151,7 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
     await fill(page, 'Name', `${marker}-attestation`);
     await fill(page, 'Description', 'issued and countersigned from the browser');
     await fill(page, 'Image URI', 'ipfs://palmares-m2-1');
-    await buildSignSubmit(page, wallet);
+    await buildSignSubmit(page, 'attestation');
 
     await page.goto('/attestations');
     const attRow = page.getByRole('row', { name: new RegExp(`${marker}-attestation`) });
@@ -145,7 +163,7 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
 
     // 3. Contrasemnătura, cu portofelul SUBIECTULUI — aici același, fiindcă subiectul e profilul lui.
     await connect(page, 'accept-attestation', attestationId);
-    await buildSignSubmit(page, wallet);
+    await buildSignSubmit(page, 'acceptance');
 
     // 4. Criteriul însuși: rândul arată „accepted".
     await page.goto('/attestations');

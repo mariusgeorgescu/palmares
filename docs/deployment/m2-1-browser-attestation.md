@@ -1,12 +1,37 @@
 # M2-1: o atestare emisă **și contrasemnată din browser**, pe preprod
 
-Ăsta e singurul criteriu din poarta M2 pe care nu-l poate închide nimeni în afară de deținătorul
-unei chei finanțate. Totul până la semnătură e construit și testat; ce lipsește e **semnătura
-însăși și trimiterea**, iar `scripts/smoke_attest_flow.sh` spune de ce repo-ul nu livrează un
-semnatar: *„this repo ships no signer, and a signer guessed here would be a"* — o cheie scrisă
-într-un fișier commis e o credențială care se publică.
+Ăsta e singurul criteriu din poarta M2 care nu se poate închide fără decizia ta. **Nu din lipsă de
+cheie** — asta s-a schimbat pe 25 octombrie — ci fiindcă trimiterea rămâne manuală prin decizia ta,
+iar `POST /submit-tx` e singurul pas ireversibil din tot produsul, marcat ca atare în cod
+(`MonadInteract.purs`: „ĂSTA e pasul ireversibil").
 
-Documentul ăsta e pregătirea, ca rularea să coste o comandă.
+**Ce s-a schimbat: cheia nu mai lipsește.** Portofelul din `cip30-test-wallet` derivă determinist,
+iar adresa lui de pe preprod ținea **53.115 tADA în 56 de UTxO-uri** la 2026-10-25, măsurat prin
+Kupo-ul clusterului. Deci nu e nevoie de o cheie nouă, de un mnemonic în mediu, sau de un fișier
+commis cu o credențială în el.
+
+**Și semnătura e dovedită.** `e2e-wallet/sign-not-submit.spec.js` rulează împotriva deployului:
+wallet-ul semnează cu adevărat, cu cheia lui, pe o tranzacție Conway construită de
+`interaction-api` din UTxO-uri reale, iar aplicația trimite martorul la `/submit-tx` cu exact
+tranzacția pe care a arătat-o în sumar. Singura diferență față de o rulare adevărată e că ruta aceea
+e **interceptată**: octeții nu pleacă.
+
+Deci ce rămâne e literal un pas: scoaterea interceptării. O variabilă o scoate.
+
+## O comandă
+
+```bash
+cd frontend
+PALMARES_WALLET_URL=https://gov.cardano.vip PALMARES_M2_SUBMIT=1 \
+  npx playwright test --config playwright.wallet.config.js e2e-wallet/m2-1-chain.spec.js
+```
+
+`PALMARES_M2_SUBMIT=1` nu înseamnă nimic altceva decât „ai voie să trimiți", și nu se pune din
+greșeală. Testul face cele trei tranzacții — profil, atestare, acceptare — și așteaptă ca rândul de
+pe `/attestations` să arate `accepted`. Cost: taxă măsurată 0,61 tADA pe una dintre ele, plus
+min-UTxO blocat în tokenurile create; sub 10 tADA în total.
+
+Dacă preferi să o faci cu mâna, pașii manuali sunt mai jos și sunt aceiași.
 
 ## Ce e deja dovedit, și cu ce
 
