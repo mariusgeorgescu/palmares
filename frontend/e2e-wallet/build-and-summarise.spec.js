@@ -27,6 +27,12 @@ test.use({
   },
 });
 
+// Construirea cere nodul și Kupo-ul din spatele serverului, iar pe deploy drumul ăla trece prin
+// rețeaua clusterului în timp ce Kupo indexează: 0,4 s pe stiva locală, peste 30 pe deploy. Prima
+// variantă expira în timeout-ul implicit, cu `expect` de 120 s înăuntru — adică testul murea
+// înainte de afirmația pe care o făcea.
+test.describe.configure({ timeout: 4 * 60 * 1000 });
+
 test.describe('a real transaction, built and read back', () => {
   test.skip(
     !FUNDED,

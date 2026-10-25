@@ -21,6 +21,7 @@ Documentul ăsta e pregătirea, ca rularea să coste o comandă.
 | Atestarea apare pe `/attestations` cu `accepted` | **se vede deja pe preprod**: din cele 19 atestări, una e acceptată și are o dispută confirmată | `https://gov.cardano.vip/attestations` |
 | Ecranul trimite ADRESELE portofelului, nu o listă goală | 1 test de wallet care citește corpul cererii de pe sârmă | `e2e-wallet/gate.spec.js`, „what the build request actually carries" |
 | **Serverul CONSTRUIEȘTE tranzacția, pe deploy** | măsurat 2026-10-25: un POST pe `/api/interaction/claim-profile` prin `https://gov.cardano.vip` întoarce CBOR-ul unei tranzacții nesemnate — selecție de intrări reală, politica de minting `648c6a73…`, token de referință CIP-68, datum-ul oracolului | — |
+| **Browserul o DECODEAZĂ și arată ce face, pe deploy** | 1 test cu wallet real împotriva `https://gov.cardano.vip`: construiește, citește sumarul (taxă, token, politică), și NU semnează — `signTx` nici nu e atins | `e2e-wallet/build-and-summarise.spec.js` |
 
 Rândul de dinainte e cel care s-a schimbat cel mai mult: până pe 25 octombrie, calea de scriere
 **nu exista în cluster** (`replicas: 0`) și ecranul trimitea oricum adrese goale, deci niciun pas de
