@@ -142,7 +142,7 @@ component =
       }
 
   render st =
-    HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-4") ]
+    HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-4") ]
       [ HH.a [ HP.href (drepListHrefFor emptyDRepFilters), HP.class_ (HH.ClassName "link link-hover text-sm") ]
           [ HH.text "← All DReps" ]
       , case st.page of

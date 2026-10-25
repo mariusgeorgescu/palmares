@@ -159,7 +159,7 @@ component =
       }
 
   render st =
-    HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-6") ]
+    HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-6") ]
       -- Hub-ul vine DUPĂ cifre, nu înaintea lor. Cifrele sunt motivul pentru care există pagina;
       -- patru carduri de navigare între titlu și ele cheltuiau primul ecran pe ceva ce bara de sus
       -- spune deja, iar „294 de DRep-i" ajungea sub linia de plutire.

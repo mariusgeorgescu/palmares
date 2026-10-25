@@ -101,7 +101,7 @@ component =
       }
 
   render st =
-    HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-4") ]
+    HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-4") ]
       [ HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
           [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Profiles" ]
           , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]

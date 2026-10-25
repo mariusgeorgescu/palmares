@@ -88,7 +88,7 @@ component =
     -- Lățimea paginii e cea a celorlalte șase ecrane. Cu `max-w-4xl` pe container, titlul sărea cu
     -- ~200px spre dreapta față de banda de stare de deasupra lui, la fiecare trecere din navbar.
     -- Lungimea de rând se păstrează acolo unde contează: pe lista de carduri.
-    HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-4") ]
+    HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-4") ]
       [ HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
           [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Methodology" ]
           , HH.p [ HP.class_ (HH.ClassName "opacity-80") ]

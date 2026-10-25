@@ -427,3 +427,43 @@ html.js-reveal .scroll-reveal.in-view {
     transition: none !important;
   }
 }
+
+/* ===== Încadrarea paginilor, după `ExplorerPageLayout` din bjj =====
+
+   Acolo fiecare ecran de explorer stă într-un panou: fundal translucid cu blur, colțuri rotunjite,
+   un contur abia vizibil, titlu în gradient și o linie sub antet. palmares avea același conținut
+   turnat direct peste fundal, fără încadrare — ceea ce face paginile să pară nelegate între ele.
+
+   Se aplică printr-o CLASĂ pe containerul fiecărui ecran, nu rescriind cele șaisprezece antete:
+   textele lor sunt literali multilinie, iar o înlocuire automată peste ele e exact felul de
+   schimbare care strică o frază fără ca nimeni să observe. O clasă pe o singură linie e sigură. */
+.explorer-page {
+  background: color-mix(in oklch, var(--color-base-300) 88%, transparent);
+}
+
+@media (min-width: 640px) {
+  .explorer-page {
+    background: color-mix(in oklch, var(--color-base-300) 82%, transparent);
+    backdrop-filter: blur(8px);
+    border-radius: 1rem;
+    border: 1px solid color-mix(in oklch, var(--color-base-content) 6%, transparent);
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+  }
+}
+
+/* Titlul ecranului în gradient, ca în bjj. Țintit pe PRIMUL `h1` al paginii, fiindcă acela e
+   titlul — restul `h1`-urilor nu există pe ecranele astea, iar dacă apare vreunul, nu e titlu. */
+.explorer-page > div:first-child h1,
+.explorer-page > h1:first-child {
+  background: linear-gradient(to right, var(--color-success), var(--color-info), var(--color-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Linia de sub antet: separă titlul de conținut fără să adauge un element. */
+.explorer-page > div:first-child {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid color-mix(in oklch, var(--color-base-content) 8%, transparent);
+}

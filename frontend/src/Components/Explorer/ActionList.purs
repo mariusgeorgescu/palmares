@@ -152,7 +152,7 @@ component =
       }
 
   render st =
-    HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-4") ]
+    HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-4") ]
       [ header st
       , case st.page of
           NotAsked -> loading

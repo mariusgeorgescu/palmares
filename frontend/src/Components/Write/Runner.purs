@@ -225,7 +225,7 @@ component =
     Just s -> oracleGate s
 
   render st =
-    HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-4") ]
+    HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-4") ]
       [ header
       , HH.div [ HP.class_ (HH.ClassName "grid gap-4 lg:grid-cols-4") ]
           [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1") ] [ flowList st ]
