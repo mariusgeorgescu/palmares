@@ -52,7 +52,8 @@
     "test:e2e": "npm run build && playwright test",
     "test:e2e:only": "playwright test",
     "e2e:live": "playwright test --config playwright.live.config.js",
-    "e2e:wallet": "playwright test --config playwright.wallet.config.js"
+    "e2e:wallet": "npm run build:prod && playwright test --config playwright.wallet.config.js",
+    "e2e:fixtures": "npm run build && playwright test"
   },
   "browser": {
     "child_process": false

@@ -10,6 +10,12 @@
 //
 // Deci: `npm run build:prod`, servit prin BFF către query-api și interaction-api locale, și abia
 // atunci wallet-ul injectat întîlnește `connectGovernanceDefault` adevărat. Vezi `e2e-wallet/README`.
+//
+// CELE DOUĂ SUITE ÎMPART `dist`, și asta e o capcană măsurată: după un `build:prod`, suita de
+// fixturi cade în bloc, fiindcă serverul ei de preview servește bundle-ul de producție. De aceea
+// fiecare suită se rulează prin scriptul ei din `package.json` — `npm run e2e:fixtures` și
+// `npm run e2e:wallet` — care CONSTRUIEȘTE bundle-ul potrivit înainte. Un `npx playwright test`
+// direct nu o face, și pică.
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
