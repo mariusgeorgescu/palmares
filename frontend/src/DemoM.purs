@@ -32,6 +32,7 @@ import Capabilities.Query.Gov.Mock
   , getProfilesMock
   , getAttestationsMock
   , getDisputesMock
+  , getRegistrySummaryMock
   , getStatusMock
   , getVotesMock
   , searchAllMock
@@ -118,6 +119,7 @@ instance MonadQueryGov DemoM where
   getProfiles = getProfilesMock
   getAttestations = getAttestationsMock
   getDisputes = getDisputesMock
+  getRegistrySummary = getRegistrySummaryMock
 
 instance monadInteractDemoM :: MonadInteract DemoM where
   buildFlow = buildFlowMock

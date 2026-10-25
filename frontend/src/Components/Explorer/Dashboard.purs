@@ -26,8 +26,8 @@ module Components.Explorer.Dashboard
 import Prelude
 
 import Capabilities.Query.Gov.Http (ApiError, renderApiError)
-import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getDashboard)
-import Capabilities.Query.Gov.Types (DRepSummary(..), DashboardPage(..), EpochPoint(..), GovActionSummary(..), Lovelace)
+import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getDashboard, getRegistrySummary)
+import Capabilities.Query.Gov.Types (DRepSummary(..), DashboardPage(..), EpochPoint(..), GovActionSummary(..), Lovelace, RegistrySummary)
 import Components.Chart.Series as Series
 import Components.Shared.DRepIdentity as DRepIdentity
 import Data.Array (mapMaybe, null)
@@ -40,13 +40,23 @@ import Format (formatAda, formatInt, formatPercent, humanize, pluralize)
 import Route.GovQueries
   ( actionDetailHrefFor
   , actionListHrefFor
-  , drepDetailHrefFor
+  , activityPath
+  , attestationListPath
+  , committeePath
   , defaultVoteFilters
+  , delegationListPath
+  , disputeListPath
+  , drepDetailHrefFor
   , drepListHrefFor
   , emptyDRepFilters
   , emptyGovActionFilters
+  , graphPath
   , methodologyPath
+  , profileListPath
+  , spoListPath
   , voteListHrefFor
+  , withdrawalListPath
+  , writePath
   )
 import Halogen as H
 import Halogen.HTML as HH
@@ -62,7 +72,12 @@ type Output = Void
 _dashboard :: Proxy "dashboard"
 _dashboard = Proxy
 
-type State = { page :: RemoteData ApiError DashboardPage }
+type State =
+  { page :: RemoteData ApiError DashboardPage
+  -- Separat de `page` fiindcă e un alt apel și o altă secțiune: cifrele registrului nu depind de
+  -- cele de guvernanță și nu trebuie să cadă împreună cu ele.
+  , registry :: Maybe RegistrySummary
+  }
 
 data Action
   = Initialize
@@ -110,7 +125,7 @@ component
   => H.Component q i Output m
 component =
   H.mkComponent
-    { initialState: const { page: NotAsked }
+    { initialState: const { page: NotAsked, registry: Nothing }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -128,6 +143,14 @@ component =
 
   load = do
     H.modify_ _ { page = Loading }
+    -- Registrul întâi, fiindcă el e subiectul paginii. Explorerul de guvernanță vine după, și
+    -- dacă răspunde mai târziu nu ține în loc partea de sus.
+    reg <- getRegistrySummary
+    H.modify_ _
+      { registry = case reg of
+          Left _ -> Nothing
+          Right r -> Just r
+      }
     res <- getDashboard
     H.modify_ _
       { page = case res of
@@ -140,32 +163,125 @@ component =
       -- Hub-ul vine DUPĂ cifre, nu înaintea lor. Cifrele sunt motivul pentru care există pagina;
       -- patru carduri de navigare între titlu și ele cheltuiau primul ecran pe ceva ce bara de sus
       -- spune deja, iar „294 de DRep-i" ajungea sub linia de plutire.
-      [ intro
+      [ intro st
+      , hubOf "Everything in the register" registryGroups
+      -- Explorerul vine DUPĂ registru și sub propriul titlu, cu o propoziție care spune de ce
+      -- există aici: nu e un al doilea produs, e felul în care un claim despre un reprezentant se
+      -- poate verifica împotriva lanțului.
+      , HH.div [ HP.class_ (HH.ClassName "space-y-2 pt-2") ]
+          [ HH.h2 [ HP.class_ (HH.ClassName "text-2xl font-bold") ] [ HH.text "The governance record" ]
+          , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
+              [ HH.text
+                  "A profile can claim to be a Cardano representative. This is where that claim is \
+                  \checked: every representative, every proposal, every vote, straight from the \
+                  \chain."
+              ]
+          ]
       , case st.page of
           NotAsked -> skeleton "Loading governance figures…"
           Loading -> skeleton "Loading governance figures…"
           Failure e -> failure e
           Success p -> renderPage p
-      , hub
+      , hubOf "Everything in the explorer" governanceGroups
       ]
 
-  intro =
-    HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
-      [ HH.h1 [ HP.class_ (HH.ClassName "text-4xl font-bold") ] [ HH.text "Palmares" ]
-      , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
-          -- „DRep" apare de peste douăzeci de ori pe ecranul ăsta și nu era explicat nicăieri pe el.
-          -- Definiția stă în a doua propoziție, înaintea oricărei cifre care o folosește.
-          [ HH.text
-              "A verifiable track record for Cardano governance. A DRep is a delegated \
-              \representative: someone who votes on governance proposals on behalf of the ada \
-              \delegated to them. Every figure below is derived independently from the chain, and \
-              \every metric resolves to a published formula."
+  -- Prima pagină trebuie să răspundă, în ordinea asta, la: ce e ăsta, de ce m-ar interesa, ce pot
+  -- face aici. Versiunea dinainte începea cu „A verifiable track record for Cardano governance" —
+  -- adevărat, dar e o propoziție pe care o înțelege cineva care știe deja ce e guvernanța Cardano.
+  -- Cine nu știe pleacă de la ea fără nimic.
+  --
+  -- Deci: o frază care spune ce se vede aici în cuvinte de zi cu zi, apoi trei lucruri pe care
+  -- le poți face, apoi cele trei cuvinte din jargon pe care site-ul le folosește oricum. Cifrele
+  -- vin după.
+  intro st =
+    HH.div [ HP.class_ (HH.ClassName "space-y-4") ]
+      [ HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
+          [ HH.h1 [ HP.class_ (HH.ClassName "text-4xl font-bold") ] [ HH.text "Palmares" ]
+          , HH.p [ HP.class_ (HH.ClassName "text-lg max-w-3xl") ]
+              [ HH.text "A register of who vouches for whom, on chain — and what those claims are worth." ]
+          , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
+              [ HH.text
+                  "Anyone can state something about someone else here: that they delivered a \
+                  \milestone, passed an audit, hold a role. The claim is written on chain, the \
+                  \subject can accept it, and anyone who thinks it is false can challenge it by \
+                  \putting money behind the challenge. Nothing is deleted and nothing is anonymous."
+              ]
+          ]
+      , registryFigures st
+      , HH.div [ HP.class_ (HH.ClassName "grid gap-3 md:grid-cols-3") ] (map useCase useCases)
+      , glossary
+      ]
+
+  -- Cele trei numere ale registrului, sus, pentru că ele sunt produsul. Un „—" cît timp nu s-a
+  -- încărcat, nu un zero: zero ar fi o afirmație despre registru.
+  registryFigures st =
+    HH.div [ HP.class_ (HH.ClassName "grid gap-3 sm:grid-cols-3") ]
+      [ figureCard "Profiles" (countOf st _.profiles) "Identities anyone can look up." profileListPath
+      , figureCard "Attestations" (countOf st _.attestations) "Claims made about them." attestationListPath
+      , figureCard "Disputes" (countOf st _.disputes) "Claims someone put money against." disputeListPath
+      ]
+
+  countOf st f = case st.registry of
+    Nothing -> "—"
+    Just r -> formatInt (f r)
+
+  figureCard label value body href =
+    HH.a
+      [ HP.href href
+      , HP.class_ (HH.ClassName "card bg-base-200 hover:bg-base-300 transition-colors")
+      ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body p-4 gap-1") ]
+          [ HH.span [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text label ]
+          , HH.span [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text value ]
+          , HH.span [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text body ]
           ]
       ]
 
-  hub =
-    HH.div [ HP.class_ (HH.ClassName "grid gap-4 sm:grid-cols-2 lg:grid-cols-4") ]
-      (map hubCard hubEntries)
+  useCase u =
+    HH.a
+      [ HP.href u.href
+      , HP.class_ (HH.ClassName "card bg-base-200 hover:bg-base-300 transition-colors")
+      ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body p-4 gap-1") ]
+          [ HH.span [ HP.class_ (HH.ClassName "font-semibold") ] [ HH.text u.title ]
+          , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text u.body ]
+          ]
+      ]
+
+  -- Trei cuvinte, o propoziție fiecare. Site-ul le folosește de sute de ori; a le explica o dată,
+  -- aici, costă trei rânduri și scutește fiecare ecran de o paranteză.
+  glossary =
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body p-4 gap-2") ]
+          [ HH.span [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-70") ]
+              [ HH.text "Four words this site uses a lot" ]
+          , HH.dl [ HP.class_ (HH.ClassName "grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-4 text-sm") ]
+              [ term "Profile" "An identity, held as a token. Whoever holds the token holds the profile."
+              , term "Attestation" "A claim one profile makes about another. It is not binding until the subject accepts it."
+              , term "Dispute" "A challenge against a claim, with a deposit at stake. Lose the challenge, lose the deposit."
+              , term "DRep" "A Cardano governance representative. A profile can prove it owns one — that is a credential claim."
+              ]
+          ]
+      ]
+
+  term label body =
+    HH.div_
+      [ HH.dt [ HP.class_ (HH.ClassName "font-semibold") ] [ HH.text label ]
+      , HH.dd [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text body ]
+      ]
+
+  hubOf title groups =
+    HH.div [ HP.class_ (HH.ClassName "space-y-4") ]
+      [ HH.h2 [ HP.class_ (HH.ClassName "text-xl font-bold") ] [ HH.text title ]
+      , HH.div [ HP.class_ (HH.ClassName "grid gap-4 md:grid-cols-2") ] (map hubGroup groups)
+      ]
+
+  hubGroup group =
+    HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
+      [ HH.h3 [ HP.class_ (HH.ClassName "text-sm uppercase tracking-wide opacity-70") ]
+          [ HH.text group.title ]
+      , HH.div [ HP.class_ (HH.ClassName "space-y-2") ] (map hubCard group.entries)
+      ]
 
   hubCard entry =
     HH.a
@@ -434,22 +550,110 @@ component =
       , HH.td [ HP.class_ (HH.ClassName "text-right font-mono") ] [ HH.text (formatPercent d.participationRate) ]
       ]
 
-hubEntries :: Array { href :: String, label :: String, description :: String }
-hubEntries =
-  [ { href: drepListHref
-    , label: "DReps"
-    , description: "Who is registered, how much power they hold, and whether they vote."
+-- | Cele trei lucruri pentru care deschide cineva site-ul. Toate trei sunt despre registru; al
+-- | treilea duce în explorer, pentru că acolo se verifică dacă cel care pretinde ceva chiar votează.
+useCases :: Array { href :: String, title :: String, body :: String }
+useCases =
+  [ { href: attestationListPath
+    , title: "See who vouched for whom"
+    , body: "Every claim on the register: who made it, about whom, whether it was accepted, and whether anyone fought it."
     }
-  , { href: actionListHrefFor emptyGovActionFilters
-    , label: "Governance actions"
-    , description: "Every proposal, its lifecycle, and who voted which way."
+  , { href: writePath
+    , title: "Make a claim of your own"
+    , body: "Mint a profile, attest to someone's work, or challenge a claim you believe is false. You sign every transaction yourself."
     }
-  , { href: voteListHrefFor defaultVoteFilters
-    , label: "Votes"
-    , description: "Individual votes, with the rationale when one was published."
+  , { href: drepListHref
+    , title: "Check it against the chain"
+    , body: "A profile can claim a governance credential. The explorer shows whether that representative actually votes."
     }
-  , { href: methodologyPath
-    , label: "Methodology"
-    , description: "The formula behind every metric on this site."
+  ]
+
+-- | Indexul, în două jumătăți: întâi registrul — care e produsul — apoi explorerul de guvernanță,
+-- | care e contextul în care claim-urile registrului se pot verifica.
+-- |
+-- | Bara de sus ține cinci destinații în linie și restul într-un meniu, ceea ce e corect pentru o
+-- | bară; pagina de pornire e singurul loc unde încape tot, iar asta face meniul o scurtătură în
+-- | loc de singura cale.
+registryGroups :: Array { title :: String, entries :: Array { href :: String, label :: String, description :: String } }
+registryGroups =
+  [ { title: "The register"
+    , entries:
+        [ { href: profileListPath
+          , label: "Profiles"
+          , description: "Identities. Each one is a token, and whoever holds the token holds the profile."
+          }
+        , { href: attestationListPath
+          , label: "Attestations"
+          , description: "Claims about those identities, and whether the subject accepted them."
+          }
+        , { href: disputeListPath
+          , label: "Disputes"
+          , description: "Claims someone challenged, with a deposit at stake on the outcome."
+          }
+        ]
+    }
+  , { title: "Taking part"
+    , entries:
+        [ { href: writePath
+          , label: "Write to the register"
+          , description: "The nine things you can do here. You sign every transaction yourself."
+          }
+        , { href: methodologyPath
+          , label: "Methodology"
+          , description: "Every number on this site resolves to a published formula and its query."
+          }
+        ]
+    }
+  ]
+
+governanceGroups :: Array { title :: String, entries :: Array { href :: String, label :: String, description :: String } }
+governanceGroups =
+  [ { title: "Who votes"
+    , entries:
+        [ { href: drepListHref
+          , label: "Representatives"
+          , description: "Everyone registered to vote on behalf of others."
+          }
+        , { href: spoListPath
+          , label: "Stake pools"
+          , description: "Pools vote too, on a smaller set of proposals."
+          }
+        , { href: committeePath
+          , label: "Constitutional committee"
+          , description: "The body that judges whether a proposal is constitutional."
+          }
+        ]
+    }
+  , { title: "What is being decided"
+    , entries:
+        [ { href: actionListHrefFor emptyGovActionFilters
+          , label: "Proposals"
+          , description: "Every governance action ever submitted, and what happened to it."
+          }
+        , { href: voteListHrefFor defaultVoteFilters
+          , label: "Votes"
+          , description: "Each vote on its own, with the reasoning when one was published."
+          }
+        , { href: withdrawalListPath
+          , label: "Treasury"
+          , description: "What was asked of the treasury, and what it actually paid."
+          }
+        ]
+    }
+  , { title: "Who stands behind whom"
+    , entries:
+        [ { href: delegationListPath
+          , label: "Delegations"
+          , description: "Who handed their voting power to whom, and when."
+          }
+        , { href: graphPath
+          , label: "Delegation graph"
+          , description: "The same thing drawn as a picture, around one representative."
+          }
+        , { href: activityPath
+          , label: "Activity"
+          , description: "Everything governance did on this chain, newest first."
+          }
+        ]
     }
   ]

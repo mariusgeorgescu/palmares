@@ -204,7 +204,7 @@ component =
 -- | coada, deci ce distinge ecranul trebuie să fie în față.
 documentTitle :: Route -> String
 documentTitle = case _ of
-  Home -> "Palmares — Cardano governance track record"
+  Home -> "Palmares — an on-chain register of who vouches for whom"
   DRepList _ -> "DReps — Palmares"
   DRepDetail drepId -> shortId drepId <> " — Palmares"
   ActionList _ -> "Governance actions — Palmares"

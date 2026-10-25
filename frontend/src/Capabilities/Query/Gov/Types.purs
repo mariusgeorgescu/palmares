@@ -62,6 +62,7 @@ module Capabilities.Query.Gov.Types
   , AttestationPage(..)
   , DisputeRow(..)
   , DisputePage(..)
+  , RegistrySummary
   ) where
 
 import Prelude
@@ -1707,3 +1708,14 @@ instance DecodeJson DisputePage where
     limit <- o .: "limit"
     offset <- o .: "offset"
     pure (DisputePage { items, total, limit, offset })
+
+-- | Cele trei numere ale registrului, pentru pagina de pornire.
+-- |
+-- | Nu e un răspuns al serverului: e compus din `total`-urile a trei liste cerute cu `limit=1`.
+-- | Un compozit de pagină ar fi fost mai ieftin, dar nu există unul pentru registru — iar trei
+-- | cereri de un rând sunt mai ieftine decât un endpoint nou pe care nimeni nu l-a cerut.
+type RegistrySummary =
+  { profiles :: Int
+  , attestations :: Int
+  , disputes :: Int
+  }

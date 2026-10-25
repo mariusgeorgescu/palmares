@@ -29,6 +29,7 @@ import Capabilities.Query.Gov.Default
   , getProfilesDefault
   , getAttestationsDefault
   , getDisputesDefault
+  , getRegistrySummaryDefault
   , getStatusDefault
   , getVotesDefault
   , searchAllDefault
@@ -123,6 +124,7 @@ instance MonadQueryGov AppM where
   getProfiles f = ask >>= \env -> getProfilesDefault env f
   getAttestations f = ask >>= \env -> getAttestationsDefault env f
   getDisputes f = ask >>= \env -> getDisputesDefault env f
+  getRegistrySummary = ask >>= getRegistrySummaryDefault
 
 -- | Scrierea. Trei metode pentru nouă fluxuri; mediul poartă prefixul BFF-ului.
 instance monadInteractAppM :: MonadInteract AppM where

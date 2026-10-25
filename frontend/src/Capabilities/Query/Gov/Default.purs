@@ -20,6 +20,7 @@ module Capabilities.Query.Gov.Default
   , getProfilesDefault
   , getAttestationsDefault
   , getDisputesDefault
+  , getRegistrySummaryDefault
   ) where
 
 import Prelude
@@ -44,6 +45,7 @@ import Capabilities.Query.Gov.Types
   , ProfilePage
   , AttestationPage
   , DisputePage
+  , RegistrySummary
   )
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
@@ -221,3 +223,25 @@ getDisputesDefault
   -> RegistryFilters
   -> m (Either ApiError DisputePage)
 getDisputesDefault env f = getJson (env.queryBaseUrl <> "/disputes" <> queryOf (disputeListHrefFor f))
+
+-- | Trei cereri de un rând, trei `total`-uri. Dacă una cade, cade tot: un registru care ar arăta
+-- | „12 profiluri, ? atestări" pe pagina de pornire ar fi mai rău decât unul care spune că n-a
+-- | putut încărca — al doilea se poate reîncerca, primul arată ca un produs stricat.
+getRegistrySummaryDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> m (Either ApiError RegistrySummary)
+getRegistrySummaryDefault env = do
+  p <- totalOf "/profiles"
+  a <- totalOf "/attestations"
+  d <- totalOf "/disputes"
+  pure do
+    profiles <- p
+    attestations <- a
+    disputes <- d
+    pure { profiles, attestations, disputes }
+  where
+  totalOf path = do
+    res <- getJson (env.queryBaseUrl <> path <> "?limit=1")
+    pure (map (\(r :: { total :: Int }) -> r.total) res)

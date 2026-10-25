@@ -157,16 +157,18 @@ test.describe('palmares, on recorded fixtures', () => {
     const problems = watchConsole(page);
     await page.goto('/');
 
-    await page.getByRole('link', { name: 'Actions', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Governance actions', level: 1 })).toBeVisible();
-    await expect(page).toHaveURL('/gov-actions');
+    // „Attestations" e in linie, fiindca registrul e produsul; explorerul de guvernanta e in
+    // meniul „Governance".
+    await page.getByRole('link', { name: 'Attestations', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Attestations', level: 1 })).toBeVisible();
+    await expect(page).toHaveURL('/attestations');
 
     await page.getByRole('link', { name: 'Methodology', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Methodology', level: 1 })).toBeVisible();
 
     // Înapoi în istoric readuce ecranul anterior: rutele sunt stare de navigare, nu de componentă.
     await page.goBack();
-    await expect(page.getByRole('heading', { name: 'Governance actions', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Attestations', level: 1 })).toBeVisible();
 
     expect(problems).toEqual([]);
   });
@@ -267,16 +269,31 @@ test('the document title names the screen', async ({ page }) => {
 
 // Bara de navigare marcheaza sectiunea in care te afli, inclusiv pe o pagina de detaliu.
 test('the navigation marks the section you are in', async ({ page }) => {
+  // Pe o pagina de detaliu de atestare nu exista ruta separata, deci se verifica pe lista — si pe
+  // un ecran de guvernanta, unde marcajul trebuie sa cada pe meniul „Governance", nu pe nimic.
+  await page.goto('/attestations');
+  await expect(page.getByRole('link', { name: 'Attestations', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('link', { name: 'Profiles', exact: true })).toHaveAttribute('aria-current', 'false');
+
   await page.goto('/dreps/drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z');
-  await expect(page.getByRole('link', { name: 'DReps', exact: true })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('link', { name: 'Votes', exact: true })).toHaveAttribute('aria-current', 'false');
+  // Pe un ecran din explorer, marcajul e pe rezumatul meniului „Governance" — altfel bara n-ar
+  // spune nimic despre unde te afli pe jumatate din site. Linkul dinauntru poarta `aria-current`,
+  // dar e intr-un `details` inchis, deci se deschide intii.
+  await expect(page.locator('nav summary', { hasText: 'Governance' })).toHaveClass(/text-primary/);
+  await page.locator('nav summary', { hasText: 'Governance' }).click();
+  await expect(page.getByRole('link', { name: 'Representatives', exact: true })).toHaveAttribute('aria-current', 'page');
 });
 
 // Un `Maybe` randat direct scrie „Just 323" sau „Nothing" in pagina, si compilatorul nu are ce sa
 // spuna: `Show (Maybe a)` exista, deci `show a.lastVotableEpoch` e cod valid. Asta s-a si intimplat,
 // in doua locuri, in minutul in care douasprezece cimpuri au devenit optionale — vazut intr-o
 // captura, nu intr-un test. Acum e un test.
-const SHOW_LEAK = /\bJust\s|\bNothing\b/;
+// Tiparul e strîns pe FORMA pe care o are un `Maybe` randat, nu pe cuvinte: `show (Just 323)`
+// pune mereu o valoare după „Just", iar un `Nothing` scăpat apare după un cuvînt („as of epoch
+// Nothing"), niciodată la început de propoziție. Varianta largă dinainte pica pe textul paginii de
+// pornire, care începe o propoziție cu „Nothing is deleted" — un test care cere să nu scrii un
+// cuvînt englezesc obișnuit e un test care se dezactivează.
+const SHOW_LEAK = /\bJust\s+[-\d"(]|[a-z0-9,:] Nothing\b/;
 
 for (const route of [
   '/',

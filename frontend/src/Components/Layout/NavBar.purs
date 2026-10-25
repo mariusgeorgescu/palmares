@@ -145,13 +145,16 @@ component =
     -- înșiruie pe toate se rupe pe al doilea rând exact pe lățimile de laptop. Pe telefon nu
     -- există submeniu: hamburgerul le listează plat, pentru că acolo e deja o coloană care se
     -- derulează și un al doilea nivel ar cere două atingeri pentru fiecare ecran.
+    -- Ordinea barei e ordinea produsului: registrul întâi, explorerul de guvernanță al doilea.
+    -- Înainte era invers, și un vizitator care citea doar bara pleca cu impresia că site-ul e un
+    -- explorer de guvernanță care are și niște profiluri pe undeva.
     primaryItems =
       [ navLink st.route Home "Home"
-      , navLink st.route (DRepList emptyDRepFilters) "DReps"
-      , navLink st.route (ActionList emptyGovActionFilters) "Actions"
-      , navLink st.route (VoteList defaultVoteFilters) "Votes"
-      -- Scrierea stă în linie, nu sub „More": e singura secțiune care schimbă ceva, iar dacă
-      -- cineva o caută și n-o găsește, concluzia e că produsul doar citește.
+      , navLink st.route (ProfileList emptyRegistryFilters) "Profiles"
+      , navLink st.route (AttestationList emptyRegistryFilters) "Attestations"
+      , navLink st.route (DisputeList emptyRegistryFilters) "Disputes"
+      -- Scrierea stă în linie: e singura secțiune care schimbă ceva, iar dacă cineva o caută și
+      -- n-o găsește, concluzia e că produsul doar citește.
       , navLink st.route (Write emptyWriteFilters) "Write"
       ]
 
@@ -177,22 +180,24 @@ component =
                       (if anyActive st then "font-semibold text-primary" else "")
                   )
               ]
-              [ HH.text "More" ]
+              -- „More" nu spunea nimic despre ce e înăuntru. „Governance" spune, și e și
+              -- distincția care contează: ce e în meniu e explorerul, ce e în linie e registrul.
+              [ HH.text "Governance" ]
           , HH.ul [ HP.class_ (HH.ClassName "bg-base-200 rounded-box z-40 w-48 p-2 shadow") ]
               (map (\(Tuple r label) -> navLink st.route r label) (moreTargetsOf st))
           ]
       ]
 
   moreTargetsOf _ =
-    [ Tuple (SpoList emptySpoFilters) "SPOs"
+    [ Tuple (DRepList emptyDRepFilters) "Representatives"
+    , Tuple (SpoList emptySpoFilters) "Stake pools"
     , Tuple Committee "Committee"
+    , Tuple (ActionList emptyGovActionFilters) "Proposals"
+    , Tuple (VoteList defaultVoteFilters) "Votes"
     , Tuple (TreasuryList emptyWithdrawalFilters) "Treasury"
     , Tuple (DelegationList emptyDelegationFilters) "Delegations"
+    , Tuple (Graph emptyGraphFilters) "Delegation graph"
     , Tuple (Activity emptyActivityFilters) "Activity"
-    , Tuple (ProfileList emptyRegistryFilters) "Profiles"
-    , Tuple (AttestationList emptyRegistryFilters) "Attestations"
-    , Tuple (DisputeList emptyRegistryFilters) "Disputes"
-    , Tuple (Graph emptyGraphFilters) "Graph"
     ]
 
   -- „More" se marchează când ecranul curent e unul dintre cele dinăuntru: altfel bara nu spune

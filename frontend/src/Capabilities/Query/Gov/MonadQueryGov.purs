@@ -25,6 +25,7 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getProfiles
   , getAttestations
   , getDisputes
+  , getRegistrySummary
   ) where
 
 import Prelude
@@ -47,6 +48,7 @@ import Capabilities.Query.Gov.Types
   , ProfilePage
   , AttestationPage
   , DisputePage
+  , RegistrySummary
   , VotePage
   )
 import Control.Monad.Trans.Class (lift)
@@ -128,6 +130,10 @@ class Monad m <= MonadQueryGov m where
   -- | `GET /disputes` — contestațiile deschise împotriva atestărilor, cu depozitul pus la bătaie.
   getDisputes :: RegistryFilters -> m (Either ApiError DisputePage)
 
+  -- | Cele trei numere ale registrului, pentru pagina de pornire. Compus din trei cereri de un
+  -- | rând, nu dintr-un endpoint propriu — vezi `RegistrySummary`.
+  getRegistrySummary :: m (Either ApiError RegistrySummary)
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
@@ -148,3 +154,4 @@ instance monadQueryGovHalogenM ::
   getProfiles = lift <<< getProfiles
   getAttestations = lift <<< getAttestations
   getDisputes = lift <<< getDisputes
+  getRegistrySummary = lift getRegistrySummary

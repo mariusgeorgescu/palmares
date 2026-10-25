@@ -23,6 +23,7 @@ module Capabilities.Query.Gov.Mock
   , getProfilesMock
   , getAttestationsMock
   , getDisputesMock
+  , getRegistrySummaryMock
   , decodeFixture
   ) where
 
@@ -66,6 +67,7 @@ import Capabilities.Query.Gov.Types
   , ProfilePage
   , AttestationPage
   , DisputePage
+  , RegistrySummary
   )
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
 import Data.Bifunctor (lmap)
@@ -142,3 +144,7 @@ getAttestationsMock _ = pure (decodeFixture attestationListFixture)
 
 getDisputesMock :: forall m. Applicative m => RegistryFilters -> m (Either ApiError DisputePage)
 getDisputesMock _ = pure (decodeFixture disputeListFixture)
+
+-- | Numerele măsurate pe preprod, ca și fixturile din care ar fi putut fi citite.
+getRegistrySummaryMock :: forall m. Applicative m => m (Either ApiError RegistrySummary)
+getRegistrySummaryMock = pure (Right { profiles: 12, attestations: 19, disputes: 5 })
