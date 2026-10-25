@@ -12,6 +12,7 @@ import UnitTests.Attestation (attestationTests)
 import UnitTests.ApiHardening (apiHardeningTests)
 import UnitTests.ChainSyncReplay (chainSyncReplayTests)
 import UnitTests.Conversions (conversionsTests)
+import UnitTests.EpochParams qualified as EpochParams
 import UnitTests.GovDto (govDtoTests)
 import UnitTests.GovIds (govIdsTests)
 import UnitTests.GovThresholds (govThresholdsTests)
@@ -85,6 +86,7 @@ unitTests =
       Refresh.tests,
       ScriptSize.tests,
       storageRoundtripTests,
+      EpochParams.tests,
       ThresholdMap.tests,
       Views.tests,
       writePathTests,

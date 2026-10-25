@@ -74,9 +74,10 @@ getStatusQuery = do
       (maxLag, inputs) <- readyInputs
       mParams <- runRead epochParamsQuery
       case mParams of
-        -- No epoch_param row at all means db-sync has not reached Shelley, or is running without
+        -- No usable epoch_param row means db-sync has not reached Conway, or is running without
         -- the ledger state that writes it. Either way no tally we publish could be audited, which
-        -- is a readiness condition rather than an empty field.
+        -- is a readiness condition rather than an empty field. See 'epochParamsQuery': a
+        -- pre-Conway row exists but has every governance column NULL, and counts as absent here.
         Nothing -> throwApi IndexerBehind
         Just params -> do
           net <- asks expectedNetwork

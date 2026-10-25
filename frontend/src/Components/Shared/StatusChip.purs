@@ -18,7 +18,7 @@ module Components.Shared.StatusChip
 
 import Prelude
 
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError(..), renderApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getStatus)
 import Capabilities.Query.Gov.Types (AttestSync(..), ChipState(..), GovStatus(..), GovSync(..), chipStateFor)
 import Data.Const (Const)
@@ -75,7 +75,7 @@ component =
       HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-center gap-2 text-xs") ]
         [ badge Amber "freshness unknown"
         , HH.span [ HP.class_ (HH.ClassName "opacity-70"), HP.title (renderApiError e) ]
-            [ HH.text "the status service did not answer" ]
+            [ HH.text (failureLabel e) ]
         ]
     Success s -> renderStatus s
 
@@ -116,6 +116,14 @@ component =
   freshnessLabel lag
     | lag <= 0 = "live"
     | otherwise = show lag <> "s behind"
+
+  -- „Nu a răspuns" e fals când serverul a răspuns exact: `indexer_behind` e un 503 pe care
+  -- query-api îl dă deliberat cât timp db-sync încă reface istoria și nu există încă parametri de
+  -- guvernanță împotriva cărora o numărătoare s-ar putea verifica. Pe un deploy nou asta e starea
+  -- pe care o vede fiecare vizitator timp de câteva ore, deci merită propoziția ei.
+  failureLabel = case _ of
+    Api { code: "indexer_behind" } -> "the index is still catching up"
+    _ -> "the status service did not answer"
 
   badge state label =
     HH.span

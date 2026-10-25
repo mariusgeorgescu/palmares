@@ -473,14 +473,6 @@ freshnessQuery =
     \) x"
     []
 
--- | The latest protocol parameters, as one JSON object.
---
--- The LATEST row rather than the tip epoch's, because @epoch_param@ is written per epoch and the
--- open epoch's row may not exist yet; serving no parameters at all would make every tally on
--- @\/status@ unauditable for the first blocks of an epoch.
---
--- The threshold lists are built as @[name, value]@ pairs with db-sync's own column names, so a
--- reader can look any of them up in @palmares.thresholds@ and check our arithmetic.
 -- | The epoch @palmares.drep_metrics@ was last refreshed for — `GV-23`.
 --
 -- One scalar off the matview, which check 070 asserts holds exactly one distinct value: every metric
@@ -495,6 +487,24 @@ metricsAsOfEpochQuery = do
     (Single e : _) -> Just e
     [] -> Nothing
 
+-- | The latest GOVERNANCE protocol parameters, as one JSON object.
+--
+-- The LATEST row rather than the tip epoch's, because @epoch_param@ is written per epoch and the
+-- open epoch's row may not exist yet; serving no parameters at all would make every tally on
+-- @\/status@ unauditable for the first blocks of an epoch.
+--
+-- The threshold lists are built as @[name, value]@ pairs with db-sync's own column names, so a
+-- reader can look any of them up in @palmares.thresholds@ and check our arithmetic.
+--
+-- @gov_action_lifetime IS NOT NULL@ is what makes a row USABLE here, not merely present. Every
+-- column this query selects is a Conway parameter, so on a pre-Conway epoch db-sync writes the
+-- @epoch_param@ row with all of them NULL — and the row is the latest one while db-sync is
+-- replaying history from Byron forward. Without the predicate, 'queryJson1' decodes
+-- @gov_action_lifetime@ into an 'Int', fails, and the deliberate @error@ there aborts the response
+-- mid-flight: @\/status@ answers with a closed socket instead of a status. Measured on preprod at
+-- epoch 78 of 321. With it, a pre-Conway database is 'Nothing', which the caller already reports
+-- as @503 IndexerBehind@ — correct, because governance parameters do not exist before Conway and
+-- no tally we could publish would be auditable against them.
 epochParamsQuery :: SqlPersistT IO (Maybe EpochParamsSummary)
 epochParamsQuery =
   queryJson1
@@ -522,6 +532,7 @@ epochParamsQuery =
     \           json_build_array('pvtpp_security_group',       t.pvtpp_security_group) \
     \         ) AS pool_thresholds \
     \  FROM palmares.thresholds t \
+    \  WHERE t.gov_action_lifetime IS NOT NULL \
     \  ORDER BY t.epoch_no DESC \
     \  LIMIT 1 \
     \) x"

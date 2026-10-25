@@ -540,6 +540,7 @@ test-suite test
     UnitTests.Profile
     UnitTests.StorageRoundtrip
     UnitTests.ThresholdMap
+    UnitTests.EpochParams
 
   build-depends:
     , chainsync-lib
