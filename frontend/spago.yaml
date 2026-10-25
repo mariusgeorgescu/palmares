@@ -57,9 +57,13 @@ workspace:
       git: https://github.com/mariusgeorgescu/purescript-cardano-capabilities.git
       ref: 09c5af6779ad8a3b5a732cdd1da38677da46b50b
 
+    # Ramura `compat/csl-15`: binding-ul nu se putea încărca pe CSL >= 12, fiindcă patru apeluri de
+    # nivel superior dispăruseră și aruncau la IMPORT. Ne trebuie CSL >= 12 pentru un motiv exact:
+    # pe 11.5.0 `Transaction.from_hex` nu poate citi o tranzacție Conway — intrările vin ca `set`
+    # etichetat (tag 258) și deserializarea moare cu „expected `Array' byte received `Tag'".
     cardano-serialization-lib:
       git: https://github.com/mariusgeorgescu/purescript-cardano-serialization-lib.git
-      ref: 7d6c664b125ce8c3cc441912fb8daf72294c17e7
+      ref: 0b6695459a92d91b5bb0a17e678565469f31b555
 
     cip30-typesafe:
       git: https://github.com/mariusgeorgescu/purescript-cip30-typesafe.git

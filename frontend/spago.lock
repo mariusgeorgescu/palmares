@@ -820,7 +820,7 @@
       },
       "cardano-serialization-lib": {
         "git": "https://github.com/mariusgeorgescu/purescript-cardano-serialization-lib.git",
-        "ref": "7d6c664b125ce8c3cc441912fb8daf72294c17e7"
+        "ref": "0b6695459a92d91b5bb0a17e678565469f31b555"
       },
       "cip30": {
         "git": "https://github.com/mariusgeorgescu/purescript-cip30.git",
@@ -1093,7 +1093,7 @@
     "cardano-serialization-lib": {
       "type": "git",
       "url": "https://github.com/mariusgeorgescu/purescript-cardano-serialization-lib.git",
-      "rev": "7d6c664b125ce8c3cc441912fb8daf72294c17e7",
+      "rev": "0b6695459a92d91b5bb0a17e678565469f31b555",
       "dependencies": [
         "argonaut-core",
         "arraybuffer-types",
