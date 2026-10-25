@@ -592,3 +592,29 @@ test('the sidebar rail is on desktop and the dock on phones, with the section ma
   // Cinci intrări, ca în bjj: mai multe și fiecare ar fi sub pragul de atingere.
   await expect(navs.first().locator('a')).toHaveCount(5);
 });
+
+test('the activity drawer opens over any screen and closes with Escape', async ({ page }) => {
+  // Ultima piesa de aspect din bjj, si una pe care o respinsesem pe o premisa gresita: credeam ca
+  // butonul flotant de la `bottom-24` s-ar bate cu docul de pe telefon. Codul lui bjj stivuieste
+  // butoanele la `bottom-24` si `bottom-40` TOCMAI fiindca are si el un doc jos — tiparul rezolvase
+  // deja coliziunea pe care o invocam.
+  await page.goto('/profiles');
+
+  const fab = page.getByRole('button', { name: 'Show recent activity' });
+  await expect(fab).toBeVisible();
+  await fab.click();
+
+  const drawer = page.getByRole('dialog', { name: 'Recent activity' });
+  await expect(drawer).toBeVisible();
+  // Indicatorul „LIVE" si cel putin un eveniment: un sertar gol ar fi un buton care minte.
+  await expect(drawer.getByText('Live')).toBeVisible();
+  await expect(drawer.locator('li')).not.toHaveCount(0);
+  // Si drumul spre fluxul intreg, fiindca sertarul arata doar zece.
+  await expect(drawer.getByRole('link', { name: 'See the whole feed' }))
+    .toHaveAttribute('href', '/activity');
+
+  // Escape inchide din PANOU, nu doar din buton.
+  await page.keyboard.press('Escape');
+  await expect(drawer).toBeHidden();
+  await expect(fab).toBeVisible();
+});

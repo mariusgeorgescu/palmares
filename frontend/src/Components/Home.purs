@@ -33,6 +33,7 @@ import Components.Explorer.SpoList as SpoList
 import Components.Explorer.TreasuryList as TreasuryList
 import Components.Explorer.VoteList as VoteList
 import Components.Layout.NavBar as NavBar
+import Components.Layout.ActivityDrawer as ActivityDrawer
 import Components.Layout.Sidebar as Sidebar
 import Components.Shared.DRepIdentity (shortId)
 import Components.Shared.StatusChip as StatusChip
@@ -179,6 +180,9 @@ component =
       -- Șina și docul. O funcție pură, nu un slot: navigarea merge prin ancore, pe care
       -- `SpaLinkInterceptor` le prinde oricum.
       , Sidebar.render st.route
+      -- Sertarul de activitate: butonul flotant stă deasupra docului pe telefon și coboară pe
+      -- desktop, exact ca în bjj. Se încarcă abia la deschidere.
+      , HH.slot_ ActivityDrawer._activityDrawer unit ActivityDrawer.component unit
       -- `md:pl-24` lasă loc șinei fixe, `pb-20` docului de pe telefon. Fără al doilea, ultimul rând
       -- al oricărui tabel stă sub doc și nu se poate citi.
       , HH.div [ HP.class_ (HH.ClassName "md:pl-24 pb-20 md:pb-0") ]
