@@ -15,7 +15,7 @@
 import { expect, test } from '@playwright/test';
 
 const ROUTES = [
-  ['/', 'Palmares — Cardano governance track record'],
+  ['/', 'Palmares — an on-chain register of who vouches for whom'],
   ['/dreps', 'DReps — Palmares'],
   ['/gov-actions', 'Governance actions — Palmares'],
   ['/votes', 'Votes — Palmares'],
@@ -96,8 +96,13 @@ test.describe('the deployed site', () => {
     test.use({ viewport: { width: 390, height: 844 } });
     for (const [path] of ROUTES) {
       test(`${path} does not scroll sideways`, async ({ page }) => {
-        await page.goto(path);
-        await page.waitForLoadState('networkidle');
+        // `domcontentloaded`, NU `networkidle`: pe baza vie `/activity` răspunde în peste cinci
+        // minute (măsurat 2026-10-25, vezi nota din README), iar `networkidle` nu se așază cît
+        // timp cererea e în zbor — testul expira pe latența serverului, nu pe derulare. Ce se
+        // măsoară aici e cadrul paginii, iar el e desenat înainte de date; tabelul plin e acoperit
+        // de suita pe fixturi.
+        await page.goto(path, { waitUntil: 'domcontentloaded' });
+        await page.getByRole('navigation', { name: 'Main' }).waitFor();
         const overflow = await page.evaluate(() => {
           const e = document.scrollingElement;
           return e.scrollWidth - e.clientWidth;
