@@ -172,3 +172,64 @@ test.describe('palmares, on recorded fixtures', () => {
     await expect(page.getByRole('link', { name: 'Go home' })).toBeVisible();
   });
 });
+
+// Regresia pe care suita n-o putea vedea: fiecare ecran derula orizontal pe telefon.
+// Masurat inainte de reparare, la 390px: /gov-actions 1117px, /dreps 941px, /votes 921px, restul
+// 505px. Un test de continut trece oricum, pentru ca textul E acolo — doar ca utilizatorul trebuie
+// sa traga pagina lateral ca sa-l vada.
+test.describe('at phone width', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  const routes = [
+    '/',
+    '/dreps',
+    '/dreps/drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z',
+    '/gov-actions',
+    '/gov-actions/90de87d46e6345118c01dc5ec701b4dce5621ffa3b1f98a3d55eb34e85da7392%230',
+    '/votes',
+    '/methodology',
+    '/this-does-not-exist',
+  ];
+
+  for (const route of routes) {
+    test(`${route} does not scroll sideways`, async ({ page }) => {
+      await page.goto(route);
+      const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+        scrollWidth: document.scrollingElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(scrollWidth, `${route} overflows by ${scrollWidth - clientWidth}px`).toBeLessThanOrEqual(clientWidth + 1);
+    });
+  }
+
+  test('the navigation collapses into a menu instead of overflowing', async ({ page }) => {
+    await page.goto('/');
+    // Linkurile orizontale sint ascunse sub lg; meniul se deschide din buton.
+    await expect(page.getByRole('link', { name: 'Methodology', exact: true })).toBeHidden();
+    await page.getByRole('button', { name: 'Main menu' }).click();
+    await expect(page.getByRole('link', { name: 'Methodology', exact: true })).toBeVisible();
+    // Si se inchide la navigare, in loc sa ramina deschis peste ecranul urmator.
+    await page.getByRole('link', { name: 'Methodology', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Methodology', level: 1 })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Methodology', exact: true })).toBeHidden();
+  });
+});
+
+// Titlul documentului e singurul lucru care distinge doua taburi deschise pe acelasi site.
+test('the document title names the screen', async ({ page }) => {
+  await page.goto('/');
+  await expect(page).toHaveTitle(/^Palmares/);
+  await page.goto('/votes');
+  await expect(page).toHaveTitle('Votes — Palmares');
+  await page.goto('/gov-actions');
+  await expect(page).toHaveTitle('Governance actions — Palmares');
+  await page.goto('/this-does-not-exist');
+  await expect(page).toHaveTitle('Not found — Palmares');
+});
+
+// Bara de navigare marcheaza sectiunea in care te afli, inclusiv pe o pagina de detaliu.
+test('the navigation marks the section you are in', async ({ page }) => {
+  await page.goto('/dreps/drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z');
+  await expect(page.getByRole('link', { name: 'DReps', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('link', { name: 'Votes', exact: true })).toHaveAttribute('aria-current', 'false');
+});
