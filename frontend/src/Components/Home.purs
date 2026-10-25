@@ -33,6 +33,7 @@ import Components.Explorer.SpoList as SpoList
 import Components.Explorer.TreasuryList as TreasuryList
 import Components.Explorer.VoteList as VoteList
 import Components.Layout.NavBar as NavBar
+import Components.Layout.Sidebar as Sidebar
 import Components.Shared.DRepIdentity (shortId)
 import Components.Shared.StatusChip as StatusChip
 import Data.Const (Const)
@@ -173,10 +174,17 @@ component =
       -- Înălțimea e rezervată, nu descoperită: banda crește de la o pastilă („checking…") la
       -- câteva fapte când răspunde `/status`, iar fără rezervare tot ce e sub ea — titlul,
       -- cardurile, primul tabel — sare în jos exact când utilizatorul a început să citească.
-      , HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 pt-4 min-h-14 sm:min-h-10 relative z-10") ]
-          [ HH.slot_ StatusChip._statusChip unit StatusChip.component unit ]
-      , HH.main [ HP.id "main", HP.class_ (HH.ClassName "min-h-[80vh] relative z-10") ]
-          [ renderRoute st.route ]
+      -- Șina și docul. O funcție pură, nu un slot: navigarea merge prin ancore, pe care
+      -- `SpaLinkInterceptor` le prinde oricum.
+      , Sidebar.render st.route
+      -- `md:pl-24` lasă loc șinei fixe, `pb-20` docului de pe telefon. Fără al doilea, ultimul rând
+      -- al oricărui tabel stă sub doc și nu se poate citi.
+      , HH.div [ HP.class_ (HH.ClassName "md:pl-24 pb-20 md:pb-0") ]
+          [ HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 pt-4 min-h-14 sm:min-h-10 relative z-10") ]
+              [ HH.slot_ StatusChip._statusChip unit StatusChip.component unit ]
+          , HH.main [ HP.id "main", HP.class_ (HH.ClassName "min-h-[80vh] relative z-10") ]
+              [ renderRoute st.route ]
+          ]
       ]
 
   renderRoute = case _ of

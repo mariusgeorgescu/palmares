@@ -170,7 +170,12 @@ test.describe('palmares, on recorded fixtures', () => {
 
     // „Attestations" e in linie, fiindca registrul e produsul; explorerul de guvernanta e in
     // meniul „Governance".
-    await page.getByRole('link', { name: 'Attestations', exact: true }).click();
+    //
+    // Scopat la bara de sus: de cînd exista si sina laterala, acelasi nume apare de doua ori — o
+    // data sus si o data in sina, deliberat. Un `getByRole` nescopat ar cadea pe strict mode, iar
+    // raspunsul corect e sa spui PE CARE il apesi, nu sa renunti la unul dintre ele.
+    const mainNav = page.getByRole('navigation', { name: 'Main' });
+    await mainNav.getByRole('link', { name: 'Attestations', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Attestations', level: 1 })).toBeVisible();
     await expect(page).toHaveURL('/attestations');
 
@@ -283,8 +288,15 @@ test('the navigation marks the section you are in', async ({ page }) => {
   // Pe o pagina de detaliu de atestare nu exista ruta separata, deci se verifica pe lista — si pe
   // un ecran de guvernanta, unde marcajul trebuie sa cada pe meniul „Governance", nu pe nimic.
   await page.goto('/attestations');
-  await expect(page.getByRole('link', { name: 'Attestations', exact: true })).toHaveAttribute('aria-current', 'page');
-  await expect(page.getByRole('link', { name: 'Profiles', exact: true })).toHaveAttribute('aria-current', 'false');
+  // Bara de sus ȘI șina marchează aceeași secțiune — două locuri, același adevăr. Se verifică
+  // amîndouă, fiindcă un marcaj care cade doar într-unul lasă celălalt mincinos.
+  const topNav = page.getByRole('navigation', { name: 'Main' });
+  const rail = page.getByRole('navigation', { name: 'Sections' }).first();
+  await expect(topNav.getByRole('link', { name: 'Attestations', exact: true }))
+    .toHaveAttribute('aria-current', 'page');
+  await expect(rail.locator('a[aria-current="page"]')).toHaveAttribute('href', '/attestations');
+  await expect(topNav.getByRole('link', { name: 'Profiles', exact: true }))
+    .toHaveAttribute('aria-current', 'false');
 
   await page.goto('/dreps/drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z');
   // Pe un ecran din explorer, marcajul e pe rezumatul meniului „Governance" — altfel bara n-ar
@@ -534,4 +546,38 @@ test('the four wallet icons are not empty strings any more', async ({ page }) =>
     expect(res.status(), `/images/${name}.svg must be served`).toBe(200);
     expect((await res.text()).slice(0, 400)).toContain('svg');
   }
+});
+
+test('the sidebar rail is on desktop and the dock on phones, with the section marked', async ({ page }) => {
+  // Elementul care dă STRUCTURA aspectului din bjj: conținutul stă între o șină la stânga și bara
+  // de sus, iar pe telefon navigarea coboară într-un doc. Fără el, oricâte clase de stil ar fi
+  // împrumutate, aplicația arată ca alta.
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await page.goto('/profiles');
+
+  const rail = page.getByRole('navigation', { name: 'Sections' }).first();
+  await expect(rail).toBeVisible();
+  // Secțiunea curentă e marcată, iar `aria-current` o spune și pentru cineva care nu vede culoarea.
+  await expect(rail.locator('a[aria-current="page"]')).toHaveAttribute('href', '/profiles');
+
+  // MĂȘTILE TREBUIE SĂ FIE GENERATE. Prima variantă compunea clasa Tailwind prin concatenare, iar
+  // scanerul citește textul sursei: regulile nu existau, iar șina a ieșit un rând de pătrate pline.
+  // Testul cere regula în foaia de stil servită, nu doar clasa pe element.
+  const css = await (await page.request.get('/output.css')).text();
+  for (const icon of ['home', 'practitioners', 'achievements', 'bell', 'dashboard', 'activity', 'lineage', 'about']) {
+    expect(css, `the mask rule for ${icon}.svg was not generated`)
+      .toContain(`url(/images/sidebar/${icon}.svg)`);
+  }
+
+  // Pe telefon: docul, nu șina.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/profiles');
+  // UN SINGUR `nav` „Sections" la lățimea asta, nu al doilea din DOM: șina e `hidden`, iar
+  // `getByRole` exclude din arborele de accesibilitate ce are `display: none`. Prima variantă cerea
+  // `nth(1)` presupunând ordinea din DOM și pica — iar comportamentul e corect, nu testul.
+  const navs = page.getByRole('navigation', { name: 'Sections' });
+  await expect(navs).toHaveCount(1);
+  await expect(navs.first()).toBeVisible();
+  // Cinci intrări, ca în bjj: mai multe și fiecare ar fi sub pragul de atingere.
+  await expect(navs.first().locator('a')).toHaveCount(5);
 });
