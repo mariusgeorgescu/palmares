@@ -182,8 +182,8 @@ component =
 
   body st page@(GovActionPage p) =
     HH.div [ HP.class_ (HH.ClassName "grid gap-4 lg:grid-cols-4") ]
-      [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1 space-y-4") ] [ sidebar st ]
-      , HH.div [ HP.class_ (HH.ClassName "lg:col-span-3 space-y-3") ]
+      [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1 min-w-0 space-y-4") ] [ sidebar st ]
+      , HH.div [ HP.class_ (HH.ClassName "lg:col-span-3 min-w-0 space-y-3") ]
           [ HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
               [ HH.text
                   ( formatInt p.total <> " proposals match, showing "
@@ -226,7 +226,7 @@ component =
         [ HP.href (actionListHrefFor (next { offset = Nothing }))
         , HP.class_
             ( HH.ClassName
-                ( "block text-xs rounded px-1 py-0.5 hover:bg-base-300 "
+                ( "block text-xs rounded px-2 py-2 lg:px-1 lg:py-0.5 hover:bg-base-300 "
                     <> (if active then "bg-base-300 font-medium" else "")
                 )
             )
@@ -271,7 +271,7 @@ component =
       HH.th [ HP.class_ (HH.ClassName (if alignRight then "text-right" else "")) ]
         [ HH.a
             [ HP.href (actionListHrefFor next)
-            , HP.class_ (HH.ClassName ("link link-hover " <> (if sorted then "font-semibold" else "")))
+            , HP.class_ (HH.ClassName ("link link-hover inline-block py-1.5 " <> (if sorted then "font-semibold" else "")))
             ]
             [ HH.text (label <> arrow) ]
         ]

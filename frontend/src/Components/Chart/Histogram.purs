@@ -42,7 +42,7 @@ render bars =
         [ HP.href b.href
         , HP.class_
             ( HH.ClassName
-                ( "flex items-center gap-2 text-xs rounded px-1 py-0.5 hover:bg-base-300 "
+                ( "flex items-center gap-2 text-xs rounded px-1 py-2 lg:py-0.5 hover:bg-base-300 "
                     <> (if b.active then "bg-base-300 font-medium" else "")
                 )
             )

@@ -156,12 +156,21 @@ component =
       [ HH.input
           [ HP.type_ HP.InputSearch
           , HP.ref inputRef
-          , HP.class_ (HH.ClassName "input input-bordered input-sm w-44 sm:w-64")
-          , HP.placeholder "Search  ⌘K"
+          , HP.class_ (HH.ClassName "input input-bordered input-sm w-28 sm:w-48 lg:w-64 lg:pr-12")
+          , HP.placeholder "Search"
           , HP.value st.draft
           , HE.onValueInput DraftChanged
           , HE.onKeyDown KeyPressed
           ]
+      -- Scurtătura se arată ca tastă, nu ca text în placeholder: pe telefon nu există ⌘, iar un
+      -- placeholder care spune „Search  ⌘K" acolo e o instrucțiune pentru o tastatură inexistentă.
+      -- `pointer-events-none` ca eticheta să nu fure clicul pe câmp.
+      , HH.span
+          [ HP.class_
+              (HH.ClassName "hidden lg:flex absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 text-xs")
+          , HP.attr (HH.AttrName "aria-hidden") "true"
+          ]
+          [ HH.text "⌘K" ]
       , if st.open then panel st else HH.text ""
       ]
 

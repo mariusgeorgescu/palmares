@@ -10,5 +10,14 @@
 }
 
 @layer components {
-  /* Project-wide component styles go here. */
+  /* `card-body` din daisyUI e un flex column, iar un element de flex are implicit
+     `min-width: auto` — adică nu se poate micșora sub lățimea conținutului. Un tabel cu opt
+     coloane sau un bloc de SQL pune deci toată pagina pe derulare orizontală, chiar dacă are
+     propriul `overflow-x-auto`.
+     Măsurat înainte de regula asta, pe un ecran de 390px: dashboard 505px, lista de DRep-i 941px,
+     lista de acțiuni 1117px. Derularea orizontală a paginii e cel mai ieftin mod de a face un site
+     să pară rupt pe telefon. */
+  .card-body > * {
+    min-width: 0;
+  }
 }

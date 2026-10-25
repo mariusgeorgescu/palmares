@@ -10,6 +10,10 @@
 
 	<meta name="theme-color" content="#2A303C">
 
+	<!-- Fără asta, browserul cere `/favicon.ico`, ia 404 pe fiecare încărcare, și tabul rămâne cu
+	     iconița generică. Nu s-a văzut în e2e pentru că headless shell-ul nu cere favicon-ul. -->
+	<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+
 	<link href="/output.css" rel="stylesheet" type="text/css">
 </head>
 

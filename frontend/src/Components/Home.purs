@@ -18,10 +18,12 @@ import Components.Explorer.DRepList as DRepList
 import Components.Explorer.Methodology as Methodology
 import Components.Explorer.VoteList as VoteList
 import Components.Layout.NavBar as NavBar
+import Components.Shared.DRepIdentity (shortId)
 import Components.Shared.StatusChip as StatusChip
 import Data.Const (Const)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -30,6 +32,9 @@ import Halogen.Store.Monad (class MonadStore)
 import Route (Route(..))
 import Route.Codec (printRoute)
 import Store as Store
+import Web.HTML (window)
+import Web.HTML.HTMLDocument (setTitle)
+import Web.HTML.Window (document)
 
 type Input = Unit
 type Output = Void
@@ -88,17 +93,24 @@ component =
       -- fără linia asta ar fi randat dashboard-ul — ceea ce e mai rău decât o pagină de eroare,
       -- pentru că arată ca un succes.
       current >>= case _ of
-        Just r -> H.modify_ _ { route = r }
-        Nothing -> H.modify_ _ { route = NotFound }
+        Just r -> setRoute r
+        Nothing -> setRoute NotFound
       emitter <- emitMatched
       _ <- H.subscribe (RouteChanged <$> emitter)
       pure unit
-    RouteChanged route -> H.modify_ _ { route = route }
+    RouteChanged route -> setRoute route
     HandleNavBar _ -> pure unit
+
+  -- Titlul documentului se schimbă cu ruta. Într-un SPA nimeni nu-l schimbă în locul tău, iar un
+  -- titlu identic pe toate ecranele face inutilizabile exact lucrurile pentru care cineva deschide
+  -- mai multe taburi: istoricul, bookmark-urile și lista de taburi.
+  setRoute route = do
+    H.modify_ _ { route = route }
+    liftEffect (window >>= document >>= setTitle (documentTitle route))
 
   render st =
     HH.div [ HP.class_ (HH.ClassName "min-h-screen bg-base-100") ]
-      [ HH.slot NavBar._navbar unit NavBar.component unit HandleNavBar
+      [ HH.slot NavBar._navbar unit NavBar.component st.route HandleNavBar
       -- Chip-ul stă în afara slotului de rută, nu în fiecare pagină: prospețimea e o proprietate a
       -- datelor, nu a ecranului, și un singur apel o acoperă pe toate.
       , HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 pt-4") ]
@@ -127,3 +139,16 @@ component =
           ]
           [ HH.text "Go home" ]
       ]
+
+-- | Titlul per ecran. Numele produsului merge la __sfârșit__: într-un tab îngust browserul taie
+-- | coada, deci ce distinge ecranul trebuie să fie în față.
+documentTitle :: Route -> String
+documentTitle = case _ of
+  Home -> "Palmares — Cardano governance track record"
+  DRepList _ -> "DReps — Palmares"
+  DRepDetail drepId -> shortId drepId <> " — Palmares"
+  ActionList _ -> "Governance actions — Palmares"
+  ActionDetail _ -> "Proposal — Palmares"
+  VoteList _ -> "Votes — Palmares"
+  Methodology _ -> "Methodology — Palmares"
+  NotFound -> "Not found — Palmares"

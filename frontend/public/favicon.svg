@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Palmares">
+  <!-- Marca palmares: un semn de bifare într-un pătrat. Produsul vinde verificabilitate, iar la 16px
+       o bifă e singura formă care încă se citește. Culorile sunt fixe, nu din temă: un favicon nu
+       moștenește `data-theme`, iar un gri care se pierde pe un tab deschis nu e o marcă. -->
+  <rect width="32" height="32" rx="7" fill="#2A303C"/>
+  <path d="M8.5 17.2l5 5L23.5 11.4" fill="none" stroke="#9FE88D" stroke-width="3.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

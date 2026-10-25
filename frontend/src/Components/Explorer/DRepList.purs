@@ -202,8 +202,8 @@ component =
 
   body st page@(DRepExplorerPage p) =
     HH.div [ HP.class_ (HH.ClassName "grid gap-4 lg:grid-cols-4") ]
-      [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1 space-y-4") ] [ sidebar st page ]
-      , HH.div [ HP.class_ (HH.ClassName "lg:col-span-3 space-y-3") ]
+      [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1 min-w-0 space-y-4") ] [ sidebar st page ]
+      , HH.div [ HP.class_ (HH.ClassName "lg:col-span-3 min-w-0 space-y-3") ]
           [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline justify-between gap-2") ]
               [ HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
                   [ HH.text
@@ -260,7 +260,7 @@ component =
         [ HP.href (drepListHrefFor (next { offset = Nothing }))
         , HP.class_
             ( HH.ClassName
-                ( "flex items-center justify-between gap-2 text-xs rounded px-1 py-0.5 hover:bg-base-300 "
+                ( "flex items-center justify-between gap-2 text-xs rounded px-2 py-2 lg:px-1 lg:py-0.5 hover:bg-base-300 "
                     <> (if active then "bg-base-300 font-medium" else "")
                 )
             )
@@ -314,7 +314,7 @@ component =
       HH.th [ HP.class_ (HH.ClassName (if alignRight then "text-right" else "")) ]
         [ HH.a
             [ HP.href (drepListHrefFor (sortToggle column st.filters))
-            , HP.class_ (HH.ClassName ("link link-hover " <> (if sorted then "font-semibold" else "")))
+            , HP.class_ (HH.ClassName ("link link-hover inline-block py-1.5 " <> (if sorted then "font-semibold" else "")))
             ]
             [ HH.text (label <> arrow) ]
         ]

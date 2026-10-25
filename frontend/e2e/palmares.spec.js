@@ -140,7 +140,7 @@ test.describe('palmares, on recorded fixtures', () => {
     const problems = watchConsole(page);
     await page.goto('/');
 
-    await page.getByPlaceholder('Search  ⌘K').fill('logical');
+    await page.getByPlaceholder('Search', { exact: true }).fill('logical');
     // Trei credențiale distincte, un singur nume: de aceea ID-ul merge lângă nume.
     await expect(page.getByRole('link', { name: /Logical Mechanism dRep/ })).toHaveCount(3);
     await expect(page.getByText('763ef75661f0cd8c8fa159a79d79bfe8f9a76878bdaaff700598ee0e')).toBeVisible();

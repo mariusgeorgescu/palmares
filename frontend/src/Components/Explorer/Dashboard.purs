@@ -253,8 +253,12 @@ component =
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text title ]
           , if null pairs then HH.p [ HP.class_ (HH.ClassName "opacity-60 text-sm") ] [ HH.text "Nothing yet." ]
             else
-              HH.table [ HP.class_ (HH.ClassName "table table-sm") ]
-                [ HH.tbody_ (map pairRow pairs) ]
+              -- Containerul de derulare nu e decor: fără el, tabelul împinge toată pagina pe
+              -- derulare orizontală la lățime de telefon.
+              HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
+                [ HH.table [ HP.class_ (HH.ClassName "table table-sm") ]
+                    [ HH.tbody_ (map pairRow pairs) ]
+                ]
           ]
       ]
 
