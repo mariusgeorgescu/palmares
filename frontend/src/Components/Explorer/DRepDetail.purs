@@ -221,7 +221,8 @@ component =
                   [ HH.text (maybe "no declared language" (\l -> "language: " <> l) s.language) ]
               ]
           , HH.div [ HP.class_ (HH.ClassName "flex flex-wrap gap-6 pt-2") ]
-              [ figure "Voting power" (formatAda s.votingPower) ("as of epoch " <> show s.votingPowerEpoch)
+              [ figure "Voting power" (formatAda s.votingPower)
+                  (maybe "not published yet" (\e -> "as of epoch " <> show e) s.votingPowerEpoch)
               , figure "Delegators" (formatInt s.delegatorCount) ""
               , figure "Participation" (formatPercent s.participationRate)
                   (pluralize s.votesCast "vote" <> " of " <> formatInt s.eligibleActions <> " eligible")

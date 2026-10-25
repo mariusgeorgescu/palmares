@@ -238,3 +238,25 @@ test('the navigation marks the section you are in', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'DReps', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByRole('link', { name: 'Votes', exact: true })).toHaveAttribute('aria-current', 'false');
 });
+
+// Un `Maybe` randat direct scrie „Just 323" sau „Nothing" in pagina, si compilatorul nu are ce sa
+// spuna: `Show (Maybe a)` exista, deci `show a.lastVotableEpoch` e cod valid. Asta s-a si intimplat,
+// in doua locuri, in minutul in care douasprezece cimpuri au devenit optionale — vazut intr-o
+// captura, nu intr-un test. Acum e un test.
+const SHOW_LEAK = /\bJust\s|\bNothing\b/;
+
+for (const route of [
+  '/',
+  '/dreps',
+  '/dreps/drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z',
+  '/gov-actions',
+  '/gov-actions/90de87d46e6345118c01dc5ec701b4dce5621ffa3b1f98a3d55eb34e85da7392%230',
+  '/votes',
+]) {
+  test(`${route} renders no PureScript constructor`, async ({ page }) => {
+    await page.goto(route);
+    const text = await page.evaluate(() => document.body.innerText);
+    const hit = text.match(SHOW_LEAK);
+    expect(hit && text.slice(Math.max(0, hit.index - 40), hit.index + 20), `${route} leaks a constructor`).toBeFalsy();
+  });
+}

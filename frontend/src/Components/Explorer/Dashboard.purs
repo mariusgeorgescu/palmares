@@ -34,7 +34,7 @@ import Data.Array (mapMaybe, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Foldable (maximum, minimum)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Tuple (Tuple(..))
 import Format (formatAda, formatInt, formatPercent, humanize, pluralize)
 import Route.GovQueries
@@ -375,8 +375,7 @@ component =
           [ HH.div_ [ HH.text (humanize a.type_) ]
           , HH.div [ HP.class_ (HH.ClassName "opacity-70") ]
               [ HH.text
-                  ( "last votable epoch " <> show a.lastVotableEpoch
-                      <> " · "
+                  ( maybe "" (\e -> "last votable epoch " <> show e <> " · ") a.lastVotableEpoch
                       <> pluralize a.votesCast "vote"
                       <> treasuryNote a.treasuryAmount
                   )
