@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 # The allowlist in .gitleaks.toml is not a hole, and this is what says so.
 #
-# That file turns OFF one rule — `generic-api-key` — in four narrow places, because that rule
-# cannot tell a public credential hash from a secret. The risk of any allowlist is that it quietly
-# stops catching the thing it was never meant to excuse, so each narrowing is tested from both
-# sides: a real-looking credential in the same place must still fail the gate, and the public value
-# the narrowing exists for must not. Both halves matter: a gate that catches nothing and a gate that
-# catches everything are equally useless.
+# That file turns OFF two rules — `generic-api-key` and `curl-auth-user` — in six narrow places,
+# because neither rule can tell a public credential hash, a function name or a deliberately-wrong
+# password from a secret. The risk of any allowlist is that it quietly stops catching the thing it
+# was never meant to excuse, so each narrowing is tested from both sides: a real-looking credential
+# in the same place must still fail the gate, and the public value the narrowing exists for must
+# not. Both halves matter: a gate that catches nothing and a gate that catches everything are
+# equally useless.
 #
-# Three of the four are covered here — the Koios wire fixtures (by path), bech32 governance
-# identifiers and raw 28-byte credential hashes (both by value shape, any path). The fourth,
-# `cabal.project`'s CHaP root keys, is a single published constant in a file no test writes to.
+# Five of the six are covered here — the Koios wire fixtures (by path), bech32 governance
+# identifiers and raw 28-byte credential hashes (both by value shape, any path), the two smoke
+# basic-auth pairs (by the password's own value) and the CIP-129 renderer's name (by that name).
+# The sixth, `cabal.project`'s CHaP root keys, is a single published constant in a file no test
+# writes to.
 #
 # Nothing it writes is a real credential: the AWS key id is the one from gitleaks' own test
 # corpus, and the private key is a BEGIN marker with eight bytes of nothing after it.
@@ -165,6 +168,58 @@ if scan; then
   fail=1
 else
   echo "  ok   a 32-byte hex value under the same binding still trips the gate"
+fi
+# 5. The `curl-auth-user` entry: two basic-auth pairs, excused by the PASSWORD'S OWN VALUE. Both
+#    halves are planted in a shell script, which is where the real ones live.
+#
+#    The plant that must still fail is a password that reads like one. Assembled from fragments for
+#    the reason in the header: this file is scanned too.
+#
+#    The Haskell plant from the step above is removed first: every `scan` call is a scan of the
+#    WHOLE copied tree, so a leftover plant from an earlier step makes every later assertion read
+#    "trips the gate" regardless of what it planted. Measured — test 5 failed for exactly that
+#    reason before this line existed.
+rm -rf "$ROOT/src"
+SH="$ROOT/scripts/zz-planted.sh"
+mkdir -p "$ROOT/scripts"
+REAL_PW="Tr0ub4dor""&3-admin"
+printf '#!/usr/bin/env bash\ncurl -s -u "admin:%s" http://127.0.0.1:8082/tx-status/x\n' "$REAL_PW" > "$SH"
+if scan; then
+  echo "  FAIL a planted credible password under 'curl -u' did NOT trip the gate"
+  fail=1
+else
+  echo "  ok   a planted credible password under 'curl -u' still trips the gate"
+fi
+
+#    ...and the two the entry exists for must not. `definitely-not-the-password` is the smoke
+#    script's wrong-credentials case and `smoke-devonly` is the local compose pair.
+printf '#!/usr/bin/env bash\ncurl -s -u "${BASIC_USER:-}:definitely-not-the-password" http://x/y\ncurl -s -u smoke:smoke-devonly http://x/y\n' > "$SH"
+if scan; then
+  echo "  ok   the wrong-credentials and dev-only pairs do not trip the gate"
+else
+  echo "  FAIL the wrong-credentials and dev-only pairs trip the gate"
+  fail=1
+fi
+rm -rf "$ROOT/scripts"
+
+# 6. The `Ids.hs` entry is the exact NAME of a function, so the plant is the same line of Haskell
+#    with a real credential on the right of the `=`. If this stops failing, the entry has widened
+#    from one identifier to "anything assigned to a Credential-named function".
+mkdir -p "$HS_DIR"
+printf 'module ZzPlanted where\n\nrenderCredentialRoleCip129 :: String\nrenderCredentialRoleCip129 = "%s"\n' "$AWS" > "$HS"
+if scan; then
+  echo "  FAIL a planted AWS key under the CIP-129 renderer's name did NOT trip the gate"
+  fail=1
+else
+  echo "  ok   a planted AWS key under the CIP-129 renderer's name still trips the gate"
+fi
+
+printf 'module ZzPlanted where\n\nrenderCredentialRoleCip129 RoleCCHot = ccHotIdCip129\n' > "$HS"
+if scan; then
+  echo "  ok   the renderer's own name does not trip the gate"
+else
+  echo "  FAIL the renderer's own name trips the gate"
+  fail=1
 fi
 rm -rf "$ROOT/src"
 

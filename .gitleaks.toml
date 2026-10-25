@@ -126,3 +126,49 @@ description = "raw blake2b-224 credential hashes: 28 bytes, the width no secret 
 targetRules = ["generic-api-key"]
 regexTarget = "match"
 regexes = ['''"[0-9a-f]{56}"''']
+
+# `curl-auth-user` on the two basic-auth pairs the smoke path and its documentation spell out.
+#
+# WHAT IT FIRES ON: `curl -u …` with any non-empty password. The rule cannot do better — a pair in
+# a committed script looks the same whether it opens something or not — so what has to be judged is
+# the VALUE, and both values are judged here rather than excused by path.
+#
+#   * `"${BASIC_USER:-}:definitely-not-the-password"` in `scripts/smoke_interaction_api.sh`, twice.
+#     It is the WRONG-credentials case: the script asserts that a bad password gets 403 and not 401,
+#     so the password has to be in the file and has to not work. A password that reads
+#     "definitely-not-the-password" cannot be a real one in any deployment.
+#   * `smoke:smoke-devonly` in `docs/usecases/api-screen-map.md`, which documents reading
+#     `/tx-status` against the local compose stack. The credentials are per-deployment and the real
+#     ones live SOPS-encrypted in the cluster repository; this pair exists only in `compose.yaml`
+#     and in the page that explains it, which is why it is named `-devonly`.
+#
+# WHY THIS IS NOT A HOLE: both entries are scoped by the password's own value, so the rule still
+# fires on every other `curl -u` in the repository, including a future one that pastes a real
+# password into a script. Verified rather than assumed: `scripts/check_gitleaks_allowlist.sh`
+# plants a credible password under the same `curl -u` and asserts the gate still catches it.
+[[allowlists]]
+description = "deliberately-wrong and dev-only basic-auth pairs in the smoke path"
+targetRules = ["curl-auth-user"]
+regexes = [
+  '''definitely-not-the-password''',
+  '''^smoke:smoke-devonly$''',
+]
+
+# `generic-api-key` on a FUNCTION NAME: `renderCredentialRoleCip129 RoleCCHot = ccHotIdCip129`
+# at `src/lib/offchain-lib/Palmares/DomainTypes/Core/Ids.hs`.
+#
+# The diagnosis is the one the two entries above already made, in its purest form: the "secret" is
+# `ccHotIdCip129`, an identifier defined and exported twenty lines up in the same module. Its two
+# siblings on the lines immediately before — `drepIdCip129` and `ccColdIdCip129` — did not fire.
+# What the rule reacted to is the word "Credential" on the left of the `=` next to a mixed-case
+# token on the right.
+#
+# WHY THE ENTRY IS THE EXACT NAME: there is no value shape to scope this by, because the value is
+# not a value — renaming an exported function so a regex stops matching it would be letting the
+# scanner write the code. The name is spelled out instead, so the entry cannot cover anything else,
+# and if the function is ever renamed this line goes stale and the finding comes back to be decided
+# again. That is the same bargain `.gitleaksignore` makes with its fingerprints.
+[[allowlists]]
+description = "Ids.hs: a CIP-129 renderer's own name, read as a key"
+targetRules = ["generic-api-key"]
+regexes = ['''^ccHotIdCip129$''']
