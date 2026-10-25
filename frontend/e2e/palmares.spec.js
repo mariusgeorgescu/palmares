@@ -156,10 +156,21 @@ test.describe('palmares, on recorded fixtures', () => {
     const problems = watchConsole(page);
     await page.goto('/');
 
-    await page.getByPlaceholder('Search', { exact: true }).fill('logical');
+    // Căutarea e acum o PALETĂ, ca în bjj: se deschide întîi. Se deschide cu scurtătura, nu cu un
+    // clic pe declanșator, fiindcă `⌘K` e drumul pe care îl promite eticheta din bara de sus — iar
+    // un test care nu-l apasă n-ar fi observat că paleta trebuie și DESCHISĂ de el, nu doar
+    // focalizată.
+    await page.keyboard.press('ControlOrMeta+k');
+    const dialog = page.getByRole('dialog', { name: 'Search' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('searchbox').fill('logical');
     // Trei credențiale distincte, un singur nume: de aceea ID-ul merge lângă nume.
     await expect(page.getByRole('link', { name: /Logical Mechanism dRep/ })).toHaveCount(3);
     await expect(page.getByText('763ef75661f0cd8c8fa159a79d79bfe8f9a76878bdaaff700598ee0e')).toBeVisible();
+
+    // Și se închide cu Escape, din panou, nu doar din cîmp.
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
 
     expect(problems).toEqual([]);
   });

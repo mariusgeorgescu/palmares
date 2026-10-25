@@ -75,6 +75,7 @@ data Action
   | Fire Int
   | KeyPressed KE.KeyboardEvent
   | GlobalKey KE.KeyboardEvent
+  | Open
   | Close
   | Dismiss
 
@@ -120,14 +121,25 @@ component =
     GlobalKey ev ->
       when ((KE.metaKey ev || KE.ctrlKey ev) && String.toLower (KE.key ev) == "k") do
         preventDefaultEvent (KE.toEvent ev)
-        H.getHTMLElementRef inputRef >>= case _ of
-          Nothing -> pure unit
-          Just el -> liftEffect (HTMLElement.focus el)
+        handleAction Open
+
+    -- De cînd căutarea e o paletă, `⌘K` trebuie întâi s-o DESCHIDĂ: înainte cîmpul era mereu în
+    -- pagină și ajungea să-l focalizezi. Ordinea contează — `getHTMLElementRef` nu-l găsește cît
+    -- timp modalul nu e randat, iar Halogen randează sincron după `modify_`, deci focalizarea de
+    -- după vede deja cîmpul.
+    Open -> do
+      H.modify_ _ { open = true }
+      H.getHTMLElementRef inputRef >>= case _ of
+        Nothing -> pure unit
+        Just el -> liftEffect (HTMLElement.focus el)
 
     DraftChanged draft -> do
       st <- H.get
       let next = st.seq + 1
-      H.modify_ _ { draft = draft, seq = next, open = draft /= "" }
+      -- `open` NU mai depinde de text. Înainte panoul apărea și dispărea odată cu conținutul
+      -- cîmpului, ceea ce era potrivit pentru un panou lipit de el; un modal care se închide
+      -- singur cînd ștergi ce-ai scris ar fi o ușă care se trântește.
+      H.modify_ _ { draft = draft, seq = next }
       if String.length (String.trim draft) < 2 then
         H.modify_ _ { results = NotAsked }
       else handleAction (Fire next)
@@ -156,43 +168,83 @@ component =
 
     Dismiss -> H.modify_ _ { draft = "", results = NotAsked, open = false }
 
+  -- PALETĂ MODALĂ, ca `UnifiedSearch` din bjj — un declanșator în bara de sus, iar căutarea
+  -- propriu-zisă într-un strat peste pagină.
+  --
+  -- Comentariul de sus al modulului spunea, pe bună dreptate, că un cîmp vizibil face același lucru
+  -- cu mai puțin cod. Ownerul a cerut însă ca produsul să semene cît mai mult cu bjj, iar paleta e
+  -- forma de acolo; obiecția a fost spusă și n-a fost susținută, deci decizia e a lui.
+  --
+  -- Ce NU s-a schimbat: toată logica — `⌘K` global, debounce-ul de 250 ms, jetonul de secvență,
+  -- navigarea cu săgeți, `Escape`. S-a schimbat doar unde se desenează. De aceea portarea e în
+  -- `render` și nicăieri altundeva.
   render st =
-    -- `onKeyDown` stă și pe înveliș, nu doar pe câmp: după un Tab în panou, Escape trebuie să
-    -- închidă tot de acolo, nu doar cât timp focusul e în input.
-    HH.div [ HP.class_ (HH.ClassName "relative"), HE.onKeyDown KeyPressed ]
-      [ HH.input
-          [ HP.type_ HP.InputSearch
-          , HP.ref inputRef
-          , HP.class_ (HH.ClassName "input input-bordered input-sm w-28 sm:w-48 lg:w-64 lg:pr-12")
-          , HP.placeholder "Search"
-          , HP.value st.draft
-          , HE.onValueInput DraftChanged
-          , HE.onKeyDown KeyPressed
+    HH.div_
+      [ -- Declanșatorul: arată ca un cîmp, ca omul să-l recunoască, dar e un buton — un `input` care
+        -- nu primește ce tastezi e exact felul de element care face pe cineva să creadă că aplicația
+        -- s-a blocat.
+        HH.button
+          [ HP.type_ HP.ButtonButton
+          , HP.class_
+              ( HH.ClassName
+                  "input input-bordered input-sm w-28 sm:w-48 lg:w-64 flex items-center \
+                  \justify-between gap-2 cursor-text opacity-80 hover:opacity-100"
+              )
+          , HE.onClick \_ -> Open
+          , HP.attr (HH.AttrName "aria-label") "Search"
           ]
-      -- Scurtătura se arată ca tastă, nu ca text în placeholder: pe telefon nu există ⌘, iar un
-      -- placeholder care spune „Search  ⌘K" acolo e o instrucțiune pentru o tastatură inexistentă.
-      -- `pointer-events-none` ca eticheta să nu fure clicul pe câmp.
-      , HH.span
-          [ HP.class_
-              (HH.ClassName "hidden lg:flex absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-70 text-xs")
-          , HP.attr (HH.AttrName "aria-hidden") "true"
+          [ HH.span [ HP.class_ (HH.ClassName "opacity-70 truncate") ]
+              [ HH.text (if st.draft == "" then "Search" else st.draft) ]
+          -- Scurtătura se arată ca tastă, nu ca text în placeholder: pe telefon nu există ⌘.
+          , HH.span
+              [ HP.class_ (HH.ClassName "hidden lg:inline opacity-70 text-xs shrink-0")
+              , HP.attr (HH.AttrName "aria-hidden") "true"
+              ]
+              [ HH.text "⌘K" ]
           ]
-          [ HH.text "⌘K" ]
-      , if st.open then panel st else HH.text ""
+      , if st.open then modal st else HH.text ""
       ]
 
+  -- Învelișul de modal al lui daisyUI, ca în `Components/Shared/Modal.purs` din bjj: `modal-open`
+  -- plus un `modal-backdrop` care închide la clic. `onKeyDown` stă pe înveliș, nu doar pe cîmp —
+  -- după un Tab în rezultate, `Escape` trebuie să închidă tot de acolo.
+  modal st =
+    HH.div
+      [ HP.class_ (HH.ClassName "modal modal-open")
+      , HP.attr (HH.AttrName "role") "dialog"
+      , HP.attr (HH.AttrName "aria-modal") "true"
+      , HP.attr (HH.AttrName "aria-label") "Search"
+      , HP.tabIndex 0
+      , HE.onKeyDown KeyPressed
+      ]
+      [ HH.div
+          [ HP.class_ (HH.ClassName "modal-backdrop bg-black/50")
+          , HE.onClick \_ -> Close
+          ]
+          []
+      , HH.div
+          [ HP.class_
+              (HH.ClassName "modal-box w-[95vw] sm:w-auto max-w-2xl max-h-[85vh] overflow-y-auto")
+          ]
+          [ HH.input
+              [ HP.type_ HP.InputSearch
+              , HP.ref inputRef
+              , HP.class_ (HH.ClassName "input input-bordered w-full")
+              , HP.placeholder "Search profiles, attestations, representatives…"
+              , HP.value st.draft
+              , HE.onValueInput DraftChanged
+              , HE.onKeyDown KeyPressed
+              ]
+          , panel st
+          ]
+      ]
+
+  -- Rezultatele stau ACUM în cutia modalului, deci nu mai au nevoie de ancorare proprie. Varianta
+  -- de dinainte se ancora de ecran pe telefon fiindcă era un panou flotant lîngă un cîmp care
+  -- aluneca; într-un modal centrat problema aceea nu mai există.
   panel st =
     HH.div
-      [ HP.class_
-          ( HH.ClassName
-              -- Pe telefon panoul se ancorează de ECRAN, nu de câmp: câmpul alunecă spre stânga
-              -- când linkurile intră în meniu, iar un panou de lățime fixă ancorat `right-0` ar
-              -- ieși din ecran exact acolo unde nu există derulare orizontală.
-              "fixed inset-x-2 top-28 w-auto sm:absolute sm:inset-x-auto sm:right-0 sm:top-full \
-              \sm:w-96 sm:mt-1 max-h-96 overflow-y-auto z-50 card bg-base-100 shadow-xl \
-              \border border-base-300"
-          )
-      ]
+      [ HP.class_ (HH.ClassName "mt-2 max-h-[60vh] overflow-y-auto") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-2 gap-1") ]
           [ case st.results of
               NotAsked ->
