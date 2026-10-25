@@ -6,16 +6,17 @@ module Capabilities.Query.Gov.Default
   ( getStatusDefault
   , getDashboardDefault
   , getDRepExplorerDefault
+  , getDRepDetailDefault
   ) where
 
 import Prelude
 
 import Capabilities.Query.Gov.Env (HasGovEnv)
 import Capabilities.Query.Gov.Http (ApiError, getJson)
-import Capabilities.Query.Gov.Types (DRepExplorerPage, DashboardPage, GovStatus)
+import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovStatus)
 import Data.Either (Either)
 import Effect.Aff.Class (class MonadAff)
-import Route.GovQueries (DRepFilters, renderDRepFilters)
+import Route.GovQueries (DRepFilters, encodePathSegment, renderDRepFilters)
 
 getStatusDefault
   :: forall m r
@@ -39,3 +40,12 @@ getDRepExplorerDefault
   -> m (Either ApiError DRepExplorerPage)
 getDRepExplorerDefault env filters =
   getJson (env.queryBaseUrl <> "/pages/drep-explorer" <> renderDRepFilters filters)
+
+getDRepDetailDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> String
+  -> m (Either ApiError DRepDetail)
+getDRepDetailDefault env drepId =
+  getJson (env.queryBaseUrl <> "/pages/drep/" <> encodePathSegment drepId)

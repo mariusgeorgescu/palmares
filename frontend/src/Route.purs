@@ -9,8 +9,12 @@ import Route.GovQueries (DRepFilters, renderDRepFilters)
 
 -- Rutele se adaugă pe măsură ce ecranele se livrează (plan, taskurile 5–11), nu în avans: o rută
 -- fără pagină e un link care duce la NotFound.
+-- Ordinea constructorilor __contează__: `Routing.Duplex.parse` acceptă o potrivire care lasă
+-- segmente neconsumate (`run` ignoră restul), deci `DRepList`, care consumă doar „dreps", ar
+-- înghiți și „/dreps/drep1…" dacă ar fi încercat primul. Specificul înaintea generalului.
 data Route
   = Home
+  | DRepDetail String
   -- Filtrele călătoresc în rută, nu în starea componentei: URL-ul e stare partajabilă, iar
   -- butoanele înainte/înapoi ale browserului sunt controale ale ecranului, nu accidente.
   | DRepList DRepFilters
@@ -28,5 +32,6 @@ derive instance Generic Route _
 instance Show Route where
   show = case _ of
     Home -> "Home"
+    DRepDetail i -> "DRepDetail " <> i
     DRepList f -> "DRepList " <> renderDRepFilters f
     NotFound -> "NotFound"

@@ -9,14 +9,15 @@ module Capabilities.Query.Gov.Mock
   ( getStatusMock
   , getDashboardMock
   , getDRepExplorerMock
+  , getDRepDetailMock
   , decodeFixture
   ) where
 
 import Prelude
 
-import Capabilities.Query.Gov.Fixtures (dashboardFixture, drepExplorerFixture, statusFixture)
+import Capabilities.Query.Gov.Fixtures (dashboardFixture, drepDetailFixture, drepExplorerFixture, statusFixture)
 import Capabilities.Query.Gov.Http (ApiError(..), classifyResponse)
-import Capabilities.Query.Gov.Types (DRepExplorerPage, DashboardPage, GovStatus)
+import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovStatus)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
@@ -40,3 +41,7 @@ getDashboardMock = pure (decodeFixture dashboardFixture)
 -- | serverul adevărat.
 getDRepExplorerMock :: forall m. Applicative m => DRepFilters -> m (Either ApiError DRepExplorerPage)
 getDRepExplorerMock _ = pure (decodeFixture drepExplorerFixture)
+
+-- | Aceeași fixtură pentru orice ID: bundle-ul demo arată mereu DRep-ul-cazul-greu.
+getDRepDetailMock :: forall m. Applicative m => String -> m (Either ApiError DRepDetail)
+getDRepDetailMock _ = pure (decodeFixture drepDetailFixture)

@@ -43,7 +43,7 @@ import Halogen.HTML.Properties as HP
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
 import Route (Route(..))
-import Route.GovQueries (DRepFilters, drepListHrefFor, emptyDRepFilters, toggleIn)
+import Route.GovQueries (DRepFilters, drepDetailHrefFor, drepListHrefFor, emptyDRepFilters, toggleIn)
 import Halogen.Router.Class (class MonadRouter, navigate)
 import Type.Proxy (Proxy(..))
 import Web.UIEvent.KeyboardEvent as KE
@@ -322,7 +322,9 @@ component =
   row (DRepSummary d) =
     HH.tr_
       [ HH.td [ HP.class_ (HH.ClassName "max-w-xs") ]
-          [ DRepIdentity.render { givenName: d.givenName, drepId: d.id, hasScript: d.hasScript } ]
+          [ HH.a [ HP.href (drepDetailHrefFor d.id), HP.class_ (HH.ClassName "hover:underline") ]
+              [ DRepIdentity.render { givenName: d.givenName, drepId: d.id, hasScript: d.hasScript } ]
+          ]
       , HH.td_
           [ HH.div [ HP.class_ (HH.ClassName "flex flex-col gap-0.5") ]
               [ HH.span [ HP.class_ (HH.ClassName ("badge badge-sm " <> statusClass d.status)) ]

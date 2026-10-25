@@ -17,6 +17,8 @@ module Route.GovQueries
   , renderDRepFilters
   , drepListPath
   , drepListHrefFor
+  , drepDetailHrefFor
+  , encodePathSegment
   , toggleIn
   ) where
 
@@ -140,6 +142,15 @@ drepListPath = "/dreps"
 
 drepListHrefFor :: DRepFilters -> String
 drepListHrefFor f = drepListPath <> renderDRepFilters f
+
+-- | Un segment de cale, codat procentual. Nu e paranoia: ID-urile ajung aici din URL, iar un
+-- | identificator de acțiune de guvernanță conține `#` prin construcție (`<txhash>#<index>`), care
+-- | netratat ar tăia cererea la fragment și ar cere altceva decât s-a cerut.
+encodePathSegment :: String -> String
+encodePathSegment s = fromMaybe s (encodeURIComponent s)
+
+drepDetailHrefFor :: String -> String
+drepDetailHrefFor drepId = drepListPath <> "/" <> encodePathSegment drepId
 
 -- | Un facet se comută: dacă valoarea e deja în listă, iese; altfel intră la coadă. Ordinea de
 -- | adăugare se păstrează ca URL-ul să nu se rescrie singur la fiecare clic.

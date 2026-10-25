@@ -20,12 +20,23 @@ module Capabilities.Query.Gov.Types
   , DashboardPage(..)
   , PowerBucket(..)
   , DRepExplorerPage(..)
+  , ChainPoint(..)
+  , FinalVotes(..)
+  , VoteTypeStats(..)
+  , DRepMetrics(..)
+  , DelegatorStats(..)
+  , PowerPoint(..)
+  , Delegator(..)
+  , DRepUpdate(..)
+  , AnchorRef(..)
+  , AnchorContent(..)
+  , DRepDetail(..)
   ) where
 
 import Prelude
 
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), (.:?))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple)
 
 -- | Blocul de sincronizare al db-sync-ului. Prezent mereu.
@@ -414,6 +425,320 @@ instance DecodeJson DRepExplorerPage where
     pure
       ( DRepExplorerPage
           { items, total, limit, offset, epoch, statusFacets, anchorFacets, languageFacets, powerBuckets }
+      )
+
+-- | Un punct în lanț: slotul, epoca, ora și tranzacția. Apare peste tot unde un eveniment trebuie
+-- | să poată fi verificat de cineva care nu ne crede pe cuvânt — de aceea `txHash` nu e opțional.
+newtype ChainPoint = ChainPoint
+  { slot :: Int
+  , epoch :: Int
+  , time :: String
+  , txHash :: String
+  }
+
+derive instance Eq ChainPoint
+
+instance DecodeJson ChainPoint where
+  decodeJson json = do
+    o <- decodeJson json
+    slot <- o .: "slot"
+    epoch <- o .: "epoch"
+    time <- o .: "time"
+    txHash <- o .: "tx_hash"
+    pure (ChainPoint { slot, epoch, time, txHash })
+
+newtype FinalVotes = FinalVotes
+  { yes :: Int
+  , no :: Int
+  , abstain :: Int
+  }
+
+derive instance Eq FinalVotes
+
+instance DecodeJson FinalVotes where
+  decodeJson json = do
+    o <- decodeJson json
+    yes <- o .: "yes"
+    no <- o .: "no"
+    abstain <- o .: "abstain"
+    pure (FinalVotes { yes, no, abstain })
+
+-- | Comportamentul pe un tip de acțiune. `eligible_actions` e numitorul, și e per tip: un DRep care
+-- | a votat o dată din două acțiuni de hard fork are 50%, nu 0,8% din total.
+newtype VoteTypeStats = VoteTypeStats
+  { eligibleActions :: Int
+  , votesCast :: Int
+  , yes :: Int
+  , no :: Int
+  , abstain :: Int
+  , participationRate :: Maybe Number
+  }
+
+derive instance Eq VoteTypeStats
+
+instance DecodeJson VoteTypeStats where
+  decodeJson json = do
+    o <- decodeJson json
+    eligibleActions <- o .: "eligible_actions"
+    votesCast <- o .: "votes_cast"
+    yes <- o .: "yes"
+    no <- o .: "no"
+    abstain <- o .: "abstain"
+    participationRate <- o .:? "participation_rate"
+    pure (VoteTypeStats { eligibleActions, votesCast, yes, no, abstain, participationRate })
+
+-- | Metricile unui DRep, cu desfășurarea raționamentelor pe șase stări.
+-- |
+-- | Cele șase nu sunt decor: „absent" (n-a publicat nimic), „pending" (n-am verificat încă),
+-- | „unverified" (am încercat și n-am putut) și „verified" sunt fapte diferite despre lume, iar un
+-- | singur procent le-ar topi într-o acuzație. `formulaIds` sunt formulele publicate din care au
+-- | ieșit cifrele — fiecare rezolvabilă în `/metrics/formulas`.
+newtype DRepMetrics = DRepMetrics
+  { asOfEpoch :: Int
+  , eligibleActions :: Int
+  , votesCast :: Int
+  , openActionsUnvoted :: Int
+  , participationRate :: Maybe Number
+  , rationaleVerified :: Int
+  , rationaleInline :: Int
+  , rationaleUnverified :: Int
+  , rationalePending :: Int
+  , rationaleAbsent :: Int
+  , rationaleCip100Valid :: Int
+  , rationaleRate :: Maybe Number
+  , voteLatencyMedianHours :: Maybe Number
+  , voteLatencyP90Hours :: Maybe Number
+  , voteLatencySample :: Int
+  , ageDays :: Int
+  , finalVotes :: FinalVotes
+  , votesByType :: Array (Tuple String VoteTypeStats)
+  , formulaIds :: Array String
+  }
+
+derive instance Eq DRepMetrics
+
+instance DecodeJson DRepMetrics where
+  decodeJson json = do
+    o <- decodeJson json
+    asOfEpoch <- o .: "as_of_epoch"
+    eligibleActions <- o .: "eligible_actions"
+    votesCast <- o .: "votes_cast"
+    openActionsUnvoted <- o .: "open_actions_unvoted"
+    participationRate <- o .:? "participation_rate"
+    rationaleVerified <- o .: "rationale_verified"
+    rationaleInline <- o .: "rationale_inline"
+    rationaleUnverified <- o .: "rationale_unverified"
+    rationalePending <- o .: "rationale_pending"
+    rationaleAbsent <- o .: "rationale_absent"
+    rationaleCip100Valid <- o .: "rationale_cip100_valid"
+    rationaleRate <- o .:? "rationale_rate"
+    voteLatencyMedianHours <- o .:? "vote_latency_median_hours"
+    voteLatencyP90Hours <- o .:? "vote_latency_p90_hours"
+    voteLatencySample <- o .: "vote_latency_sample"
+    ageDays <- o .: "age_days"
+    finalVotes <- o .: "final_votes"
+    votesByType <- o .: "votes_by_type"
+    formulaIds <- o .: "formula_ids"
+    pure
+      ( DRepMetrics
+          { asOfEpoch
+          , eligibleActions
+          , votesCast
+          , openActionsUnvoted
+          , participationRate
+          , rationaleVerified
+          , rationaleInline
+          , rationaleUnverified
+          , rationalePending
+          , rationaleAbsent
+          , rationaleCip100Valid
+          , rationaleRate
+          , voteLatencyMedianHours
+          , voteLatencyP90Hours
+          , voteLatencySample
+          , ageDays
+          , finalVotes
+          , votesByType
+          , formulaIds
+          }
+      )
+
+-- | Mișcarea delegatorilor pe o fereastră de epoci. `delegator_count_prev` e termenul de comparație
+-- | pe care serverul l-a calculat; fără el, „19 delegatori" nu spune dacă e în creștere.
+newtype DelegatorStats = DelegatorStats
+  { delegatorCount :: Int
+  , delegatorCountPrev :: Int
+  , delegatorsRetained :: Int
+  , delegatorsJoined :: Int
+  , delegatorsLeft :: Int
+  , delegatorRetentionRate :: Maybe Number
+  , windowEpochs :: Int
+  }
+
+derive instance Eq DelegatorStats
+
+instance DecodeJson DelegatorStats where
+  decodeJson json = do
+    o <- decodeJson json
+    delegatorCount <- o .: "delegator_count"
+    delegatorCountPrev <- o .: "delegator_count_prev"
+    delegatorsRetained <- o .: "delegators_retained"
+    delegatorsJoined <- o .: "delegators_joined"
+    delegatorsLeft <- o .: "delegators_left"
+    delegatorRetentionRate <- o .:? "delegator_retention_rate"
+    windowEpochs <- o .: "window_epochs"
+    pure
+      ( DelegatorStats
+          { delegatorCount
+          , delegatorCountPrev
+          , delegatorsRetained
+          , delegatorsJoined
+          , delegatorsLeft
+          , delegatorRetentionRate
+          , windowEpochs
+          }
+      )
+
+newtype PowerPoint = PowerPoint
+  { epoch :: Int
+  , lovelace :: Lovelace
+  , delegatorCount :: Int
+  }
+
+derive instance Eq PowerPoint
+
+instance DecodeJson PowerPoint where
+  decodeJson json = do
+    o <- decodeJson json
+    epoch <- o .: "epoch"
+    lovelace <- o .: "lovelace"
+    delegatorCount <- o .: "delegator_count"
+    pure (PowerPoint { epoch, lovelace, delegatorCount })
+
+-- | `lovelace` e `Maybe`, și nu din prudență: măsurat pe serverul care rulează, al cincilea
+-- | delegator al unui DRep real îl avea `null`. Suma delegată se citește din `epoch_stake`, iar
+-- | epoca poate să n-aibă încă rândul (limitarea §8.3 din contractul API-ului). Un decodor care
+-- | cerea un număr a rupt tot ecranul pentru un singur rând incomplet.
+newtype Delegator = Delegator
+  { stakeAddress :: String
+  , lovelace :: Maybe Lovelace
+  , delegatedAt :: ChainPoint
+  , isCurrent :: Boolean
+  }
+
+derive instance Eq Delegator
+
+instance DecodeJson Delegator where
+  decodeJson json = do
+    o <- decodeJson json
+    stakeAddress <- o .: "stake_address"
+    lovelace <- o .:? "lovelace"
+    delegatedAt <- o .: "delegated_at"
+    isCurrent <- o .: "is_current"
+    pure (Delegator { stakeAddress, lovelace, delegatedAt, isCurrent })
+
+-- | Un eveniment din viața înregistrării: `registered`, `updated`, `retired`. `anchor_url` e cel
+-- | declarat la acel moment, deci istoria metadatelor se vede fără să ne credem pe cuvânt.
+newtype DRepUpdate = DRepUpdate
+  { kind :: String
+  , at :: ChainPoint
+  , deposit :: Maybe Lovelace
+  , anchorUrl :: Maybe String
+  , anchorStatus :: Maybe String
+  }
+
+derive instance Eq DRepUpdate
+
+instance DecodeJson DRepUpdate where
+  decodeJson json = do
+    o <- decodeJson json
+    kind <- o .: "kind"
+    at <- o .: "at"
+    deposit <- o .:? "deposit"
+    anchorUrl <- o .:? "anchor_url"
+    anchorStatus <- o .:? "anchor_status"
+    pure (DRepUpdate { kind, at, deposit, anchorUrl, anchorStatus })
+
+-- | O referință din documentul de metadate. Scrisă de autorul documentului, deci `uri` e text
+-- | neîncrezut: `Components.Shared.Anchor` decide dacă devine link sau rămâne text.
+newtype AnchorRef = AnchorRef
+  { label :: Maybe String
+  , uri :: Maybe String
+  }
+
+derive instance Eq AnchorRef
+
+instance DecodeJson AnchorRef where
+  decodeJson json = do
+    o <- decodeJson json
+    label <- o .:? "label"
+    uri <- o .:? "uri"
+    pure (AnchorRef { label, uri })
+
+-- | Conținutul documentului CIP-119, normalizat de server la șapte câmpuri (verificat pe șase
+-- | documente reale, toate aveau exact același set de chei).
+-- |
+-- | __Totul de aici e text străin.__ Niciun câmp nu ajunge pe ecran ca HTML, toate se taie la
+-- | randare, și `image_url`/`payment_address` nu se folosesc ca să se încarce sau să se plătească
+-- | ceva — se arată.
+newtype AnchorContent = AnchorContent
+  { givenName :: Maybe String
+  , objectives :: Maybe String
+  , motivations :: Maybe String
+  , qualifications :: Maybe String
+  , imageUrl :: Maybe String
+  , paymentAddress :: Maybe String
+  , references :: Array AnchorRef
+  }
+
+derive instance Eq AnchorContent
+
+instance DecodeJson AnchorContent where
+  decodeJson json = do
+    o <- decodeJson json
+    givenName <- o .:? "given_name"
+    objectives <- o .:? "objectives"
+    motivations <- o .:? "motivations"
+    qualifications <- o .:? "qualifications"
+    imageUrl <- o .:? "image_url"
+    paymentAddress <- o .:? "payment_address"
+    references <- fromMaybe [] <$> o .:? "references"
+    pure
+      ( AnchorContent
+          { givenName, objectives, motivations, qualifications, imageUrl, paymentAddress, references }
+      )
+
+-- | `GET /pages/drep/{id}` — identitatea, metricile, delegatorii, puterea pe epoci, istoria
+-- | înregistrării și documentul de metadate, într-un __singur__ apel.
+-- |
+-- | Ce nu e aici: istoricul de voturi. Nu lipsește din greșeală — `/votes` filtrat după acest DRep
+-- | e propriul ecran, cu propria paginare, iar un istoric întreg lipit aici ar fi exact adâncimea
+-- | pe care serverul o servește în 12 secunde.
+newtype DRepDetail = DRepDetail
+  { drep :: DRepSummary
+  , metrics :: DRepMetrics
+  , delegatorStats :: DelegatorStats
+  , powerByEpoch :: Array PowerPoint
+  , topDelegators :: Array Delegator
+  , updates :: Array DRepUpdate
+  , anchorContent :: Maybe AnchorContent
+  }
+
+derive instance Eq DRepDetail
+
+instance DecodeJson DRepDetail where
+  decodeJson json = do
+    o <- decodeJson json
+    drep <- o .: "drep"
+    metrics <- o .: "metrics"
+    delegatorStats <- o .: "delegator_stats"
+    powerByEpoch <- o .: "power_by_epoch"
+    topDelegators <- o .: "top_delegators"
+    updates <- o .: "updates"
+    anchorContent <- o .:? "anchor_content"
+    pure
+      ( DRepDetail
+          { drep, metrics, delegatorStats, powerByEpoch, topDelegators, updates, anchorContent }
       )
 
 -- | Culoarea chip-ului de prospețime. `Unknown` nu e decor: înseamnă „n-am putut citi starea", care

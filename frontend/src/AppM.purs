@@ -14,7 +14,7 @@ import AppEnv (Env)
 import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.LogMessages (class LogMessages)
-import Capabilities.Query.Gov.Default (getDRepExplorerDefault, getDashboardDefault, getStatusDefault)
+import Capabilities.Query.Gov.Default (getDRepDetailDefault, getDRepExplorerDefault, getDashboardDefault, getStatusDefault)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Transaction.MonadInteraction (class MonadInteraction)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
@@ -87,3 +87,4 @@ instance MonadQueryGov AppM where
   getStatus = ask >>= getStatusDefault
   getDashboard = ask >>= getDashboardDefault
   getDRepExplorer filters = ask >>= \env -> getDRepExplorerDefault env filters
+  getDRepDetail drepId = ask >>= \env -> getDRepDetailDefault env drepId

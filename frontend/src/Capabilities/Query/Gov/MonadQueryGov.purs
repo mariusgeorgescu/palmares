@@ -11,12 +11,13 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getStatus
   , getDashboard
   , getDRepExplorer
+  , getDRepDetail
   ) where
 
 import Prelude
 
 import Capabilities.Query.Gov.Http (ApiError)
-import Capabilities.Query.Gov.Types (DRepExplorerPage, DashboardPage, GovStatus)
+import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovStatus)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Halogen (HalogenM)
@@ -36,9 +37,15 @@ class Monad m <= MonadQueryGov m where
   -- | într-un apel. Filtrele vin din rută, deci ecranul nu-și ține o a doua copie a lor.
   getDRepExplorer :: DRepFilters -> m (Either ApiError DRepExplorerPage)
 
+  -- | `GET /pages/drep/{id}` — identitate, metrici, delegatori, putere pe epoci, istoria
+  -- | înregistrării și documentul de metadate, într-un apel. Sfatul de a chema patru rute separate
+  -- | pentru ecranul acesta e mort: compozitul există tocmai ca să nu existe N+1.
+  getDRepDetail :: String -> m (Either ApiError DRepDetail)
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
   getStatus = lift getStatus
   getDashboard = lift getDashboard
   getDRepExplorer = lift <<< getDRepExplorer
+  getDRepDetail = lift <<< getDRepDetail

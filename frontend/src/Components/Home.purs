@@ -11,6 +11,7 @@ import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Components.Explorer.Dashboard as Dashboard
+import Components.Explorer.DRepDetail as DRepDetail
 import Components.Explorer.DRepList as DRepList
 import Components.Layout.NavBar as NavBar
 import Components.Shared.StatusChip as StatusChip
@@ -44,6 +45,7 @@ type Slots =
   , statusChip :: StatusChip.Slot
   , dashboard :: Dashboard.Slot
   , drepList :: DRepList.Slot
+  , drepDetail :: DRepDetail.Slot
   )
 
 component
@@ -96,6 +98,7 @@ component =
   renderRoute = case _ of
     Home -> HH.slot_ Dashboard._dashboard unit Dashboard.component unit
     DRepList filters -> HH.slot_ DRepList._drepList unit DRepList.component filters
+    DRepDetail drepId -> HH.slot_ DRepDetail._drepDetail unit DRepDetail.component drepId
     NotFound -> renderNotFound
 
   renderNotFound =

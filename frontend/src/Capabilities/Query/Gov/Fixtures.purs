@@ -9,6 +9,7 @@ module Capabilities.Query.Gov.Fixtures
   ( statusFixture
   , dashboardFixture
   , drepExplorerFixture
+  , drepDetailFixture
   ) where
 
 -- | `GET /status` pe preprod, 2026-10-24. `epoch_params` e omis: niciun decodor nu-l citește încă,
@@ -595,5 +596,367 @@ drepExplorerFixture =
         "count": 12
       }
     ]
+  }
+  """
+
+-- | `GET /pages/drep/drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z` pe preprod,
+-- | 2026-10-25. Ales dintre cei 294 pentru că e cazul __greu__: DRep script, cu ancoră validă, cu
+-- | două referințe externe, cu voturi pe patru tipuri de acțiuni din șapte — adică exact ecranul pe
+-- | care se vede dacă randarea unui document străin e făcută cu grijă.
+-- |
+-- | `power_by_epoch` e ultimele 20 de puncte din cele 94 reale. `top_delegators` sunt toți cinci,
+-- | __inclusiv al cincilea, care are `lovelace: null`__: un delegator pentru care epoca nu are
+-- | stake înregistrat (limitarea §8.3 din contractul API-ului). Fixtura de dinainte îi tăia, și
+-- | exact de aceea a trecut testele și a căzut în browser pe serverul adevărat.
+drepDetailFixture :: String
+drepDetailFixture =
+  """
+  {
+    "drep": {
+      "id": "drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z",
+      "hex": "763ef75661f0cd8c8fa159a79d79bfe8f9a76878bdaaff700598ee0e",
+      "has_script": true,
+      "status": "inactive",
+      "is_active": false,
+      "active_until_epoch": 189,
+      "given_name": "Logical Mechanism dRep",
+      "image_url": "https://www.logicalmechanism.io/img/fullLogo.png",
+      "language": "en-us",
+      "anchor_status": "valid",
+      "registered_at": "2024-09-06T23:10:12Z",
+      "age_days": 778,
+      "voting_power": 5942176444940,
+      "voting_power_epoch": 321,
+      "delegator_count": 5,
+      "eligible_actions": 120,
+      "votes_cast": 1,
+      "participation_rate": 0.008333333333333333,
+      "rationale_rate": 0.0,
+      "open_actions_unvoted": 7,
+      "last_vote_at": "2024-09-06T23:22:48Z",
+      "as_of_epoch": 321
+    },
+    "metrics": {
+      "as_of_epoch": 321,
+      "eligible_actions": 120,
+      "votes_cast": 1,
+      "open_actions_unvoted": 7,
+      "participation_rate": 0.008333333333333333,
+      "rationale_verified": 0,
+      "rationale_inline": 0,
+      "rationale_unverified": 0,
+      "rationale_pending": 0,
+      "rationale_absent": 1,
+      "rationale_cip100_valid": 0,
+      "rationale_rate": 0.0,
+      "vote_latency_median_hours": 0.05444444444444444,
+      "vote_latency_p90_hours": 0.05444444444444444,
+      "vote_latency_sample": 1,
+      "age_days": 778,
+      "final_votes": {
+        "yes": 1,
+        "no": 0,
+        "abstain": 0
+      },
+      "votes_by_type": [
+        [
+          "hard_fork_initiation",
+          {
+            "eligible_actions": 2,
+            "votes_cast": 0,
+            "yes": 0,
+            "no": 0,
+            "abstain": 0,
+            "participation_rate": 0.0
+          }
+        ],
+        [
+          "info_action",
+          {
+            "eligible_actions": 17,
+            "votes_cast": 1,
+            "yes": 1,
+            "no": 0,
+            "abstain": 0,
+            "participation_rate": 0.058823529411764705
+          }
+        ],
+        [
+          "new_committee",
+          {
+            "eligible_actions": 7,
+            "votes_cast": 0,
+            "yes": 0,
+            "no": 0,
+            "abstain": 0,
+            "participation_rate": 0.0
+          }
+        ],
+        [
+          "new_constitution",
+          {
+            "eligible_actions": 1,
+            "votes_cast": 0,
+            "yes": 0,
+            "no": 0,
+            "abstain": 0,
+            "participation_rate": 0.0
+          }
+        ],
+        [
+          "no_confidence",
+          {
+            "eligible_actions": 1,
+            "votes_cast": 0,
+            "yes": 0,
+            "no": 0,
+            "abstain": 0,
+            "participation_rate": 0.0
+          }
+        ],
+        [
+          "parameter_change",
+          {
+            "eligible_actions": 11,
+            "votes_cast": 0,
+            "yes": 0,
+            "no": 0,
+            "abstain": 0,
+            "participation_rate": 0.0
+          }
+        ],
+        [
+          "treasury_withdrawals",
+          {
+            "eligible_actions": 81,
+            "votes_cast": 0,
+            "yes": 0,
+            "no": 0,
+            "abstain": 0,
+            "participation_rate": 0.0
+          }
+        ]
+      ],
+      "formula_ids": [
+        "participation_rate_v1",
+        "rationale_rate_v1",
+        "age_days_v1",
+        "delegator_retention_rate_v1",
+        "vote_latency_median_hours_v1",
+        "votes_by_type_v1"
+      ]
+    },
+    "delegator_stats": {
+      "delegator_count": 5,
+      "delegator_count_prev": 5,
+      "delegators_retained": 5,
+      "delegators_joined": 0,
+      "delegators_left": 0,
+      "delegator_retention_rate": 1.0,
+      "window_epochs": 10
+    },
+    "power_by_epoch": [
+      {
+        "epoch": 302,
+        "lovelace": 5889967679740,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 303,
+        "lovelace": 5874056067112,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 304,
+        "lovelace": 5874836087448,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 305,
+        "lovelace": 5879754429475,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 306,
+        "lovelace": 5883923005781,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 307,
+        "lovelace": 5888569602056,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 308,
+        "lovelace": 5893190135192,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 309,
+        "lovelace": 5897720675965,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 310,
+        "lovelace": 5901872333057,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 311,
+        "lovelace": 5906522519873,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 312,
+        "lovelace": 5910755571684,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 313,
+        "lovelace": 5910762282359,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 314,
+        "lovelace": 5910770233192,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 315,
+        "lovelace": 5914902920642,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 316,
+        "lovelace": 5919918376352,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 317,
+        "lovelace": 5924415104092,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 318,
+        "lovelace": 5928925649832,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 319,
+        "lovelace": 5933433550288,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 320,
+        "lovelace": 5937875560062,
+        "delegator_count": 5
+      },
+      {
+        "epoch": 321,
+        "lovelace": 5942176444940,
+        "delegator_count": 5
+      }
+    ],
+    "top_delegators": [
+      {
+        "stake_address": "stake_test1uzrvw62pn24xw0yk8ksyuj6m4ezg6jgw9n4vjqktstjd5aspv59nv",
+        "lovelace": 5912487235860,
+        "delegated_at": {
+          "slot": 69983290,
+          "epoch": 165,
+          "time": "2024-09-06T23:48:10Z",
+          "tx_hash": "7215b4e94e30d1341b1c30f9defacfa9a583a2ef0973dcd3e2b862d9f5e386da"
+        },
+        "is_current": true
+      },
+      {
+        "stake_address": "stake_test1ur7sufjy8lfactkprnwl5x7mjn0ugajqg920n6uv4g7l68cra6p74",
+        "lovelace": 11647105014,
+        "delegated_at": {
+          "slot": 71680542,
+          "epoch": 169,
+          "time": "2024-09-26T15:15:42Z",
+          "tx_hash": "2d91ed34e62bcca5b1e80673044aec56ce2da17794be843a96e8784fcc97ca1a"
+        },
+        "is_current": true
+      },
+      {
+        "stake_address": "stake_test1uzl65wzu364hh0wxex94qsf5xkeaq2mnmc7xgnsnsjuqr4qruvxwu",
+        "lovelace": 8863539868,
+        "delegated_at": {
+          "slot": 69981608,
+          "epoch": 165,
+          "time": "2024-09-06T23:20:08Z",
+          "tx_hash": "46bd643c23eabbce70deebbf23127022f109f7813086b123b4cedca8f3d95983"
+        },
+        "is_current": true
+      },
+      {
+        "stake_address": "stake_test1upqt8jvd8d045a6gs2wkzt57rnx47s5ewz4un2l746r847g7hgw24",
+        "lovelace": 180912096,
+        "delegated_at": {
+          "slot": 69981238,
+          "epoch": 165,
+          "time": "2024-09-06T23:13:58Z",
+          "tx_hash": "fdd0e44251da1b0b6b6c9d8e92ad0010d3e13640f608ccf91c18278b9ab99861"
+        },
+        "is_current": true
+      },
+      {
+        "stake_address": "stake_test1uzyp0n0lqk65g9wae0uhn3fdzevww4u7w665w46wsdmeaysjvtvpu",
+        "lovelace": null,
+        "delegated_at": {
+          "slot": 88520092,
+          "epoch": 208,
+          "time": "2025-04-09T12:54:52Z",
+          "tx_hash": "bcfd8c71d322df7205013b0a5f5f418f80b733f95c37b31109557bfc3022317a"
+        },
+        "is_current": true
+      }
+    ],
+    "updates": [
+      {
+        "kind": "updated",
+        "at": {
+          "slot": 69981800,
+          "epoch": 165,
+          "time": "2024-09-06T23:23:20Z",
+          "tx_hash": "ebab27b88379f662d5bdcd2db7c0be391fd94674a889255411d540b6684e5c13"
+        },
+        "deposit": null,
+        "anchor_url": "https://www.logicalmechanism.io/drepTestnet",
+        "anchor_status": "valid"
+      },
+      {
+        "kind": "registered",
+        "at": {
+          "slot": 69981012,
+          "epoch": 165,
+          "time": "2024-09-06T23:10:12Z",
+          "tx_hash": "744fb092ab6d8a4d8ca8f66ea3c0abb6b9d49381205aa41c75c8597e91137948"
+        },
+        "deposit": 500000000,
+        "anchor_url": null,
+        "anchor_status": null
+      }
+    ],
+    "anchor_content": {
+      "given_name": "Logical Mechanism dRep",
+      "objectives": "We want to provide expert consulting, comprehensive knowledge, and in-depth research into the future of Cardano.",
+      "motivations": "We are a technical consulting company specializing in open-sourced decentralized applications for the everyday user. We know Cardano inwards and out.",
+      "qualifications": "We are Plutus pioneers, dApp developers, stake pool operators, and open-source contributors. We know Cardano.",
+      "image_url": "https://www.logicalmechanism.io/img/fullLogo.png",
+      "payment_address": "addr_test1qrvnxkaylr4upwxfxctpxpcumj0fl6fdujdc72j8sgpraa9l4gu9er4t0w7udjvt2pqngddn6q4h8h3uv38p8p9cq82qav4lmp",
+      "references": [
+        {
+          "label": "The Logical Mechanism Website",
+          "uri": "https://www.logicalmechanism.io/"
+        },
+        {
+          "label": "The Logical Mechanism GitHub",
+          "uri": "https://github.com/logical-mechanism"
+        }
+      ]
+    }
   }
   """

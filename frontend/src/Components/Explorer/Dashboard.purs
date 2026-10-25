@@ -36,7 +36,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import Format (formatAda, formatInt, formatPercent, humanize, pluralize)
-import Route.GovQueries (drepListHrefFor, emptyDRepFilters)
+import Route.GovQueries (drepDetailHrefFor, drepListHrefFor, emptyDRepFilters)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -317,7 +317,9 @@ component =
   drepRow (DRepSummary d) =
     HH.tr_
       [ HH.td [ HP.class_ (HH.ClassName "max-w-xs") ]
-          [ DRepIdentity.render { givenName: d.givenName, drepId: d.id, hasScript: d.hasScript } ]
+          [ HH.a [ HP.href (drepDetailHrefFor d.id), HP.class_ (HH.ClassName "hover:underline") ]
+              [ DRepIdentity.render { givenName: d.givenName, drepId: d.id, hasScript: d.hasScript } ]
+          ]
       , HH.td [ HP.class_ (HH.ClassName "text-right font-mono") ] [ HH.text (formatAda d.votingPower) ]
       , HH.td [ HP.class_ (HH.ClassName "text-right font-mono") ] [ HH.text (formatInt d.delegatorCount) ]
       , HH.td [ HP.class_ (HH.ClassName "text-right font-mono") ] [ HH.text (formatPercent d.participationRate) ]
