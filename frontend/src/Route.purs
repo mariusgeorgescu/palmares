@@ -5,7 +5,7 @@ module Route
 
 import Data.Generic.Rep (class Generic)
 import Prelude
-import Route.GovQueries (DRepFilters, renderDRepFilters)
+import Route.GovQueries (DRepFilters, GovActionFilters, renderDRepFilters, renderGovActionFilters)
 
 -- Rutele se adaugă pe măsură ce ecranele se livrează (plan, taskurile 5–11), nu în avans: o rută
 -- fără pagină e un link care duce la NotFound.
@@ -18,6 +18,8 @@ data Route
   -- Filtrele călătoresc în rută, nu în starea componentei: URL-ul e stare partajabilă, iar
   -- butoanele înainte/înapoi ale browserului sunt controale ale ecranului, nu accidente.
   | DRepList DRepFilters
+  | ActionDetail String
+  | ActionList GovActionFilters
   | NotFound
 
 derive instance eqRoute :: Eq Route
@@ -34,4 +36,6 @@ instance Show Route where
     Home -> "Home"
     DRepDetail i -> "DRepDetail " <> i
     DRepList f -> "DRepList " <> renderDRepFilters f
+    ActionDetail i -> "ActionDetail " <> i
+    ActionList f -> "ActionList " <> renderGovActionFilters f
     NotFound -> "NotFound"

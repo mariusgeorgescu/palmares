@@ -14,6 +14,7 @@ module Format
   , groupDigits
   , humanize
   , pluralize
+  , roleLabel
   ) where
 
 import Prelude
@@ -55,6 +56,16 @@ formatPercent = case _ of
 -- | `1 vote`, `0 votes`. Textul e public și în engleză, deci „1 votes" e o greșeală vizibilă.
 pluralize :: Int -> String -> String
 pluralize n word = formatInt n <> " " <> word <> (if n == 1 then "" else "s")
+
+-- | Rolurile de votant au majuscule proprii: `humanize` ar da „Drep" și „Spo", care pe un site
+-- | public arată ca o greșeală, nu ca o abreviere.
+roleLabel :: String -> String
+roleLabel = case _ of
+  "drep" -> "DRep"
+  "spo" -> "SPO"
+  "constitutional_committee" -> "Constitutional committee"
+  "committee_member" -> "Committee member"
+  other -> humanize other
 
 -- | `treasury_withdrawals` → `Treasury withdrawals`. Serverul publică enum-urile în snake_case;
 -- | ecranul le arată ca text, iar maparea e mecanică — deci nu există o listă de etichete de

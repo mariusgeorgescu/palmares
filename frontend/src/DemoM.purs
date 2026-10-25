@@ -13,7 +13,14 @@ import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.LogMessages (class LogMessages)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
-import Capabilities.Query.Gov.Mock (getDRepDetailMock, getDRepExplorerMock, getDashboardMock, getStatusMock)
+import Capabilities.Query.Gov.Mock
+  ( getDRepDetailMock
+  , getDRepExplorerMock
+  , getDashboardMock
+  , getGovActionDetailMock
+  , getGovActionsMock
+  , getStatusMock
+  )
 import Cardano.Capabilities.Transaction.MonadInteraction (class MonadInteraction)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Control.Monad.Error.Class (class MonadThrow)
@@ -83,3 +90,5 @@ instance MonadQueryGov DemoM where
   getDashboard = getDashboardMock
   getDRepExplorer = getDRepExplorerMock
   getDRepDetail = getDRepDetailMock
+  getGovActions = getGovActionsMock
+  getGovActionDetail = getGovActionDetailMock

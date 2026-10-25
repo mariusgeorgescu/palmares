@@ -16,6 +16,7 @@ module Capabilities.Query.Gov.Types
   , Lovelace
   , EpochPoint(..)
   , DRepSummary(..)
+  , Lifecycle(..)
   , GovActionSummary(..)
   , DashboardPage(..)
   , PowerBucket(..)
@@ -31,6 +32,13 @@ module Capabilities.Query.Gov.Types
   , AnchorRef(..)
   , AnchorContent(..)
   , DRepDetail(..)
+  , Tally(..)
+  , Withdrawal(..)
+  , ParamChange(..)
+  , Proposer(..)
+  , ActionAnchor(..)
+  , GovActionDetail(..)
+  , GovActionPage(..)
   ) where
 
 import Prelude
@@ -254,18 +262,47 @@ instance DecodeJson DRepSummary where
           }
       )
 
--- | Rândul de acțiune de guvernanță, din care se citesc câmpurile pe care le randează cineva acum.
--- | `proposed_at` și `lifecycle` sunt obiecte imbricate pe care le întoarce serverul și pe care
--- | niciun ecran livrat nu le arată încă; decodorul le ignoră, pentru că Argonaut citește cheile pe
--- | care le numește. Detaliul de acțiune (taskul 8) le adaugă când le afișează.
+-- | Ciclul de viață al unei acțiuni. Cele patru epoci sunt separate și toate opționale, pentru că
+-- | o acțiune reală măsurată avea __și__ `expired_epoch` 304 __și__ `dropped_epoch` 305: starea e
+-- | un cuvânt, dar drumul până la ea are mai mulți pași, iar `formula_id` spune care regulă l-a
+-- | decis.
+newtype Lifecycle = Lifecycle
+  { state :: String
+  , ratifiedEpoch :: Maybe Int
+  , enactedEpoch :: Maybe Int
+  , expiredEpoch :: Maybe Int
+  , droppedEpoch :: Maybe Int
+  , formulaId :: Maybe String
+  }
+
+derive instance Eq Lifecycle
+
+instance DecodeJson Lifecycle where
+  decodeJson json = do
+    o <- decodeJson json
+    state <- o .: "state"
+    ratifiedEpoch <- o .:? "ratified_epoch"
+    enactedEpoch <- o .:? "enacted_epoch"
+    expiredEpoch <- o .:? "expired_epoch"
+    droppedEpoch <- o .:? "dropped_epoch"
+    formulaId <- o .:? "formula_id"
+    pure (Lifecycle { state, ratifiedEpoch, enactedEpoch, expiredEpoch, droppedEpoch, formulaId })
+
+-- | Rândul de acțiune de guvernanță. Același obiect în `closing_soon` de pe dashboard, în `items`
+-- | din listă și în `action` din detaliu, deci un singur decodor.
 newtype GovActionSummary = GovActionSummary
   { id :: String
   , bech32 :: String
   , type_ :: String
   , title :: Maybe String
+  , abstract :: Maybe String
   , anchorStatus :: Maybe String
+  , proposedAt :: ChainPoint
   , expiresEpoch :: Int
   , lastVotableEpoch :: Int
+  , lifecycle :: Lifecycle
+  , deposit :: Maybe Lovelace
+  , returnAddress :: Maybe String
   , treasuryAmount :: Maybe Lovelace
   , votesCast :: Int
   }
@@ -279,14 +316,33 @@ instance DecodeJson GovActionSummary where
     bech32 <- o .: "bech32"
     type_ <- o .: "type"
     title <- o .:? "title"
+    abstract <- o .:? "abstract"
     anchorStatus <- o .:? "anchor_status"
+    proposedAt <- o .: "proposed_at"
     expiresEpoch <- o .: "expires_epoch"
     lastVotableEpoch <- o .: "last_votable_epoch"
+    lifecycle <- o .: "lifecycle"
+    deposit <- o .:? "deposit"
+    returnAddress <- o .:? "return_address"
     treasuryAmount <- o .:? "treasury_amount"
     votesCast <- o .: "votes_cast"
     pure
       ( GovActionSummary
-          { id, bech32, type_, title, anchorStatus, expiresEpoch, lastVotableEpoch, treasuryAmount, votesCast }
+          { id
+          , bech32
+          , type_
+          , title
+          , abstract
+          , anchorStatus
+          , proposedAt
+          , expiresEpoch
+          , lastVotableEpoch
+          , lifecycle
+          , deposit
+          , returnAddress
+          , treasuryAmount
+          , votesCast
+          }
       )
 
 -- | `GET /pages/dashboard`, un singur apel pentru tot ecranul de pornire.
@@ -740,6 +796,185 @@ instance DecodeJson DRepDetail where
       ( DRepDetail
           { drep, metrics, delegatorStats, powerByEpoch, topDelegators, updates, anchorContent }
       )
+
+-- | Numărătoarea voturilor pentru un rol, la o epocă.
+-- |
+-- | `ratio` e `Maybe` pentru un motiv măsurat: pe o acțiune reală, cu 43 de voturi exprimate, era
+-- | `null` — pragul se calculează pe putere de vot, iar când puterea de partea „da" și cea de
+-- | partea „nu" sunt amândouă zero, raportul nu există. „0%" ar fi o afirmație despre rezultat;
+-- | „n/a" e adevărul. `threshold_param` numește parametrul de protocol care a dat pragul, iar
+-- | `basis` spune ce a intrat în numitor (`cast_votes_only`).
+newtype Tally = Tally
+  { role :: String
+  , epoch :: Int
+  , yesPower :: Lovelace
+  , noPower :: Lovelace
+  , abstainPower :: Lovelace
+  , yesCount :: Int
+  , noCount :: Int
+  , abstainCount :: Int
+  , ratio :: Maybe Number
+  , threshold :: Maybe Number
+  , thresholdParam :: Maybe String
+  , basis :: Maybe String
+  , formulaId :: Maybe String
+  }
+
+derive instance Eq Tally
+
+instance DecodeJson Tally where
+  decodeJson json = do
+    o <- decodeJson json
+    role <- o .: "role"
+    epoch <- o .: "epoch"
+    yesPower <- o .: "yes_power"
+    noPower <- o .: "no_power"
+    abstainPower <- o .: "abstain_power"
+    yesCount <- o .: "yes_count"
+    noCount <- o .: "no_count"
+    abstainCount <- o .: "abstain_count"
+    ratio <- o .:? "ratio"
+    threshold <- o .:? "threshold"
+    thresholdParam <- o .:? "threshold_param"
+    basis <- o .:? "basis"
+    formulaId <- o .:? "formula_id"
+    pure
+      ( Tally
+          { role
+          , epoch
+          , yesPower
+          , noPower
+          , abstainPower
+          , yesCount
+          , noCount
+          , abstainCount
+          , ratio
+          , threshold
+          , thresholdParam
+          , basis
+          , formulaId
+          }
+      )
+
+-- | O retragere propusă. `paid_heuristic` e cinstea serverului: plata nu se poate citi direct din
+-- | lanț pentru fiecare caz, deci câmpul spune când „plătit" e o deducție, nu o observație. Ecranul
+-- | trebuie să spună același lucru.
+newtype Withdrawal = Withdrawal
+  { beneficiary :: String
+  , amount :: Lovelace
+  , enactedAt :: Maybe ChainPoint
+  , paidHeuristic :: Boolean
+  }
+
+derive instance Eq Withdrawal
+
+instance DecodeJson Withdrawal where
+  decodeJson json = do
+    o <- decodeJson json
+    beneficiary <- o .: "beneficiary"
+    amount <- o .: "amount"
+    enactedAt <- o .:? "enacted_at"
+    paidHeuristic <- o .: "paid_heuristic"
+    pure (Withdrawal { beneficiary, amount, enactedAt, paidHeuristic })
+
+-- | Un parametru de protocol pe care acțiunea îl schimbă, cu grupul din care își ia pragul.
+newtype ParamChange = ParamChange
+  { param :: String
+  , group :: Maybe String
+  }
+
+derive instance Eq ParamChange
+
+instance DecodeJson ParamChange where
+  decodeJson json = do
+    o <- decodeJson json
+    param <- o .: "param"
+    group <- o .:? "group"
+    pure (ParamChange { param, group })
+
+-- | Cine a propus, și de câte ori. `actions_count` e contextul care transformă „o adresă de stake"
+-- | în „cineva care a propus deja de zece ori".
+newtype Proposer = Proposer
+  { stakeAddress :: String
+  , actionsCount :: Int
+  }
+
+derive instance Eq Proposer
+
+instance DecodeJson Proposer where
+  decodeJson json = do
+    o <- decodeJson json
+    stakeAddress <- o .: "stake_address"
+    actionsCount <- o .: "actions_count"
+    pure (Proposer { stakeAddress, actionsCount })
+
+-- | Documentul de metadate al unei acțiuni — CIP-108, deci __alt set de câmpuri__ decât documentul
+-- | unui DRep (CIP-119). Măsurat pe o propunere reală: `rationale` avea peste 2.500 de caractere,
+-- | iar `references` conținea același link de două ori. Amândouă se randează așa cum sunt: e
+-- | documentul lor, iar un deduplicator ar ascunde ce au scris.
+newtype ActionAnchor = ActionAnchor
+  { title :: Maybe String
+  , abstract :: Maybe String
+  , motivation :: Maybe String
+  , rationale :: Maybe String
+  , references :: Array AnchorRef
+  }
+
+derive instance Eq ActionAnchor
+
+instance DecodeJson ActionAnchor where
+  decodeJson json = do
+    o <- decodeJson json
+    title <- o .:? "title"
+    abstract <- o .:? "abstract"
+    motivation <- o .:? "motivation"
+    rationale <- o .:? "rationale"
+    references <- fromMaybe [] <$> o .:? "references"
+    pure (ActionAnchor { title, abstract, motivation, rationale, references })
+
+-- | `GET /pages/gov-action/{id}` — acțiunea, numărătorile pe rol, retragerile, parametrii atinși,
+-- | proponentul și documentul, într-un apel.
+newtype GovActionDetail = GovActionDetail
+  { action :: GovActionSummary
+  , tallies :: Array Tally
+  , withdrawals :: Array Withdrawal
+  , paramChanges :: Array ParamChange
+  , proposer :: Maybe Proposer
+  , anchorContent :: Maybe ActionAnchor
+  }
+
+derive instance Eq GovActionDetail
+
+instance DecodeJson GovActionDetail where
+  decodeJson json = do
+    o <- decodeJson json
+    action <- o .: "action"
+    tallies <- fromMaybe [] <$> o .:? "tallies"
+    withdrawals <- fromMaybe [] <$> o .:? "withdrawals"
+    paramChanges <- fromMaybe [] <$> o .:? "param_changes"
+    proposer <- o .:? "proposer"
+    anchorContent <- o .:? "anchor_content"
+    pure (GovActionDetail { action, tallies, withdrawals, paramChanges, proposer, anchorContent })
+
+-- | Plicul rutelor de listă: `items`, `total`, `limit`, `offset`. `next_cursor` există în răspuns
+-- | dar nu e modelat — singura rută cu cursor e `/activity`, și n-o randează nimeni.
+newtype GovActionPage = GovActionPage
+  { items :: Array GovActionSummary
+  , total :: Int
+  , limit :: Int
+  , offset :: Int
+  }
+
+derive instance Eq GovActionPage
+
+instance DecodeJson GovActionPage where
+  decodeJson json = do
+    o <- decodeJson json
+    items <- o .: "items"
+    total <- o .: "total"
+    limit <- o .: "limit"
+    offset <- o .: "offset"
+    pure (GovActionPage { items, total, limit, offset })
 
 -- | Culoarea chip-ului de prospețime. `Unknown` nu e decor: înseamnă „n-am putut citi starea", care
 -- | e un fapt diferit de „datele sunt proaspete" și de „datele sunt vechi". Un chip care arată verde

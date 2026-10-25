@@ -7,16 +7,18 @@ module Capabilities.Query.Gov.Default
   , getDashboardDefault
   , getDRepExplorerDefault
   , getDRepDetailDefault
+  , getGovActionsDefault
+  , getGovActionDetailDefault
   ) where
 
 import Prelude
 
 import Capabilities.Query.Gov.Env (HasGovEnv)
 import Capabilities.Query.Gov.Http (ApiError, getJson)
-import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovStatus)
+import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovActionDetail, GovActionPage, GovStatus)
 import Data.Either (Either)
 import Effect.Aff.Class (class MonadAff)
-import Route.GovQueries (DRepFilters, encodePathSegment, renderDRepFilters)
+import Route.GovQueries (DRepFilters, GovActionFilters, encodePathSegment, renderDRepFilters, renderGovActionFilters)
 
 getStatusDefault
   :: forall m r
@@ -49,3 +51,21 @@ getDRepDetailDefault
   -> m (Either ApiError DRepDetail)
 getDRepDetailDefault env drepId =
   getJson (env.queryBaseUrl <> "/pages/drep/" <> encodePathSegment drepId)
+
+getGovActionsDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> GovActionFilters
+  -> m (Either ApiError GovActionPage)
+getGovActionsDefault env filters =
+  getJson (env.queryBaseUrl <> "/gov-actions" <> renderGovActionFilters filters)
+
+getGovActionDetailDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> String
+  -> m (Either ApiError GovActionDetail)
+getGovActionDetailDefault env actionId =
+  getJson (env.queryBaseUrl <> "/pages/gov-action/" <> encodePathSegment actionId)

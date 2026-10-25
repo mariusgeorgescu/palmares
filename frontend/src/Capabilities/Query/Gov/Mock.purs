@@ -10,18 +10,27 @@ module Capabilities.Query.Gov.Mock
   , getDashboardMock
   , getDRepExplorerMock
   , getDRepDetailMock
+  , getGovActionsMock
+  , getGovActionDetailMock
   , decodeFixture
   ) where
 
 import Prelude
 
-import Capabilities.Query.Gov.Fixtures (dashboardFixture, drepDetailFixture, drepExplorerFixture, statusFixture)
+import Capabilities.Query.Gov.Fixtures
+  ( dashboardFixture
+  , drepDetailFixture
+  , drepExplorerFixture
+  , govActionDetailFixture
+  , govActionListFixture
+  , statusFixture
+  )
 import Capabilities.Query.Gov.Http (ApiError(..), classifyResponse)
-import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovStatus)
+import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovActionDetail, GovActionPage, GovStatus)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
-import Route.GovQueries (DRepFilters)
+import Route.GovQueries (DRepFilters, GovActionFilters)
 
 -- | Decodează o fixtură exact cum s-ar decoda un 200 real.
 decodeFixture :: forall a. DecodeJson a => String -> Either ApiError a
@@ -45,3 +54,9 @@ getDRepExplorerMock _ = pure (decodeFixture drepExplorerFixture)
 -- | Aceeași fixtură pentru orice ID: bundle-ul demo arată mereu DRep-ul-cazul-greu.
 getDRepDetailMock :: forall m. Applicative m => String -> m (Either ApiError DRepDetail)
 getDRepDetailMock _ = pure (decodeFixture drepDetailFixture)
+
+getGovActionsMock :: forall m. Applicative m => GovActionFilters -> m (Either ApiError GovActionPage)
+getGovActionsMock _ = pure (decodeFixture govActionListFixture)
+
+getGovActionDetailMock :: forall m. Applicative m => String -> m (Either ApiError GovActionDetail)
+getGovActionDetailMock _ = pure (decodeFixture govActionDetailFixture)

@@ -18,6 +18,14 @@ module Route.GovQueries
   , drepListPath
   , drepListHrefFor
   , drepDetailHrefFor
+  , GovActionFilters
+  , emptyGovActionFilters
+  , govActionFiltersCodec
+  , govActionFilterPairs
+  , renderGovActionFilters
+  , actionListPath
+  , actionListHrefFor
+  , actionDetailHrefFor
   , encodePathSegment
   , toggleIn
   ) where
@@ -156,3 +164,70 @@ drepDetailHrefFor drepId = drepListPath <> "/" <> encodePathSegment drepId
 -- | adăugare se păstrează ca URL-ul să nu se rescrie singur la fiecare clic.
 toggleIn :: String -> Array String -> Array String
 toggleIn v xs = if v `elem` xs then delete v xs else snoc xs v
+
+-- | Filtrele listei de acțiuni. `type_` e numele câmpului, `type` e numele parametrului: `type` e
+-- | cuvânt rezervat în PureScript, iar cheia din URL o poartă codecul, nu eticheta record-ului.
+type GovActionFilters =
+  { type_ :: Array String
+  , state :: Array String
+  , anchor_status :: Array String
+  , q :: Maybe String
+  , order_by :: Maybe String
+  , sort_order :: Maybe String
+  , limit :: Maybe String
+  , offset :: Maybe String
+  }
+
+emptyGovActionFilters :: GovActionFilters
+emptyGovActionFilters =
+  { type_: []
+  , state: []
+  , anchor_status: []
+  , q: Nothing
+  , order_by: Nothing
+  , sort_order: Nothing
+  , limit: Nothing
+  , offset: Nothing
+  }
+
+govActionFiltersCodec :: RouteDuplex' GovActionFilters
+govActionFiltersCodec =
+  record
+    # prop (Proxy :: Proxy "type_") (repeatedParam "type")
+    # prop (Proxy :: Proxy "state") (repeatedParam "state")
+    # prop (Proxy :: Proxy "anchor_status") (repeatedParam "anchor_status")
+    # prop (Proxy :: Proxy "q") (optional (param "q"))
+    # prop (Proxy :: Proxy "order_by") (optional (param "order_by"))
+    # prop (Proxy :: Proxy "sort_order") (optional (param "sort_order"))
+    # prop (Proxy :: Proxy "limit") (optional (param "limit"))
+    # prop (Proxy :: Proxy "offset") (optional (param "offset"))
+
+govActionFilterPairs :: GovActionFilters -> Array (Tuple String String)
+govActionFilterPairs f =
+  map (Tuple "type") f.type_
+    <> map (Tuple "state") f.state
+    <> map (Tuple "anchor_status") f.anchor_status
+    <> opt "q" f.q
+    <> order
+    <> opt "limit" f.limit
+    <> opt "offset" f.offset
+  where
+  opt k = maybe [] \v -> [ Tuple k v ]
+
+  order = case f.order_by of
+    Nothing -> []
+    Just ob -> [ Tuple "order_by" ob, Tuple "sort_order" (fromMaybe "asc" f.sort_order) ]
+
+renderGovActionFilters :: GovActionFilters -> String
+renderGovActionFilters = renderQuery <<< govActionFilterPairs
+
+actionListPath :: String
+actionListPath = "/gov-actions"
+
+actionListHrefFor :: GovActionFilters -> String
+actionListHrefFor f = actionListPath <> renderGovActionFilters f
+
+-- | Un identificator de acțiune e `<txhash>#<index>`. `#` netratat ar tăia cererea la fragment,
+-- | deci ar cere pagina listei în loc de acțiune.
+actionDetailHrefFor :: String -> String
+actionDetailHrefFor actionId = actionListPath <> "/" <> encodePathSegment actionId

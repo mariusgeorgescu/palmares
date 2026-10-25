@@ -36,7 +36,14 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import Format (formatAda, formatInt, formatPercent, humanize, pluralize)
-import Route.GovQueries (drepDetailHrefFor, drepListHrefFor, emptyDRepFilters)
+import Route.GovQueries
+  ( actionDetailHrefFor
+  , actionListHrefFor
+  , drepDetailHrefFor
+  , drepListHrefFor
+  , emptyDRepFilters
+  , emptyGovActionFilters
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -268,7 +275,10 @@ component =
 
   actionRow (GovActionSummary a) =
     HH.li [ HP.class_ (HH.ClassName "py-2 flex flex-wrap items-baseline justify-between gap-2") ]
-      [ HH.div [ HP.class_ (HH.ClassName "min-w-0 space-y-0.5") ]
+      [ HH.a
+          [ HP.href (actionDetailHrefFor a.id)
+          , HP.class_ (HH.ClassName "min-w-0 space-y-0.5 hover:underline")
+          ]
           [ HH.div [ HP.class_ (HH.ClassName "font-medium truncate") ]
               [ HH.text (fromMaybe "Untitled proposal" a.title) ]
           , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-60 truncate"), HP.title a.id ]
@@ -331,7 +341,7 @@ hubEntries =
     , label: "DReps"
     , description: "Who is registered, how much power they hold, and whether they vote."
     }
-  , { href: "/gov-actions"
+  , { href: actionListHrefFor emptyGovActionFilters
     , label: "Governance actions"
     , description: "Every proposal, its lifecycle, and who voted which way."
     }

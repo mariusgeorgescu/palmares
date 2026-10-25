@@ -8,7 +8,7 @@ import Components.Shared.DRepIdentity (identityText, shortId)
 import Data.Array (replicate)
 import Data.Maybe (Maybe(..))
 import Data.String as String
-import Format (formatAda, formatInt, formatPercent, groupDigits, humanize, pluralize)
+import Format (formatAda, formatInt, formatPercent, groupDigits, humanize, pluralize, roleLabel)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
@@ -67,6 +67,13 @@ spec = do
       humanize "treasury_withdrawals" `shouldEqual` "Treasury withdrawals"
       humanize "info_action" `shouldEqual` "Info action"
       humanize "proposed" `shouldEqual` "Proposed"
+
+  describe "roleLabel" do
+    it "keeps the abbreviations the ecosystem writes" do
+      roleLabel "drep" `shouldEqual` "DRep"
+      roleLabel "spo" `shouldEqual` "SPO"
+      roleLabel "constitutional_committee" `shouldEqual` "Constitutional committee"
+      roleLabel "something_else" `shouldEqual` "Something else"
 
   describe "shortId" do
     it "keeps the prefix and the tail of a bech32 id" do

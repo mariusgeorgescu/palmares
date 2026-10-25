@@ -6,9 +6,11 @@ module Route.Codec
   ) where
 
 import Data.Either (Either(..))
-import Prelude
+-- `(/)` din `Routing.Duplex.Generic.Syntax` ascunde împărțirea din Prelude; aici nu se împarte
+-- nimic, iar avertismentul ar rămâne la fiecare build.
+import Prelude hiding ((/))
 import Route (Route(..))
-import Route.GovQueries (drepFiltersCodec)
+import Route.GovQueries (drepFiltersCodec, govActionFiltersCodec)
 import Routing.Duplex (RouteDuplex', parse, path, print, root, segment)
 import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/))
@@ -19,6 +21,8 @@ routeCodec = root $ sum
   { "Home": noArgs
   , "DRepDetail": "dreps" / segment
   , "DRepList": path "dreps" drepFiltersCodec
+  , "ActionDetail": "gov-actions" / segment
+  , "ActionList": path "gov-actions" govActionFiltersCodec
   , "NotFound": path "__not_found__" noArgs
   }
 

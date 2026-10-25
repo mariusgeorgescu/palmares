@@ -20,13 +20,14 @@ module Components.Shared.Anchor
   ( safeHref
   , clampText
   , render
+  , renderAction
   , renderUnavailable
   , statusExplanation
   ) where
 
 import Prelude
 
-import Capabilities.Query.Gov.Types (AnchorContent(..), AnchorRef(..))
+import Capabilities.Query.Gov.Types (ActionAnchor(..), AnchorContent(..), AnchorRef(..))
 import Data.Array (null)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
@@ -91,6 +92,59 @@ renderUnavailable r =
         Just url -> externalLink url url
     ]
 
+-- | Documentul unei acțiuni (CIP-108) — alt set de câmpuri decât al unui DRep (CIP-119).
+-- |
+-- | Limita de tăiere e mai mare aici (10.000, nu 2.000): `rationale` e argumentul pentru care se
+-- | votează, iar pe o propunere reală avea peste 2.500 de caractere. Tăierea rămâne, pentru că
+-- | motivul ei n-a fost niciodată lungimea rezonabilă, ci cea nerezonabilă.
+renderAction :: forall w i. ActionAnchor -> HH.HTML w i
+renderAction (ActionAnchor a) =
+  HH.div [ HP.class_ (HH.ClassName "space-y-3") ]
+    [ longField "Abstract" a.abstract
+    , longField "Motivation" a.motivation
+    , longField "Rationale" a.rationale
+    , if null a.references then HH.text ""
+      else
+        HH.div_
+          [ fieldLabel "References"
+          -- Nu se deduplică: documentul măsurat avea același link de două ori, iar un
+          -- deduplicator ar ascunde ce au scris ei.
+          , HH.ul [ HP.class_ (HH.ClassName "list-disc list-inside space-y-1") ]
+              (map referenceItem a.references)
+          ]
+    ]
+
+fieldLabel :: forall w i. String -> HH.HTML w i
+fieldLabel t = HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-60") ] [ HH.text t ]
+
+longField :: forall w i. String -> Maybe String -> HH.HTML w i
+longField title = case _ of
+  Nothing -> HH.text ""
+  Just value ->
+    if String.trim value == "" then HH.text ""
+    else
+      HH.div_
+        [ fieldLabel title
+        , HH.p [ HP.class_ (HH.ClassName "text-sm whitespace-pre-line") ]
+            [ HH.text (clampText 10000 value) ]
+        ]
+
+referenceItem :: forall w i. AnchorRef -> HH.HTML w i
+referenceItem (AnchorRef ref) =
+  let
+    text = clampText 120 (fromMaybe "(untitled reference)" ref.label)
+  in
+    HH.li_
+      [ case ref.uri of
+          Nothing -> HH.span_ [ HH.text text ]
+          Just uri ->
+            HH.span [ HP.class_ (HH.ClassName "space-x-2") ]
+              [ externalLink uri text
+              , HH.span [ HP.class_ (HH.ClassName "font-mono text-xs opacity-60 break-all") ]
+                  [ HH.text (clampText 160 uri) ]
+              ]
+      ]
+
 render :: forall w i. AnchorContent -> HH.HTML w i
 render (AnchorContent a) =
   HH.div [ HP.class_ (HH.ClassName "space-y-3") ]
@@ -124,7 +178,7 @@ render (AnchorContent a) =
           ]
     ]
   where
-  label t = HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-60") ] [ HH.text t ]
+  label = fieldLabel
 
   field title = case _ of
     Nothing -> HH.text ""
@@ -137,20 +191,7 @@ render (AnchorContent a) =
               [ HH.text (clampText 2000 value) ]
           ]
 
-  reference (AnchorRef ref) =
-    let
-      text = clampText 120 (fromMaybe "(untitled reference)" ref.label)
-    in
-      HH.li_
-        [ case ref.uri of
-            Nothing -> HH.span_ [ HH.text text ]
-            Just uri ->
-              HH.span [ HP.class_ (HH.ClassName "space-x-2") ]
-                [ externalLink uri text
-                , HH.span [ HP.class_ (HH.ClassName "font-mono text-xs opacity-60 break-all") ]
-                    [ HH.text (clampText 160 uri) ]
-                ]
-        ]
+  reference = referenceItem
 
 -- | Un link spre un document străin. Dacă schema nu e http(s), rămâne text: nimic nu e atât de
 -- | important de afișat încât să merite un `href` care execută cod.

@@ -39,7 +39,7 @@ import Components.Shared.DRepIdentity as DRepIdentity
 import Data.Array (last, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Number.Format (fixed, toStringWith)
 import Data.String as String
 import Data.Tuple (Tuple(..))

@@ -12,16 +12,18 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getDashboard
   , getDRepExplorer
   , getDRepDetail
+  , getGovActions
+  , getGovActionDetail
   ) where
 
 import Prelude
 
 import Capabilities.Query.Gov.Http (ApiError)
-import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovStatus)
+import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovActionDetail, GovActionPage, GovStatus)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Halogen (HalogenM)
-import Route.GovQueries (DRepFilters)
+import Route.GovQueries (DRepFilters, GovActionFilters)
 
 class Monad m <= MonadQueryGov m where
   -- | `GET /status` — rețeaua, epoca, lag-ul, pragurile și starea proiectorului, într-un singur
@@ -42,6 +44,14 @@ class Monad m <= MonadQueryGov m where
   -- | pentru ecranul acesta e mort: compozitul există tocmai ca să nu existe N+1.
   getDRepDetail :: String -> m (Either ApiError DRepDetail)
 
+  -- | `GET /gov-actions` — lista. Nu există compozit de pagină pentru ea, și nu trebuie: plicul
+  -- | poartă deja tot ce randează tabelul.
+  getGovActions :: GovActionFilters -> m (Either ApiError GovActionPage)
+
+  -- | `GET /pages/gov-action/{id}` — acțiunea, numărătorile pe rol, retragerile, parametrii atinși,
+  -- | proponentul și documentul, într-un apel.
+  getGovActionDetail :: String -> m (Either ApiError GovActionDetail)
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
@@ -49,3 +59,5 @@ instance monadQueryGovHalogenM ::
   getDashboard = lift getDashboard
   getDRepExplorer = lift <<< getDRepExplorer
   getDRepDetail = lift <<< getDRepDetail
+  getGovActions = lift <<< getGovActions
+  getGovActionDetail = lift <<< getGovActionDetail
