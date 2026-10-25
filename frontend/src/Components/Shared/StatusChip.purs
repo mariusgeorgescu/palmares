@@ -21,6 +21,7 @@ import Prelude
 import Capabilities.Query.Gov.Http (ApiError(..), renderApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getStatus)
 import Capabilities.Query.Gov.Types (AttestSync(..), ChipState(..), GovStatus(..), GovSync(..), chipStateFor)
+import Format (formatLag)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -93,7 +94,7 @@ component =
     in
       HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-center gap-x-3 gap-y-1 text-xs") ]
         [ HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-outline") ] [ HH.text st.network ]
-        , badge (chipStateFor s) (freshnessLabel gov.lagSeconds)
+        , badge (chipStateFor s) (formatLag gov.lagSeconds)
         , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
             [ HH.text ("epoch " <> show gov.epoch) ]
         -- Amindouă epocile lipsesc pe o bază de date care n-a produs încă metrici sau distribuție
@@ -120,10 +121,6 @@ component =
     Just e | e /= chainEpoch ->
       HH.span [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text (label <> show e) ]
     _ -> HH.text ""
-
-  freshnessLabel lag
-    | lag <= 0 = "live"
-    | otherwise = show lag <> "s behind"
 
   -- „Nu a răspuns" e fals când serverul a răspuns exact: `indexer_behind` e un 503 pe care
   -- query-api îl dă deliberat cât timp db-sync încă reface istoria și nu există încă parametri de

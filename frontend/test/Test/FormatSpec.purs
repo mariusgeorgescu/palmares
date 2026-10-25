@@ -8,7 +8,7 @@ import Components.Shared.DRepIdentity (identityText, shortId)
 import Data.Array (replicate)
 import Data.Maybe (Maybe(..))
 import Data.String as String
-import Format (formatAda, formatInt, formatPercent, groupDigits, humanize, matchLine, pluralize, roleLabel)
+import Format (formatAda, formatInt, formatLag, formatPercent, groupDigits, humanize, matchLine, pluralize, roleLabel)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
@@ -46,14 +46,6 @@ spec = do
     it "renders exactly a thousand ADA with separators" do
       formatAda 1000000000.0 `shouldEqual` "1,000 ADA"
 
-  describe "humanize" do
-    it "writes the two acronyms the way the ecosystem writes them" do
-      -- Maparea mecanica din snake_case da „Drep registered", care pe un site public arata ca o
-      -- greseala de scriere. Apare pe fiecare pastila de filtru din fluxul de activitate.
-      humanize "drep_registered" `shouldEqual` "DRep registered"
-      humanize "delegation_changed" `shouldEqual` "Delegation changed"
-      humanize "treasury_withdrawals" `shouldEqual` "Treasury withdrawals"
-
   describe "matchLine" do
     it "says nothing when there is nothing, because the empty card says it better" do
       -- Masurat pe deployul de preprod: linia si cardul de sub ea scriau aceeasi propozitie, una
@@ -86,11 +78,29 @@ spec = do
       pluralize 0 "vote" `shouldEqual` "0 votes"
       pluralize 1234 "vote" `shouldEqual` "1,234 votes"
 
+  describe "formatLag" do
+    it "writes a two-year lag in days, not in seconds" do
+      -- Masurat pe deploy, cu db-sync refacind istoria: banda scria „58155804s behind". E corect
+      -- si inutilizabil — nimeni nu imparte 58 de milioane la 86400 in cap.
+      formatLag 58155804 `shouldEqual` "673.1 d behind"
+
+    it "keeps seconds where seconds are the unit of the question" do
+      formatLag 0 `shouldEqual` "live"
+      formatLag 43 `shouldEqual` "43s behind"
+      formatLag 600 `shouldEqual` "10 min behind"
+      formatLag 7200 `shouldEqual` "2.0 h behind"
+
   describe "humanize" do
     it "turns a server enum into a label" do
       humanize "treasury_withdrawals" `shouldEqual` "Treasury withdrawals"
       humanize "info_action" `shouldEqual` "Info action"
       humanize "proposed" `shouldEqual` "Proposed"
+
+    it "writes the two acronyms the way the ecosystem writes them" do
+      -- Maparea mecanica din snake_case da „Drep registered", care pe un site public arata ca o
+      -- greseala de scriere. Apare pe fiecare pastila de filtru din fluxul de activitate.
+      humanize "drep_registered" `shouldEqual` "DRep registered"
+      humanize "delegation_changed" `shouldEqual` "Delegation changed"
 
   describe "roleLabel" do
     it "keeps the abbreviations the ecosystem writes" do

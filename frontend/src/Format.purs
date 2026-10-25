@@ -13,6 +13,7 @@ module Format
   , formatAdaOnly
   , formatDay
   , formatHours
+  , formatLag
   , formatPercent
   , groupDigits
   , humanize
@@ -25,6 +26,7 @@ import Prelude
 
 import Capabilities.Query.Gov.Types (Lovelace)
 import Data.Maybe (Maybe(..))
+import Data.Int (toNumber)
 import Data.Number.Format (fixed, toStringWith)
 import Data.String as String
 import Data.String.CodeUnits as CU
@@ -72,6 +74,19 @@ formatDay = CU.take 10
 -- | Cât a durat, în unitatea pe care o citește un om. Peste două zile, orele cer o împărțire în
 -- | cap: „346.6 h" e „paisprezece zile". Pragul e la 48 și nu la 24, ca „30 h" să nu devină „1.3 d",
 -- | care e mai greu de citit decât orele.
+-- | Un decalaj în secunde, scris la scara la care se citește.
+-- |
+-- | `show lag <> "s behind"` e corect și inutilizabil: pe deployul care reface istoria,
+-- | banda de stare scria „58155804s behind" — 673 de zile, pe care nimeni nu le împarte în cap.
+-- | Secundele rămân sub două minute, fiindcă acolo chiar sînt unitatea întrebării („cît de vechi
+-- | e numărul ăsta?"); peste asta se trece la minute, la ore, apoi la zile prin `formatHours`.
+formatLag :: Int -> String
+formatLag lag
+  | lag <= 0 = "live"
+  | lag < 120 = show lag <> "s behind"
+  | lag < 5400 = toStringWith (fixed 0) (toNumber lag / 60.0) <> " min behind"
+  | otherwise = formatHours (toNumber lag / 3600.0) <> " behind"
+
 formatHours :: Number -> String
 formatHours h =
   if h < 48.0 then toStringWith (fixed 1) h <> " h"
