@@ -161,10 +161,12 @@ component =
       -- overlay-ul dă adâncime și contrast barei de navigare, iar cele două lumini pulsează decalat
       -- ca să nu bată în ritm. `pointer-events-none` fiindcă sunt decor, nu suprafață.
       --
-      -- bjj are dedesubt și o FOTOGRAFIE cu efect Ken Burns (`hero-bg-image`). Aici nu e pusă încă:
-      -- a lui e o sală de arte marțiale, iar un registru de guvernanță are nevoie de propria
-      -- imagine, pe care nimeni nu a ales-o. Mecanismul e gata — o clasă și un fișier o aprind.
+      -- Dedesubt, în locul fotografiei lui bjj: marca Cardano, uriașă și la 3% opacitate, derivând
+      -- lent. O fotografie de stoc aleasă de mine ar fi fost și o decizie de gust, și una de
+      -- licență; asta e ceva ce proiectul deține deja și care spune adevărul despre el. Se
+      -- înlocuiește cu o fotografie schimbând o regulă din CSS.
       -- Luminile sunt ascunse pe telefon: pe un ecran mic ocupă jumătate din el.
+      , HH.div [ HP.class_ (HH.ClassName "fixed inset-0 pointer-events-none hero-bg-image z-0") ] []
       , HH.div [ HP.class_ (HH.ClassName "fixed inset-0 pointer-events-none global-bg-overlay z-0") ] []
       , HH.div [ HP.class_ (HH.ClassName "fixed inset-0 pointer-events-none hero-neon-glow-left z-0 hidden sm:block") ] []
       , HH.div [ HP.class_ (HH.ClassName "fixed inset-0 pointer-events-none hero-neon-glow-right z-0 hidden sm:block") ] []

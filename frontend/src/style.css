@@ -467,3 +467,37 @@ html.js-reveal .scroll-reveal.in-view {
   padding-bottom: 1rem;
   border-bottom: 1px solid color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
+
+/* ===== Fundalul: marca Cardano, uriașă și abia vizibilă =====
+
+   Slotul `hero-bg-image` din bjj ține o FOTOGRAFIE cu efect Ken Burns — la ei o sală de arte
+   marțiale. Un registru de guvernanță n-are echivalentul ei, iar o fotografie de stoc aleasă de
+   mine ar fi și o decizie de gust, și una de licență.
+
+   Deci slotul se umple cu ceva ce proiectul deține deja și care spune adevărul despre el: constelația
+   de puncte a mărcii Cardano, la 3% opacitate, derivând lent. Fără fișier nou, fără licență de
+   verificat, fără altă decizie de luat — și se înlocuiește cu o fotografie schimbând o singură
+   regulă, dacă ownerul alege una.
+
+   `background-attachment: fixed` ar fi fost mai simplu, dar pe iOS e ignorat și pe Android
+   provoacă repictări la fiecare derulare; stratul e deja `position: fixed`, deci nu e nevoie. */
+.hero-bg-image {
+  background-image: url('/images/cardano-logo.svg');
+  background-repeat: no-repeat;
+  background-position: 50% 42%;
+  background-size: min(120vh, 95vw);
+  opacity: 0.03;
+  animation: hero-drift 40s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes hero-drift {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.1) translate(-1.5%, -1%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-bg-image {
+    animation: none !important;
+  }
+}
