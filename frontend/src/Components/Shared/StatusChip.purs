@@ -92,14 +92,11 @@ component =
         , badge (chipStateFor s) (freshnessLabel gov.lagSeconds)
         , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
             [ HH.text ("epoch " <> show gov.epoch) ]
-        , if st.metricsAsOfEpoch == gov.epoch then HH.text ""
-          else
-            HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
-              [ HH.text ("metrics as of epoch " <> show st.metricsAsOfEpoch) ]
-        , if st.drepDistrEpoch == gov.epoch then HH.text ""
-          else
-            HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
-              [ HH.text ("voting power as of epoch " <> show st.drepDistrEpoch) ]
+        -- Amindouă epocile lipsesc pe o bază de date care n-a produs încă metrici sau distribuție
+        -- de putere. Atunci nu se scrie nimic: „as of epoch ?" nu e o informație, iar banda spune
+        -- oricum, prin pastila ei, cît de veche e imaginea.
+        , offEpochNote "metrics as of epoch " gov.epoch st.metricsAsOfEpoch
+        , offEpochNote "voting power as of epoch " gov.epoch st.drepDistrEpoch
         , renderAttestation st.attestation
         ]
 
@@ -112,6 +109,13 @@ component =
     Just (AttestSync a) ->
       HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
         [ HH.text ("attestations: " <> a.state <> " (" <> show a.lagSeconds <> "s behind)") ]
+
+  -- Banda spune ce e NOU: o epocă egală cu cea a lanțului e același număr scris a doua oară, iar
+  -- una care lipsește n-are ce să spună.
+  offEpochNote label chainEpoch = case _ of
+    Just e | e /= chainEpoch ->
+      HH.span [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text (label <> show e) ]
+    _ -> HH.text ""
 
   freshnessLabel lag
     | lag <= 0 = "live"

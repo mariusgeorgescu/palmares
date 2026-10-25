@@ -116,7 +116,7 @@ spec = do
         Just (Withdrawal w) -> do
           w.amount `shouldEqual` 1000000000000.0
           isNothing w.enactedAt `shouldEqual` true
-          w.paidHeuristic `shouldEqual` false
+          w.paidHeuristic `shouldEqual` Just false
 
     it "decodes the CIP-108 document, duplicate references and all" do
       -- Documentul real conține același link de două ori. Se randează așa cum e: e documentul lor,

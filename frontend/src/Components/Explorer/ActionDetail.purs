@@ -197,12 +197,16 @@ component =
                 ]
             , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all") ]
                 [ HH.text a.bech32 ]
-            , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all") ]
-                [ HH.text ("tx " <> at.txHash) ]
+            , case at.txHash of
+                Nothing -> HH.text ""
+                Just h ->
+                  HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all") ]
+                    [ HH.text ("tx " <> h) ]
             , HH.div [ HP.class_ (HH.ClassName "flex flex-wrap gap-6 pt-2") ]
                 [ figure "Votes cast" (formatInt a.votesCast) ""
-                , figure "Expires" ("epoch " <> show a.expiresEpoch)
-                    ("votable to epoch " <> show a.lastVotableEpoch)
+                -- O acțiune deja decisă nu mai are epocă de expirare, și atunci nu se scrie una.
+                , figure "Expires" (epochOrDash a.expiresEpoch)
+                    (maybe "" (\e -> "votable to epoch " <> show e) a.lastVotableEpoch)
                 , figure "Deposit" (maybe "not recorded" formatAda a.deposit) "refunded to the return address"
                 , figure "Asked for" (maybe "nothing" formatAda a.treasuryAmount) ""
                 ]
@@ -233,6 +237,11 @@ component =
                     [ HH.text ("deposit returns to " <> addr) ]
             ]
         ]
+
+  -- „not recorded" e aceeași formulare ca la depozitul lipsă de deasupra: un cîmp absent se
+  -- numește o dată, la fel peste tot, în loc să fie o liniuță pe un ecran și un gol pe altul.
+  epochOrDash :: Maybe Int -> String
+  epochOrDash = maybe "not recorded" (\e -> "epoch " <> show e)
 
   figure title value hint =
     HH.div_
@@ -322,7 +331,7 @@ component =
               Just (ChainPoint at) -> HH.text ("epoch " <> show at.epoch <> " · " <> formatDay at.time)
           -- `paid_heuristic` e cinstea serverului: plata nu se poate citi direct pentru fiecare caz.
           -- Ecranul spune același lucru în loc să prezinte o deducție ca pe o observație.
-          , if w.paidHeuristic then
+          , if w.paidHeuristic == Just true then
               HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
                 [ HH.text "inferred, not read from a payment on chain" ]
             else HH.text ""

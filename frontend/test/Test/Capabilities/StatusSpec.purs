@@ -54,7 +54,7 @@ spec = do
     it "decodes the measured preprod payload" do
       withStatus statusFixture \(GovStatus s) -> do
         s.network `shouldEqual` "preprod"
-        s.metricsAsOfEpoch `shouldEqual` 321
+        s.metricsAsOfEpoch `shouldEqual` Just 321
         s.amberLagSeconds `shouldEqual` 120
         s.readyMaxLagSeconds `shouldEqual` 300
         case s.governance of
@@ -85,7 +85,7 @@ spec = do
       -- se etichetează cu ea. Un singur câmp pentru amândouă ar pune o etichetă greșită pe un număr
       -- corect, care e cea mai greu de observat formă de greșeală.
       withStatus governanceOnlyFixture \(GovStatus s) -> do
-        s.drepDistrEpoch `shouldEqual` 320
+        s.drepDistrEpoch `shouldEqual` Just 320
         case s.governance of
           GovSync g -> g.epoch `shouldEqual` 321
 

@@ -7,6 +7,7 @@ import Prelude
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Test.Capabilities.DashboardSpec as DashboardSpec
+import Test.Capabilities.EarlyChainSpec as EarlyChainSpec
 import Test.Capabilities.ActionSpec as ActionSpec
 import Test.Capabilities.DRepDetailSpec as DRepDetailSpec
 import Test.Capabilities.DRepListSpec as DRepListSpec
@@ -31,3 +32,4 @@ main = launchAff_ $ runSpec [ consoleReporter ] do
   ActionSpec.spec
   VoteSpec.spec
   SearchSpec.spec
+  EarlyChainSpec.spec

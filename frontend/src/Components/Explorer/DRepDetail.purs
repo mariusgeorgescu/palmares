@@ -210,8 +210,13 @@ component =
                           s.activeUntilEpoch
                       )
                   ]
-              , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
-                  [ HH.text ("registered " <> s.registeredAt <> " (" <> formatInt s.ageDays <> " days ago)") ]
+              -- Data înregistrării și vechimea vin din același certificat: cînd nu există, nu
+              -- există niciuna. Rîndul dispare, în loc să scrie „registered  (0 days ago)".
+              , case s.registeredAt of
+                  Nothing -> HH.text ""
+                  Just at ->
+                    HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
+                      [ HH.text ("registered " <> at <> maybe "" (\d -> " (" <> formatInt d <> " days ago)") s.ageDays) ]
               , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
                   [ HH.text (maybe "no declared language" (\l -> "language: " <> l) s.language) ]
               ]
@@ -315,8 +320,8 @@ component =
               ( case last points of
                   Nothing -> ""
                   Just (PowerPoint p) ->
-                    "Latest: " <> formatAda p.lovelace <> " from "
-                      <> pluralize p.delegatorCount "delegator"
+                    "Latest: " <> formatAda p.lovelace
+                      <> delegatorsNote p.delegatorCount
                       <> " in epoch "
                       <> show p.epoch
                       <> "."
@@ -324,10 +329,15 @@ component =
           ]
       ]
 
+  -- Numărul de delegatori vine din `epoch_stake`, care poate să nu aibă încă rîndul epocii.
+  -- Atunci se scrie doar suma: „from 0 delegators" ar fi o afirmație, nu o necunoscută.
+  delegatorsNote :: Maybe Int -> String
+  delegatorsNote = maybe "" (\n -> " from " <> pluralize n "delegator")
+
   powerPoint (PowerPoint p) =
     { label: "epoch " <> show p.epoch
     , value: p.lovelace
-    , hint: formatAda p.lovelace <> " from " <> pluralize p.delegatorCount "delegator"
+    , hint: formatAda p.lovelace <> delegatorsNote p.delegatorCount
     }
 
   votesByTypeCard (DRepMetrics m) =
@@ -438,8 +448,14 @@ component =
                   HH.span [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
                     [ HH.text ("deposit " <> formatAda dep) ]
             ]
-        , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all") ]
-            [ HH.text ("tx " <> at.txHash) ]
+        -- Un `ChainPoint` fără `tx_hash` e un eveniment de GRANIȚĂ DE EPOCĂ — expirări, schimbări
+        -- de stare — pe care nu le-a provocat nicio tranzacție. Rîndul de hash dispare atunci, în
+        -- loc să scrie „tx " urmat de nimic.
+        , case at.txHash of
+            Nothing -> HH.text ""
+            Just h ->
+              HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all") ]
+                [ HH.text ("tx " <> h) ]
         , case u.anchorUrl of
             Nothing -> HH.text ""
             Just url ->

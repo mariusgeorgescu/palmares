@@ -234,7 +234,7 @@ component =
               ]
           )
       , statCard "Voting power delegated" (formatAda p.drepPowerLovelace)
-          (HH.text ("as of epoch " <> show p.powerEpoch))
+          (HH.text (powerAsOf p.powerEpoch))
       -- „Parked on always-abstain" era argou peste un nume de protocol. Cifra asta e 85% din toată
       -- puterea delegată; propoziția trebuie să spună cine a ales și ce a ales.
       , statCard "Delegated to always-abstain" (formatAda p.alwaysAbstainLovelace)
@@ -384,6 +384,14 @@ component =
           ]
       ]
 
+  -- Distribuția de putere vine cu o epocă întîrziere față de lanț, deci `power_epoch` lipsește
+  -- cît timp ledgerul n-a publicat încă una. Atunci toate cifrele de putere de deasupra sînt zero,
+  -- și singurul lucru onest de scris lîngă ele e de ce.
+  powerAsOf :: Maybe Int -> String
+  powerAsOf = case _ of
+    Just e -> "as of epoch " <> show e
+    Nothing -> "not published yet"
+
   treasuryNote :: Maybe Lovelace -> String
   treasuryNote = case _ of
     Nothing -> ""
@@ -394,7 +402,7 @@ component =
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text "Largest DReps by voting power" ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-              [ HH.text ("Voting power as of epoch " <> show p.powerEpoch <> ".") ]
+              [ HH.text ("Voting power " <> powerAsOf p.powerEpoch <> ".") ]
           , HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
               [ HH.table [ HP.class_ (HH.ClassName "table table-sm") ]
                   [ HH.thead_

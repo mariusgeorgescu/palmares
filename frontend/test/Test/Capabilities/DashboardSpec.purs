@@ -34,7 +34,7 @@ spec = do
         p.inactiveDreps `shouldEqual` 187
         p.unknownDreps `shouldEqual` 90
         p.retiredDreps `shouldEqual` 526
-        p.powerEpoch `shouldEqual` 321
+        p.powerEpoch `shouldEqual` Just 321
         p.totalActions `shouldEqual` 131
         p.actionsInFlight `shouldEqual` 7
         length p.actionsByType `shouldEqual` 7
@@ -64,7 +64,7 @@ spec = do
           d.hasScript `shouldEqual` false
           d.status `shouldEqual` "active"
           d.votingPower `shouldEqual` 400644627419166.0
-          d.votingPowerEpoch `shouldEqual` 321
+          d.votingPowerEpoch `shouldEqual` Just 321
           d.delegatorCount `shouldEqual` 19
           d.participationRate `shouldEqual` Just 0.09523809523809523
           -- Măsurat: 154 din 200 de DRep-i n-au nume. Cazul fără nume e cazul obișnuit.
@@ -77,8 +77,8 @@ spec = do
           a.type_ `shouldEqual` "no_confidence"
           isNothing a.title `shouldEqual` true
           isNothing a.treasuryAmount `shouldEqual` true
-          a.expiresEpoch `shouldEqual` 324
-          a.lastVotableEpoch `shouldEqual` 323
+          a.expiresEpoch `shouldEqual` Just 324
+          a.lastVotableEpoch `shouldEqual` Just 323
 
   describe "activeInactive" do
     it "counts active plus inactive, which is not total_dreps" do

@@ -121,10 +121,10 @@ newtype GovStatus = GovStatus
   , governance :: GovSync
   , attestation :: Maybe AttestSync
   , attestLagSeconds :: Maybe Int
-  , drepDistrEpoch :: Int
+  , drepDistrEpoch :: Maybe Int
   , amberLagSeconds :: Int
   , readyMaxLagSeconds :: Int
-  , metricsAsOfEpoch :: Int
+  , metricsAsOfEpoch :: Maybe Int
   }
 
 derive instance Eq GovStatus
@@ -136,10 +136,10 @@ instance DecodeJson GovStatus where
     governance <- o .: "governance"
     attestation <- o .:? "attestation"
     attestLagSeconds <- o .:? "attest_lag_seconds"
-    drepDistrEpoch <- o .: "drep_distr_epoch"
+    drepDistrEpoch <- o .:? "drep_distr_epoch"
     amberLagSeconds <- o .: "amber_lag_seconds"
     readyMaxLagSeconds <- o .: "ready_max_lag_seconds"
-    metricsAsOfEpoch <- o .: "metrics_as_of_epoch"
+    metricsAsOfEpoch <- o .:? "metrics_as_of_epoch"
     pure
       ( GovStatus
           { network
@@ -201,10 +201,10 @@ newtype DRepSummary = DRepSummary
   , imageUrl :: Maybe String
   , language :: Maybe String
   , anchorStatus :: Maybe String
-  , registeredAt :: String
-  , ageDays :: Int
+  , registeredAt :: Maybe String
+  , ageDays :: Maybe Int
   , votingPower :: Lovelace
-  , votingPowerEpoch :: Int
+  , votingPowerEpoch :: Maybe Int
   , delegatorCount :: Int
   , eligibleActions :: Int
   , votesCast :: Int
@@ -230,10 +230,10 @@ instance DecodeJson DRepSummary where
     imageUrl <- o .:? "image_url"
     language <- o .:? "language"
     anchorStatus <- o .:? "anchor_status"
-    registeredAt <- o .: "registered_at"
-    ageDays <- o .: "age_days"
+    registeredAt <- o .:? "registered_at"
+    ageDays <- o .:? "age_days"
     votingPower <- o .: "voting_power"
-    votingPowerEpoch <- o .: "voting_power_epoch"
+    votingPowerEpoch <- o .:? "voting_power_epoch"
     delegatorCount <- o .: "delegator_count"
     eligibleActions <- o .: "eligible_actions"
     votesCast <- o .: "votes_cast"
@@ -305,8 +305,8 @@ newtype GovActionSummary = GovActionSummary
   , abstract :: Maybe String
   , anchorStatus :: Maybe String
   , proposedAt :: ChainPoint
-  , expiresEpoch :: Int
-  , lastVotableEpoch :: Int
+  , expiresEpoch :: Maybe Int
+  , lastVotableEpoch :: Maybe Int
   , lifecycle :: Lifecycle
   , deposit :: Maybe Lovelace
   , returnAddress :: Maybe String
@@ -326,8 +326,8 @@ instance DecodeJson GovActionSummary where
     abstract <- o .:? "abstract"
     anchorStatus <- o .:? "anchor_status"
     proposedAt <- o .: "proposed_at"
-    expiresEpoch <- o .: "expires_epoch"
-    lastVotableEpoch <- o .: "last_votable_epoch"
+    expiresEpoch <- o .:? "expires_epoch"
+    lastVotableEpoch <- o .:? "last_votable_epoch"
     lifecycle <- o .: "lifecycle"
     deposit <- o .:? "deposit"
     returnAddress <- o .:? "return_address"
@@ -361,7 +361,10 @@ instance DecodeJson GovActionSummary where
 -- |   * trezoreria sunt __două__ numere — cerut și adoptat — iar `treasury_enacted_lovelace` era 0
 -- |     la măsurătoare. Un singur număr ar sugera că s-au plătit 656 de milioane de ADA;
 -- |   * `power_epoch` e epoca distribuției de putere, separată de `epoch`. Cifrele de putere se
--- |     etichetează cu ea.
+-- |     etichetează cu ea — și e `null` cît timp distribuția nu există încă, fiindcă ledgerul o
+-- |     produce cu o epocă întîrziere. Măsurat pe preprod: `"power_epoch": null` pe un lanț care
+-- |     încă se reface, iar un decodor care cerea un număr rupea TOT ecranul de pornire. Fixtura
+-- |     avea 321 acolo, deci testele n-aveau cum s-o vadă.
 newtype DashboardPage = DashboardPage
   { epoch :: Int
   , totalDreps :: Int
@@ -369,7 +372,7 @@ newtype DashboardPage = DashboardPage
   , inactiveDreps :: Int
   , unknownDreps :: Int
   , retiredDreps :: Int
-  , powerEpoch :: Int
+  , powerEpoch :: Maybe Int
   , drepPowerLovelace :: Lovelace
   , alwaysAbstainLovelace :: Lovelace
   , alwaysNoConfidenceLovelace :: Lovelace
@@ -395,7 +398,7 @@ instance DecodeJson DashboardPage where
     inactiveDreps <- o .: "inactive_dreps"
     unknownDreps <- o .: "unknown_dreps"
     retiredDreps <- o .: "retired_dreps"
-    powerEpoch <- o .: "power_epoch"
+    powerEpoch <- o .:? "power_epoch"
     drepPowerLovelace <- o .: "drep_power_lovelace"
     alwaysAbstainLovelace <- o .: "always_abstain_lovelace"
     alwaysNoConfidenceLovelace <- o .: "always_no_confidence_lovelace"
@@ -496,7 +499,7 @@ newtype ChainPoint = ChainPoint
   { slot :: Int
   , epoch :: Int
   , time :: String
-  , txHash :: String
+  , txHash :: Maybe String
   }
 
 derive instance Eq ChainPoint
@@ -507,7 +510,7 @@ instance DecodeJson ChainPoint where
     slot <- o .: "slot"
     epoch <- o .: "epoch"
     time <- o .: "time"
-    txHash <- o .: "tx_hash"
+    txHash <- o .:? "tx_hash"
     pure (ChainPoint { slot, epoch, time, txHash })
 
 newtype FinalVotes = FinalVotes
@@ -572,7 +575,7 @@ newtype DRepMetrics = DRepMetrics
   , voteLatencyMedianHours :: Maybe Number
   , voteLatencyP90Hours :: Maybe Number
   , voteLatencySample :: Int
-  , ageDays :: Int
+  , ageDays :: Maybe Int
   , finalVotes :: FinalVotes
   , votesByType :: Array (Tuple String VoteTypeStats)
   , formulaIds :: Array String
@@ -598,7 +601,7 @@ instance DecodeJson DRepMetrics where
     voteLatencyMedianHours <- o .:? "vote_latency_median_hours"
     voteLatencyP90Hours <- o .:? "vote_latency_p90_hours"
     voteLatencySample <- o .: "vote_latency_sample"
-    ageDays <- o .: "age_days"
+    ageDays <- o .:? "age_days"
     finalVotes <- o .: "final_votes"
     votesByType <- o .: "votes_by_type"
     formulaIds <- o .: "formula_ids"
@@ -665,7 +668,7 @@ instance DecodeJson DelegatorStats where
 newtype PowerPoint = PowerPoint
   { epoch :: Int
   , lovelace :: Lovelace
-  , delegatorCount :: Int
+  , delegatorCount :: Maybe Int
   }
 
 derive instance Eq PowerPoint
@@ -675,7 +678,7 @@ instance DecodeJson PowerPoint where
     o <- decodeJson json
     epoch <- o .: "epoch"
     lovelace <- o .: "lovelace"
-    delegatorCount <- o .: "delegator_count"
+    delegatorCount <- o .:? "delegator_count"
     pure (PowerPoint { epoch, lovelace, delegatorCount })
 
 -- | `lovelace` e `Maybe`, și nu din prudență: măsurat pe serverul care rulează, al cincilea
@@ -870,7 +873,7 @@ newtype Withdrawal = Withdrawal
   { beneficiary :: String
   , amount :: Lovelace
   , enactedAt :: Maybe ChainPoint
-  , paidHeuristic :: Boolean
+  , paidHeuristic :: Maybe Boolean
   }
 
 derive instance Eq Withdrawal
@@ -881,7 +884,7 @@ instance DecodeJson Withdrawal where
     beneficiary <- o .: "beneficiary"
     amount <- o .: "amount"
     enactedAt <- o .:? "enacted_at"
-    paidHeuristic <- o .: "paid_heuristic"
+    paidHeuristic <- o .:? "paid_heuristic"
     pure (Withdrawal { beneficiary, amount, enactedAt, paidHeuristic })
 
 -- | Un parametru de protocol pe care acțiunea îl schimbă, cu grupul din care își ia pragul.
