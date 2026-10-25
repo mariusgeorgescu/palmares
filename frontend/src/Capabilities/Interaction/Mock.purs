@@ -7,13 +7,15 @@ module Capabilities.Interaction.Mock
   ( buildFlowMock
   , submitSignedMock
   , txStatusMock
+  , interactionStatusMock
   ) where
 
 import Prelude
 
-import Capabilities.Interaction.Types (FlowRequest, SubmitParams)
+import Capabilities.Interaction.Types (FlowRequest, InteractionStatus(..), OracleParams(..), SubmitParams)
 import Capabilities.Query.Gov.Http (ApiError(..))
 import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
 
 -- | O tranzacție nesemnată de formă plauzibilă. Nu e validă pe niciun lanț, și nici nu trebuie:
 -- | singurul lucru care o atinge în demo e ecranul care o arată.
@@ -28,3 +30,28 @@ submitSignedMock _ =
 
 txStatusMock :: forall m. Applicative m => String -> m (Either ApiError Boolean)
 txStatusMock _ = pure (Right false)
+
+-- | Oracolul din demo e DESCHIS, cu parametrii măsurați pe preprod: depozitul de dispută de 5 ADA
+-- | e numărul pe care ecranul îl scrie în propoziția de consecință, iar o fixtură care l-ar lăsa
+-- | pe zero ar face ecranul să promită o dispută gratuită.
+interactionStatusMock :: forall m. Applicative m => m (Either ApiError InteractionStatus)
+interactionStatusMock =
+  pure
+    ( Right
+        ( InteractionStatus
+            { provider: "node-kupo"
+            , network: "preprod"
+            , deployedScripts: true
+            , oraclePaused: Just false
+            , oracle: Just
+                ( OracleParams
+                    { disputeDepositLovelace: 5000000.0
+                    , disputeTimeoutMs: 2592000000.0
+                    , minUtxoLovelace: 1000000.0
+                    , profileCreationFeeLovelace: Nothing
+                    , attestationFeeLovelace: Nothing
+                    }
+                )
+            }
+        )
+    )

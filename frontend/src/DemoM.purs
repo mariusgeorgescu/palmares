@@ -13,7 +13,7 @@ import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.LogMessages (class LogMessages)
 import Capabilities.Interaction.MonadInteract (class MonadInteract)
-import Capabilities.Interaction.Mock (buildFlowMock, submitSignedMock, txStatusMock)
+import Capabilities.Interaction.Mock (buildFlowMock, interactionStatusMock, submitSignedMock, txStatusMock)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Capabilities.Wallet.Governance (class MonadGovWallet)
 import Capabilities.Wallet.GovernanceMock (connectGovernanceMock)
@@ -123,6 +123,7 @@ instance monadInteractDemoM :: MonadInteract DemoM where
   buildFlow = buildFlowMock
   submitSigned = submitSignedMock
   txStatus = txStatusMock
+  interactionStatus = interactionStatusMock
 
 instance monadGovWalletDemoM :: MonadGovWallet DemoM where
   connectGovernance = connectGovernanceMock

@@ -17,14 +17,20 @@ module Capabilities.Interaction.Types
   , profileKinds
   , attestationKinds
   , disputeVerdicts
+  , OracleParams(..)
+  , InteractionStatus(..)
+  , oracleGate
+  , OracleGate(..)
   ) where
 
 import Prelude
 
 import Data.Argonaut.Core (Json, jsonEmptyObject)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), (.:?))
 import Data.Argonaut.Encode ((:=), (~>))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..), fst, snd)
+import Capabilities.Query.Gov.Types (Lovelace)
 
 -- | Adresele pe care serverul le folosește ca să aleagă intrările și să dea restul.
 -- |
@@ -229,3 +235,91 @@ encodeSubmit p =
   "tx_unsigned" := p.txUnsigned
     ~> "tx_wit" := p.txWit
     ~> jsonEmptyObject
+
+-- | Parametrii pe care oracolul îi impune acum. Depozitul de dispută e singurul număr pe care un om
+-- | trebuie să-l vadă ÎNAINTE să deschidă o dispută — e ce riscă.
+-- |
+-- | Taxele sunt `Maybe` și sunt `null` pe preprod: protocolul permite taxe, deploymentul ăsta nu le
+-- | cere. „Fără taxă" și „nu știm taxa" nu sunt același lucru, deci nu se scriu la fel.
+newtype OracleParams = OracleParams
+  { disputeDepositLovelace :: Lovelace
+  , disputeTimeoutMs :: Number
+  , minUtxoLovelace :: Lovelace
+  , profileCreationFeeLovelace :: Maybe Lovelace
+  , attestationFeeLovelace :: Maybe Lovelace
+  }
+
+derive instance Eq OracleParams
+
+instance DecodeJson OracleParams where
+  decodeJson json = do
+    o <- decodeJson json
+    disputeDepositLovelace <- o .: "dispute_deposit_lovelace"
+    disputeTimeoutMs <- o .: "dispute_timeout_ms"
+    minUtxoLovelace <- o .: "min_utxo_lovelace"
+    profileCreationFeeLovelace <- o .:? "profile_creation_fee_lovelace"
+    attestationFeeLovelace <- o .:? "attestation_fee_lovelace"
+    pure
+      ( OracleParams
+          { disputeDepositLovelace
+          , disputeTimeoutMs
+          , minUtxoLovelace
+          , profileCreationFeeLovelace
+          , attestationFeeLovelace
+          }
+      )
+
+-- | `GET /status` al lui interaction-api.
+-- |
+-- | `oraclePaused` și `oracle` sunt amândouă opționale în contractul serverului — NU sunt în
+-- | `required` — și asta e informație, nu o scăpare: un server care n-a putut citi oracolul nu are
+-- | ce să pună acolo. Vezi `oracleGate`.
+newtype InteractionStatus = InteractionStatus
+  { provider :: String
+  , network :: String
+  , deployedScripts :: Boolean
+  , oraclePaused :: Maybe Boolean
+  , oracle :: Maybe OracleParams
+  }
+
+derive instance Eq InteractionStatus
+
+instance DecodeJson InteractionStatus where
+  decodeJson json = do
+    o <- decodeJson json
+    provider <- o .: "provider"
+    network <- o .: "network"
+    deployedScripts <- o .: "deployed_scripts"
+    oraclePaused <- o .:? "oracle_paused"
+    oracle <- o .:? "oracle"
+    pure (InteractionStatus { provider, network, deployedScripts, oraclePaused, oracle })
+
+-- | Ce are voie să se întâmple, după starea oracolului.
+data OracleGate
+  = OracleOpen
+  -- | Oracolul a oprit protocolul. E o stare voită a cuiva, nu o defecțiune.
+  | OraclePaused
+  -- | Nu se știe dacă e oprit. __Se blochează la fel ca „oprit"__, și din același motiv pentru
+  -- | care se blochează o rețea nedeterminată: a presupune „probabil merge" înseamnă a construi o
+  -- | tranzacție care va fi respinsă de validator după ce omul a semnat-o.
+  | OracleUnknown
+  -- | Scripturile nu sunt pe lanț. Nimic nu se poate construi împotriva lor.
+  | ScriptsMissing
+
+derive instance Eq OracleGate
+
+instance Show OracleGate where
+  show = case _ of
+    OracleOpen -> "OracleOpen"
+    OraclePaused -> "OraclePaused"
+    OracleUnknown -> "OracleUnknown"
+    ScriptsMissing -> "ScriptsMissing"
+
+-- | Verdictul. Ordinea contează: fără scripturi pe lanț, starea oracolului e irelevantă.
+oracleGate :: InteractionStatus -> OracleGate
+oracleGate (InteractionStatus s)
+  | not s.deployedScripts = ScriptsMissing
+  | otherwise = case s.oraclePaused of
+      Nothing -> OracleUnknown
+      Just true -> OraclePaused
+      Just false -> OracleOpen

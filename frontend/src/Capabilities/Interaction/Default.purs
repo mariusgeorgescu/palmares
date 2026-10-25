@@ -7,11 +7,12 @@ module Capabilities.Interaction.Default
   ( buildFlowDefault
   , submitSignedDefault
   , txStatusDefault
+  , interactionStatusDefault
   ) where
 
 import Prelude
 
-import Capabilities.Interaction.Types (FlowRequest, SubmitParams, encodeFlow, encodeSubmit, flowPath)
+import Capabilities.Interaction.Types (FlowRequest, InteractionStatus, SubmitParams, encodeFlow, encodeSubmit, flowPath)
 import Capabilities.Query.Gov.Http (ApiError, getJson, postJson)
 import Data.Either (Either)
 import Effect.Aff.Class (class MonadAff)
@@ -50,3 +51,12 @@ txStatusDefault
 txStatusDefault env txId = do
   res <- getJson (env.interactionBaseUrl <> "/tx-status/" <> txId)
   pure (map (\(r :: { confirmed :: Boolean }) -> r.confirmed) res)
+
+-- | Starea serverului de scriere. Ruta e publică prin contractul de boot — nu e sub BasicAuth —
+-- | pentru că un client trebuie să poată afla dacă protocolul e oprit fără să aibă credențiale.
+interactionStatusDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasInteractEnv r)
+  -> m (Either ApiError InteractionStatus)
+interactionStatusDefault env = getJson (env.interactionBaseUrl <> "/status")

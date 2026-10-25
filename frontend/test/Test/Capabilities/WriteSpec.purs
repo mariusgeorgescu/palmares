@@ -8,7 +8,7 @@ module Test.Capabilities.WriteSpec (spec) where
 import Prelude
 
 import AppEnv (NetworkMagic(..), preprodMagic, previewMagic)
-import Capabilities.Interaction.Types (FlowRequest(..), encodeFlow, flowPath)
+import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams(..), encodeFlow, flowPath, oracleGate)
 import Capabilities.Wallet.Governance (BlockReason(..), WalletCapabilities, blockMessage, verdictOf)
 import Components.Write.Flows (buildRequest, flowSpecs, missingFields, specFor)
 import Data.Argonaut.Core (stringify)
@@ -140,3 +140,31 @@ spec = do
     it "routes each flow to its own path" do
       flowPath (AcceptAttestation { attestationId: "a", addresses }) `shouldEqual` "/accept-attestation"
       flowPath (ExpireDispute { disputeId: "d", addresses }) `shouldEqual` "/expire-dispute"
+
+  describe "the oracle gate" do
+    it "opens only when the scripts are on chain AND the oracle says it is not paused" do
+      oracleGate (InteractionStatus (baseStatus { deployedScripts = true, oraclePaused = Just false })) `shouldEqual` OracleOpen
+
+    it "blocks on an unknown pause state exactly as hard as on a known pause" do
+      -- Acelasi refuz ca la reteaua nedeterminata, din acelasi motiv: o tranzactie construita
+      -- impotriva unui protocol oprit e respinsa de validator DUPA ce omul a semnat-o.
+      oracleGate (InteractionStatus (baseStatus { oraclePaused = Nothing })) `shouldEqual` OracleUnknown
+      oracleGate (InteractionStatus (baseStatus { oraclePaused = Just true })) `shouldEqual` OraclePaused
+
+    it "reports missing scripts before anything about the oracle" do
+      -- Fara scripturi pe lant, starea oracolului e irelevanta — si un mesaj despre oracol ar
+      -- trimite omul sa astepte ceva ce nu se va intimpla.
+      oracleGate (InteractionStatus (baseStatus { deployedScripts = false, oraclePaused = Just false }))
+        `shouldEqual` ScriptsMissing
+      oracleGate (InteractionStatus (baseStatus { deployedScripts = false, oraclePaused = Nothing }))
+        `shouldEqual` ScriptsMissing
+
+-- | Un `/status` de pornire, peste care testele schimbă doar cîmpul care contează.
+baseStatus :: { provider :: String, network :: String, deployedScripts :: Boolean, oraclePaused :: Maybe Boolean, oracle :: Maybe OracleParams }
+baseStatus =
+  { provider: "node-kupo"
+  , network: "preprod"
+  , deployedScripts: true
+  , oraclePaused: Just false
+  , oracle: Nothing
+  }

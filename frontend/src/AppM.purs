@@ -33,7 +33,7 @@ import Capabilities.Query.Gov.Default
   , getVotesDefault
   , searchAllDefault
   )
-import Capabilities.Interaction.Default (buildFlowDefault, submitSignedDefault, txStatusDefault)
+import Capabilities.Interaction.Default (buildFlowDefault, interactionStatusDefault, submitSignedDefault, txStatusDefault)
 import Capabilities.Interaction.MonadInteract (class MonadInteract)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Capabilities.Wallet.Governance (class MonadGovWallet)
@@ -129,6 +129,7 @@ instance monadInteractAppM :: MonadInteract AppM where
   buildFlow r = ask >>= \env -> buildFlowDefault env r
   submitSigned p = ask >>= \env -> submitSignedDefault env p
   txStatus i = ask >>= \env -> txStatusDefault env i
+  interactionStatus = ask >>= interactionStatusDefault
 
 -- | Poarta de wallet. Magic-ul AȘTEPTAT vine din mediu, nu din wallet: altfel „e pe rețeaua
 -- | potrivită" ar fi o tautologie.

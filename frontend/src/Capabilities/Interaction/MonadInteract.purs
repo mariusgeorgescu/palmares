@@ -11,11 +11,12 @@ module Capabilities.Interaction.MonadInteract
   , buildFlow
   , submitSigned
   , txStatus
+  , interactionStatus
   ) where
 
 import Prelude
 
-import Capabilities.Interaction.Types (FlowRequest, SubmitParams)
+import Capabilities.Interaction.Types (FlowRequest, InteractionStatus, SubmitParams)
 import Capabilities.Query.Gov.Http (ApiError)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
@@ -31,7 +32,12 @@ class Monad m <= MonadInteract m where
   -- | `GET /tx-status/{id}` — dacă s-a confirmat. `false` înseamnă „încă nu", nu „a eșuat".
   txStatus :: String -> m (Either ApiError Boolean)
 
+  -- | `GET /status` — dacă scripturile sunt pe lanț, dacă oracolul e oprit, și ce depozit cere
+  -- | acum. Se citește ÎNAINTE de orice formular, nu la apăsarea butonului.
+  interactionStatus :: m (Either ApiError InteractionStatus)
+
 instance monadInteractHalogenM :: MonadInteract m => MonadInteract (HalogenM st act slots msg m) where
   buildFlow = lift <<< buildFlow
   submitSigned = lift <<< submitSigned
   txStatus = lift <<< txStatus
+  interactionStatus = lift interactionStatus

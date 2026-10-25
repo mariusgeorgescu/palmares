@@ -18,10 +18,12 @@ module Components.Write.Runner
 import Prelude
 
 import AppEnv (Env)
-import Capabilities.Interaction.MonadInteract (class MonadInteract, buildFlow)
+import Capabilities.Interaction.MonadInteract (class MonadInteract, buildFlow, interactionStatus)
 import Capabilities.Query.Gov.Http (renderApiError)
 import Capabilities.Wallet.Governance (class MonadGovWallet, GateVerdict(..), blockMessage, connectGovernance, hasExtension)
+import Capabilities.Interaction.Types (InteractionStatus(..), OracleGate(..), OracleParams(..), oracleGate)
 import Components.Write.Flows (FieldKind(..), buildRequest, flowSpecs, missingFields, specFor)
+import Format (formatAda)
 import Control.Monad.Reader (class MonadAsk)
 import Data.Array (length, null)
 import Data.Const (Const)
@@ -62,6 +64,8 @@ type State =
   { filters :: WriteFilters
   , values :: Map String String
   , gate :: Maybe GateVerdict
+  -- Starea protocolului, citită o dată la intrarea pe ecran. `Nothing` cît timp n-a răspuns.
+  , oracle :: Maybe InteractionStatus
   , step :: Step
   }
 
@@ -81,7 +85,7 @@ component
   => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: \filters -> { filters, values: seedFrom filters, gate: Nothing, step: Idle }
+    { initialState: \filters -> { filters, values: seedFrom filters, gate: Nothing, oracle: Nothing, step: Idle }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -98,7 +102,15 @@ component =
       Map.fromFoldable (map (\k -> Tuple k s) (subjectKeysFor (fromMaybe "" filters.flow)))
 
   handleAction = case _ of
-    Initialize -> pure unit
+    -- Starea oracolului se cere ÎNAINTE de orice: dacă protocolul e oprit, nu are rost nici
+    -- măcar să conectezi wallet-ul.
+    Initialize -> do
+      res <- interactionStatus
+      H.modify_ _
+        { oracle = case res of
+            Left _ -> Nothing
+            Right st -> Just st
+        }
     Receive filters -> do
       st <- H.get
       when (filters /= st.filters) do
@@ -132,6 +144,12 @@ component =
             }
 
   emptyAddresses = { usedAddresses: [], changeAddress: "" }
+
+  -- `OracleUnknown` cît timp n-a răspuns încă: ecranul nu promite nimic pe baza unui răspuns care
+  -- n-a venit. Când vine, devine ce spune serverul.
+  protocolGate st = case st.oracle of
+    Nothing -> OracleUnknown
+    Just s -> oracleGate s
 
   render st =
     HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-4") ]
@@ -260,11 +278,43 @@ component =
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-3") ]
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text spec.title ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-80") ] [ HH.text spec.summary ]
-          , case st.gate of
-              Just (Allowed _) -> form st spec
-              _ -> gateNote
+          , case protocolGate st, st.gate of
+              OracleOpen, Just (Allowed _) -> form st spec
+              OracleOpen, _ -> gateNote
+              g, _ -> oracleNote g
           ]
       ]
+
+  -- Oracolul e o poartă diferită de wallet, și se spune ca atare: „protocolul e oprit" nu e
+  -- aceeași problemă cu „wallet-ul tău nu poate", iar un singur mesaj pentru amândouă ar trimite
+  -- omul să-și schimbe wallet-ul degeaba.
+  oracleNote = case _ of
+    OracleOpen -> HH.text ""
+    OraclePaused ->
+      HH.div [ HP.class_ (HH.ClassName "alert alert-warning text-sm") ]
+        [ HH.span_
+            [ HH.text
+                "The oracle has paused this protocol. Nothing can be written until whoever holds \
+                \that authority resumes it. Reading is unaffected."
+            ]
+        ]
+    OracleUnknown ->
+      HH.div [ HP.class_ (HH.ClassName "alert alert-warning text-sm") ]
+        [ HH.span_
+            [ HH.text
+                "We cannot tell whether this protocol is paused, so nothing will be built. A \
+                \transaction built against a paused protocol is rejected by the validator after \
+                \you have already signed it."
+            ]
+        ]
+    ScriptsMissing ->
+      HH.div [ HP.class_ (HH.ClassName "alert alert-error text-sm") ]
+        [ HH.span_
+            [ HH.text
+                "The protocol's scripts are not on this chain, so there is nothing to write \
+                \against. This is a deployment problem, not something you can fix here."
+            ]
+        ]
 
   -- Formularul nu se desenează fără poartă deschisă. Un formular completat degeaba e o pierdere
   -- de timp pe care o puteai spune de la început.
@@ -276,7 +326,7 @@ component =
     HH.div [ HP.class_ (HH.ClassName "space-y-3") ]
       [ HH.div [ HP.class_ (HH.ClassName "grid gap-3 md:grid-cols-2") ] (map (field st) spec.fields)
       , HH.div [ HP.class_ (HH.ClassName "alert alert-warning text-sm") ]
-          [ HH.span_ [ HH.text spec.consequence ] ]
+          [ HH.span_ [ HH.text (consequenceOf st spec) ] ]
       , HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-center gap-3") ]
           [ HH.button
               [ HP.class_ (HH.ClassName "btn btn-primary btn-sm")
@@ -289,6 +339,18 @@ component =
           ]
       , stepNote st
       ]
+
+  -- Depozitul se scrie cu NUMĂRUL cerut acum de oracol, nu cu „un depozit": e ce riscă omul, și e
+  -- singurul parametru al protocolului care îl costă direct.
+  consequenceOf st spec =
+    if spec.id /= "open-dispute" then spec.consequence
+    else case st.oracle of
+      Just (InteractionStatus s) -> case s.oracle of
+        Just (OracleParams o) ->
+          "Locks " <> formatAda o.disputeDepositLovelace
+            <> " from your wallet until the dispute resolves. You lose it if the dispute is dismissed."
+        Nothing -> spec.consequence
+      Nothing -> spec.consequence
 
   missingNote spec st =
     let
