@@ -11,8 +11,9 @@ import AppEnv (NetworkMagic(..), preprodMagic, previewMagic)
 import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams(..), encodeFlow, flowPath, oracleGate)
 import Capabilities.Wallet.Governance (BlockReason(..), WalletCapabilities, blockMessage, impliedMagic, verdictOf)
 import Components.Write.Flows (buildRequest, flowSpecs, missingFields, specFor)
+import Components.Write.TxSummary (summariseJson)
 import Data.Argonaut.Core (stringify)
-import Data.Array (length, nub)
+import Data.Array (head, length, nub)
 import Data.Map as Map
 import Data.Tuple.Nested ((/\))
 import Data.Maybe (Maybe(..), isJust, isNothing)
@@ -197,6 +198,45 @@ spec = do
       oracleGate (InteractionStatus (baseStatus { deployedScripts = false, oraclePaused = Nothing }))
         `shouldEqual` ScriptsMissing
 
+  describe "R8: the signing summary is read out of the transaction" do
+    -- Forma JSON-ului e luata din `cardano_serialization_lib.d.ts` al versiunii pinate (11.5.0),
+    -- nu ghicita: `TransactionBodyJSON.fee` e string, `mint` e o LISTA de perechi
+    -- `[policy, {assetName: quantity}]`, iar `amount.coin` e string si el. Toate sint string-uri
+    -- fiindca sint numere de 64 de biti.
+    it "reads the fee, the mint and the outputs out of CSL's body JSON" do
+      case summariseJson bodyJson of
+        Nothing -> fail "the body JSON did not decode"
+        Just s -> do
+          s.fee `shouldEqual` 182133.0
+          length s.mints `shouldEqual` 1
+          length s.outputs `shouldEqual` 2
+          s.requiredSigners `shouldEqual` 1
+          s.certificates `shouldEqual` 0
+          case head s.mints of
+            Nothing -> fail "expected a mint"
+            Just m -> do
+              m.quantity `shouldEqual` "1"
+              m.assetName `shouldEqual` "000643b0abc"
+
+    it "keeps 64-bit amounts intact" do
+      -- 505 bilioane de lovelace nu incap intr-un Int de 32 de biti. Daca cineva schimba citirea
+      -- din `Number` in `Int`, linia asta cade — si nu ecranul live, la a doua tranzactie mare.
+      case summariseJson bodyJson of
+        Nothing -> fail "the body JSON did not decode"
+        Just s -> case head s.outputs of
+          Nothing -> fail "expected an output"
+          Just o -> o.lovelace `shouldEqual` 505754377083269.0
+
+    it "counts the other tokens in an output without naming them" do
+      case summariseJson bodyJson of
+        Nothing -> fail "the body JSON did not decode"
+        Just s -> map _.otherAssets s.outputs `shouldEqual` [ 0, 1 ]
+
+    it "refuses a body it cannot read, instead of guessing zero" do
+      -- Un sumar cu „fee 0" pe o tranzactie necitita ar fi exact minciuna pe care R8 o interzice.
+      isNothing (summariseJson "{\"outputs\":[]}") `shouldEqual` true
+      isNothing (summariseJson "not json") `shouldEqual` true
+
 -- | Un `/status` de pornire, peste care testele schimbă doar cîmpul care contează.
 baseStatus :: { provider :: String, network :: String, deployedScripts :: Boolean, oraclePaused :: Maybe Boolean, oracle :: Maybe OracleParams }
 baseStatus =
@@ -206,3 +246,22 @@ baseStatus =
   , oraclePaused: Just false
   , oracle: Nothing
   }
+
+bodyJson :: String
+bodyJson =
+  """
+{ "inputs": [ { "transaction_id": "aa", "index": 0 } ]
+, "outputs":
+    [ { "address": "addr_test1qqrecipient", "amount": { "coin": "505754377083269" } }
+    , { "address": "addr_test1qqchange"
+      , "amount":
+          { "coin": "1500000"
+          , "multiasset": { "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3": { "000643b0abc": "1" } }
+          }
+      }
+    ]
+, "fee": "182133"
+, "mint": [ [ "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3", { "000643b0abc": "1" } ] ]
+, "required_signers": [ "5a0ea8b28def0497f0954af950abf61097da9fed0079811605bb70b8" ]
+}
+"""

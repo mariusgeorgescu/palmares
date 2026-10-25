@@ -22,8 +22,10 @@ import Capabilities.Interaction.MonadInteract (class MonadInteract, buildFlow, i
 import Capabilities.Query.Gov.Http (renderApiError)
 import Capabilities.Wallet.Governance (class MonadGovWallet, GateVerdict(..), blockMessage, connectGovernance, hasExtension)
 import Capabilities.Interaction.Types (InteractionStatus(..), OracleGate(..), OracleParams(..), oracleGate)
+import Components.Shared.DRepIdentity (shortId)
 import Components.Write.Flows (FieldKind(..), buildRequest, flowSpecs, missingFields, specFor)
-import Format (formatAda)
+import Components.Write.TxSummaryDecode (summarise)
+import Format (formatAda, pluralize)
 import Control.Monad.Reader (class MonadAsk)
 import Cardano.Wallet.Cip30 (getAvailableWallets)
 import Data.Array (length, null)
@@ -435,6 +437,45 @@ component =
 
   valueOf st spec = fromMaybe "" (Map.lookup spec.key st.values)
 
+  -- Mint-ul e faptul central al fiecărui flux de aici: profilul, atestarea și disputa sunt toate
+  -- token-uri. „Creates 1 token" cu numele lui spune mai mult decât orice altceva din sumar.
+  mintLine m =
+    HH.li_
+      [ HH.text
+          ( (if m.quantity == "1" then "Creates one token, " else "Creates " <> m.quantity <> " of token ")
+              <> assetLabel m.assetName
+              <> " under policy "
+              <> shortId m.policy
+              <> "."
+          )
+      ]
+
+  outputLine o =
+    HH.li_
+      [ HH.text
+          ( "Sends " <> formatAda o.lovelace <> " to " <> shortId o.address
+              <> (if o.otherAssets > 0 then ", with " <> pluralize o.otherAssets "token" else "")
+              <> "."
+          )
+      ]
+
+  certLine n =
+    if n == 0 then []
+    else [ HH.li_ [ HH.text (pluralize n "certificate" <> " included.") ] ]
+
+  signerLine n =
+    if n == 0 then []
+    else
+      [ HH.li_
+          [ HH.text
+              (pluralize n "signature" <> " required beyond the inputs — this is what proves the credential is yours.")
+          ]
+      ]
+
+  -- Numele activului vine în hex. Scurtat, nu decodat: un `assetName` nu e garantat text, iar o
+  -- decodare care reușește uneori ar face ca uneori să arate ca text și uneori ca hex.
+  assetLabel n = if String.length n > 16 then String.take 16 n <> "…" else n
+
   -- Ce s-a întîmplat, în cuvinte care spun și ce NU s-a întîmplat.
   stepNote st = case st.step of
     Idle -> HH.text ""
@@ -443,16 +484,45 @@ component =
     Failed e ->
       HH.div [ HP.class_ (HH.ClassName "alert alert-error text-sm") ]
         [ HH.span_ [ HH.text e ] ]
-    Built tx ->
-      HH.div [ HP.class_ (HH.ClassName "alert alert-info text-sm flex-col items-start gap-2") ]
-        [ HH.span_
-            [ HH.text
-                "Built. Nothing has been signed or submitted — this is the unsigned transaction, \
-                \and the next step is your wallet."
-            ]
-        , HH.code [ HP.class_ (HH.ClassName "font-mono text-xs break-all opacity-80") ]
-            [ HH.text (String.take 120 tx <> if String.length tx > 120 then "…" else "") ]
-        ]
+    -- R8: ce se arată aici e ce FACE tranzacția, citit din ea. Ecoul câmpurilor din formular nu
+    -- ajunge — ar dovedi ce s-a cerut, nu ce s-a construit — iar CBOR-ul brut nu e un sumar, e
+    -- exact blind-signing-ul pe care check 14 îl interzice.
+    Built tx -> case summarise tx of
+      Nothing ->
+        -- O tranzacție pe care n-o putem citi NU se oferă la semnat. Asta e singurul răspuns
+        -- consecvent cu regula: dacă nu putem spune ce face, nu putem cere o semnătură pentru ea.
+        HH.div [ HP.class_ (HH.ClassName "alert alert-error text-sm") ]
+          [ HH.span_
+              [ HH.text
+                  "The server returned a transaction this app could not decode, so it will not be \
+                  \offered for signing. Nothing has happened on chain."
+              ]
+          ]
+      Just sum ->
+        HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+          [ HH.div [ HP.class_ (HH.ClassName "card-body gap-3") ]
+              [ HH.h3 [ HP.class_ (HH.ClassName "card-title text-base") ]
+                  [ HH.text "What this transaction does" ]
+              , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
+                  [ HH.text
+                      "Read out of the transaction itself, not out of the form you filled in. \
+                      \Nothing has been signed or submitted yet."
+                  ]
+              , HH.ul [ HP.class_ (HH.ClassName "text-sm space-y-1 list-disc ml-5") ]
+                  ( [ HH.li_ [ HH.text ("Pays a network fee of " <> formatAda sum.fee <> ".") ] ]
+                      <> map mintLine sum.mints
+                      <> map outputLine sum.outputs
+                      <> certLine sum.certificates
+                      <> signerLine sum.requiredSigners
+                  )
+              , HH.details_
+                  [ HH.summary [ HP.class_ (HH.ClassName "text-xs opacity-70 cursor-pointer") ]
+                      [ HH.text "Show the raw transaction" ]
+                  , HH.pre [ HP.class_ (HH.ClassName "bg-base-300 rounded p-2 overflow-x-auto text-xs mt-2") ]
+                      [ HH.code_ [ HH.text tx ] ]
+                  ]
+              ]
+          ]
 
 derive instance Eq Step
 
