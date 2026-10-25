@@ -19,6 +19,14 @@ Documentul ăsta e pregătirea, ca rularea să coste o comandă.
 | Formularul refuză să construiască incomplet | unitare + e2e | `WriteSpec`, `gate.spec.js` |
 | Sumarul de semnare citește din tranzacție | 4 teste unitare pe forma JSON a CSL | `WriteSpec`, „R8" |
 | Atestarea apare pe `/attestations` cu `accepted` | **se vede deja pe preprod**: din cele 19 atestări, una e acceptată și are o dispută confirmată | `https://gov.cardano.vip/attestations` |
+| Ecranul trimite ADRESELE portofelului, nu o listă goală | 1 test de wallet care citește corpul cererii de pe sârmă | `e2e-wallet/gate.spec.js`, „what the build request actually carries" |
+| **Serverul CONSTRUIEȘTE tranzacția, pe deploy** | măsurat 2026-10-25: un POST pe `/api/interaction/claim-profile` prin `https://gov.cardano.vip` întoarce CBOR-ul unei tranzacții nesemnate — selecție de intrări reală, politica de minting `648c6a73…`, token de referință CIP-68, datum-ul oracolului | — |
+
+Rândul de dinainte e cel care s-a schimbat cel mai mult: până pe 25 octombrie, calea de scriere
+**nu exista în cluster** (`replicas: 0`) și ecranul trimitea oricum adrese goale, deci niciun pas de
+aici nu era dovedit pe deploy. Acum tot drumul până la semnătură e parcurs pe deployul real:
+provider `node + Kupo`, cele cinci scripturi de referință rezolvate, intrări alese, tranzacție
+întoarsă. Ce rămâne e **exact semnătura și trimiterea**, nimic altceva.
 
 Ultimul rând contează: drumul `issue → accept → /attestations cu accepted` **a fost parcurs pe
 preprod**, de `smoke_attest_flow.sh`. Ce n-a fost parcurs **din browser** e exact ce cere M2-1.
