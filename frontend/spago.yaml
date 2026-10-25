@@ -12,6 +12,10 @@ package:
     - arrays
     - bifunctors
     - integers
+    - js-uri
+    - foldable-traversable
+    - numbers
+    - tuples
     - strings
     - cardano-capabilities: "*"
     - console: ">=6.1.0 <7.0.0"

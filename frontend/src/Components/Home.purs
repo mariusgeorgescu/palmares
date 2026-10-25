@@ -11,6 +11,7 @@ import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Components.Explorer.Dashboard as Dashboard
+import Components.Explorer.DRepList as DRepList
 import Components.Layout.NavBar as NavBar
 import Components.Shared.StatusChip as StatusChip
 import Data.Const (Const)
@@ -19,7 +20,7 @@ import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Router.Class (class MonadRouter, emitMatched)
+import Halogen.Router.Class (class MonadRouter, current, emitMatched)
 import Halogen.Store.Monad (class MonadStore)
 import Route (Route(..))
 import Route.Codec (printRoute)
@@ -42,6 +43,7 @@ type Slots =
   ( navbar :: NavBar.Slot
   , statusChip :: StatusChip.Slot
   , dashboard :: Dashboard.Slot
+  , drepList :: DRepList.Slot
   )
 
 component
@@ -66,6 +68,14 @@ component =
   where
   handleAction = case _ of
     Initialize -> do
+      -- Ruta curentă se citește, nu se așteaptă. `mkRouter` notifică prima potrivire în
+      -- `runAppBase`, înainte ca rădăcina să se aboneze, deci acel prim eveniment se pierde: fără
+      -- linia asta, orice URL deschis direct — un link dat mai departe, un refresh, un bookmark —
+      -- randa pagina de pornire. Template-ul avea același defect; nu se vedea, pentru că avea o
+      -- singură rută cu conținut.
+      current >>= case _ of
+        Just r -> H.modify_ _ { route = r }
+        Nothing -> pure unit
       emitter <- emitMatched
       _ <- H.subscribe (RouteChanged <$> emitter)
       pure unit
@@ -85,6 +95,7 @@ component =
 
   renderRoute = case _ of
     Home -> HH.slot_ Dashboard._dashboard unit Dashboard.component unit
+    DRepList filters -> HH.slot_ DRepList._drepList unit DRepList.component filters
     NotFound -> renderNotFound
 
   renderNotFound =

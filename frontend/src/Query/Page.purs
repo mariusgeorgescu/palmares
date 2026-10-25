@@ -1,18 +1,17 @@
 -- | Paginarea și sortarea, într-un singur loc, pentru că fiecare din regulile de aici a fost
 -- | măsurată pe serviciul care rulează și niciuna nu e publicată în swagger.
 -- |
+-- | Aici stau __regulile__, nu randarea: șirul de interogare îl scrie `Route.GovQueries`, din
+-- | același record care ține și starea din URL. Două funcții care produc același query string ar
+-- | ajunge să nu mai producă același query string.
+-- |
 -- | Swagger-ul declară pentru `limit` și `offset` bounds-urile de Int64
 -- | (`minimum: -9223372036854775808`), deci un client generat din schemă ar valida orice. Clamp-urile
 -- | reale și plafonul de offset sunt aici. Vezi `docs/usecases/api-screen-map.md` §3.1.
 module Query.Page
-  ( SortOrder(..)
-  , PageQuery
-  , defaultPageQuery
-  , renderSortOrder
-  , clampLimit
+  ( clampLimit
   , nextOffset
   , prevOffset
-  , renderPageQuery
   , offsetCeiling
   , votesOffsetCeiling
   , listLimitMax
@@ -22,37 +21,7 @@ module Query.Page
 
 import Prelude
 
-import Data.Array (catMaybes)
 import Data.Maybe (Maybe(..))
-import Data.String (joinWith)
-
-data SortOrder = Asc | Desc
-
-derive instance Eq SortOrder
-derive instance Ord SortOrder
-
-instance Show SortOrder where
-  show = renderSortOrder
-
-renderSortOrder :: SortOrder -> String
-renderSortOrder = case _ of
-  Asc -> "asc"
-  Desc -> "desc"
-
--- | `sortOrder` nu e `Maybe`, și asta e intenționat.
--- |
--- | `order_by` trimis fără `sort_order` înseamnă `asc` pe server (`Query/Common.hs:155`), deci
--- | „sortează după putere de vot" ar arăta cei mai slabi DRep-i primii. Un câmp obligatoriu face
--- | imposibil să-l uiți; `renderPageQuery` îl emite doar când există un `order_by` de însoțit.
-type PageQuery =
-  { limit :: Int
-  , offset :: Int
-  , orderBy :: Maybe String
-  , sortOrder :: SortOrder
-  }
-
-defaultPageQuery :: PageQuery
-defaultPageQuery = { limit: 50, offset: 0, orderBy: Nothing, sortOrder: Desc }
 
 -- | Plafonul dur de offset: `offset=10000` răspunde, `offset=10001` dă `400 offset_too_large`.
 offsetCeiling :: Int
@@ -105,14 +74,3 @@ prevOffset limit offset
   | offset <= 0 = Nothing
   | offset - limit < 0 = Just 0
   | otherwise = Just (offset - limit)
-
--- | Query string-ul, fără `?`. `sort_order` apare dacă și numai dacă apare `order_by`: singur n-are
--- | ce să ordoneze, iar `order_by` singur alege implicit `asc`.
-renderPageQuery :: PageQuery -> String
-renderPageQuery q =
-  joinWith "&" $ catMaybes
-    [ Just ("limit=" <> show q.limit)
-    , Just ("offset=" <> show q.offset)
-    , map (\o -> "order_by=" <> o) q.orderBy
-    , map (\_ -> "sort_order=" <> renderSortOrder q.sortOrder) q.orderBy
-    ]

@@ -7,6 +7,7 @@ import Prelude
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Test.Capabilities.DashboardSpec as DashboardSpec
+import Test.Capabilities.DRepListSpec as DRepListSpec
 import Test.Capabilities.HttpSpec as HttpSpec
 import Test.Capabilities.StatusSpec as StatusSpec
 import Test.FormatSpec as FormatSpec
@@ -21,3 +22,4 @@ main = launchAff_ $ runSpec [ consoleReporter ] do
   PageSpec.spec
   DashboardSpec.spec
   FormatSpec.spec
+  DRepListSpec.spec

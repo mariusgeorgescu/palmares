@@ -28,6 +28,7 @@ import Halogen.Router.Class (class MonadRouter, navigate)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Route (Route(..))
 import Route.Codec (printRoute)
+import Route.GovQueries (emptyDRepFilters)
 import Store as Store
 import Type.Proxy (Proxy(..))
 import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
@@ -84,6 +85,7 @@ component =
       , HH.div [ HP.class_ (HH.ClassName "flex-none gap-2") ]
           [ HH.ul [ HP.class_ (HH.ClassName "menu menu-horizontal px-1") ]
               [ navLink Home "Home"
+              , navLink (DRepList emptyDRepFilters) "DReps"
               ]
           , HH.slot WC._walletConnect unit WC.component walletConnectInput HandleWalletConnect
           ]

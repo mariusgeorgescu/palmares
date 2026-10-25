@@ -6,26 +6,12 @@ module Test.Query.PageSpec (spec) where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Query.Page (SortOrder(..), clampLimit, defaultPageQuery, listLimitMax, nextOffset, offsetCeiling, prevOffset, renderPageQuery, votesOffsetCeiling)
+import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset, votesOffsetCeiling)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
 spec :: Spec Unit
 spec = do
-  describe "renderPageQuery" do
-    it "always emits sort_order when order_by is present" do
-      -- `order_by` fără `sort_order` înseamnă `asc` pe server, deci „cei mai puternici DRep-i" ar
-      -- arăta cei mai slabi. Ăsta e testul care ține regula.
-      renderPageQuery { limit: 50, offset: 0, orderBy: Just "voting_power", sortOrder: Desc }
-        `shouldEqual` "limit=50&offset=0&order_by=voting_power&sort_order=desc"
-
-    it "emits neither when order_by is absent" do
-      renderPageQuery defaultPageQuery `shouldEqual` "limit=50&offset=0"
-
-    it "carries asc when that is what was asked for" do
-      renderPageQuery { limit: 20, offset: 40, orderBy: Just "epoch", sortOrder: Asc }
-        `shouldEqual` "limit=20&offset=40&order_by=epoch&sort_order=asc"
-
   describe "clampLimit" do
     it "clamps above the maximum" do
       clampLimit listLimitMax 100000 `shouldEqual` 200

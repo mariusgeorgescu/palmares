@@ -29,6 +29,7 @@
               "effect": ">=4.0.0 <5.0.0"
             },
             "either",
+            "foldable-traversable",
             {
               "halogen": ">=7.0.0 <8.0.0"
             },
@@ -45,7 +46,9 @@
               "halogen-store": ">=0.5.4 <0.6.0"
             },
             "integers",
+            "js-uri",
             "maybe",
+            "numbers",
             {
               "prelude": ">=6.0.2 <7.0.0"
             },
@@ -60,6 +63,7 @@
             },
             "strings",
             "transformers",
+            "tuples",
             {
               "web-html": ">=4.1.1 <5.0.0"
             }

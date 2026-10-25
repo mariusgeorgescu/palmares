@@ -8,6 +8,7 @@ module Route.Codec
 import Data.Either (Either(..))
 import Prelude
 import Route (Route(..))
+import Route.GovQueries (drepFiltersCodec)
 import Routing.Duplex (RouteDuplex', parse, path, print, root)
 import Routing.Duplex.Generic (noArgs, sum)
 
@@ -15,6 +16,7 @@ import Routing.Duplex.Generic (noArgs, sum)
 routeCodec :: RouteDuplex' Route
 routeCodec = root $ sum
   { "Home": noArgs
+  , "DRepList": path "dreps" drepFiltersCodec
   , "NotFound": path "__not_found__" noArgs
   }
 

@@ -8,6 +8,7 @@
 module Capabilities.Query.Gov.Fixtures
   ( statusFixture
   , dashboardFixture
+  , drepExplorerFixture
   ) where
 
 -- | `GET /status` pe preprod, 2026-10-24. `epoch_params` e omis: niciun decodor nu-l citește încă,
@@ -392,6 +393,206 @@ dashboardFixture =
         "return_address": "stake_test1uzrr46pd4wn2qpzvv5fpdeycndzsgjc899jn8e4rmten3ngcgm3f4",
         "treasury_amount": null,
         "votes_cast": 0
+      }
+    ]
+  }
+  """
+
+-- | `GET /pages/drep-explorer?limit=4&order_by=voting_power&sort_order=desc` pe preprod,
+-- | 2026-10-25.
+-- |
+-- | Trei fapte măsurate pe care ecranul trebuie să le respecte, și pe care fixtura le păstrează:
+-- |
+-- |   * `status_facets` însumează 820, iar `total` e 294. Facetele se numără fiecare cu propriul
+-- |     predicat scos (semantică standard de facet), deci __nu se calculează procente din ele__;
+-- |   * `anchor_facets` însumează 131: un DRep fără ancoră nu intră în nicio categorie;
+-- |   * `power_buckets` __da__ însumează la 294, pentru că fiecare DRep cade în exact un bucket.
+-- |     E singura desfășurare din care un procent are sens.
+-- |
+-- | `language_facets` are o cheie goală (`""`, 4 DRep-i): limba e un câmp liber din metadate, iar
+-- | șirul gol e o valoare pe care o scrie cineva, nu absența valorii.
+drepExplorerFixture :: String
+drepExplorerFixture =
+  """
+  {
+    "items": [
+      {
+        "id": "drep1ygzlzlzj8r9c3zutlgh9ugqx958cwr6q704xtt9j5uf4lzsz9rwhm",
+        "hex": "05f17c5238cb888b8bfa2e5e20062d0f870f40f3ea65acb2a7135f8a",
+        "has_script": false,
+        "status": "active",
+        "is_active": true,
+        "active_until_epoch": 324,
+        "given_name": null,
+        "image_url": null,
+        "language": null,
+        "anchor_status": null,
+        "registered_at": "2025-07-14T05:02:00Z",
+        "age_days": 468,
+        "voting_power": 400644627419166,
+        "voting_power_epoch": 321,
+        "delegator_count": 19,
+        "eligible_actions": 105,
+        "votes_cast": 10,
+        "participation_rate": 0.09523809523809523,
+        "rationale_rate": 0.0,
+        "open_actions_unvoted": 7,
+        "last_vote_at": "2026-07-29T19:21:51Z",
+        "as_of_epoch": 321
+      },
+      {
+        "id": "drep1yg3j4dkpz3j0eh4e9d5l3uy43sf5ndz2wv4c2fywgdcu4wsjmj5wp",
+        "hex": "232ab6c11464fcdeb92b69f8f0958c1349b44a732b85248e4371caba",
+        "has_script": false,
+        "status": "inactive",
+        "is_active": false,
+        "active_until_epoch": 296,
+        "given_name": null,
+        "image_url": null,
+        "language": null,
+        "anchor_status": "unreachable",
+        "registered_at": "2026-01-20T12:15:56Z",
+        "age_days": 277,
+        "voting_power": 60594158706858,
+        "voting_power_epoch": 321,
+        "delegator_count": 417,
+        "eligible_actions": 36,
+        "votes_cast": 0,
+        "participation_rate": 0.0,
+        "rationale_rate": null,
+        "open_actions_unvoted": 7,
+        "last_vote_at": null,
+        "as_of_epoch": 321
+      },
+      {
+        "id": "drep1ygnl9fjlz3pahx5vd2m6y4ya0562n8ttqzss9ncacu6l6pqwm2php",
+        "hex": "27f2a65f1443db9a8c6ab7a2549d7d34a99d6b00a102cf1dc735fd04",
+        "has_script": false,
+        "status": "inactive",
+        "is_active": false,
+        "active_until_epoch": 199,
+        "given_name": null,
+        "image_url": null,
+        "language": null,
+        "anchor_status": null,
+        "registered_at": "2024-11-09T09:41:55Z",
+        "age_days": 715,
+        "voting_power": 7264462090316,
+        "voting_power_epoch": 321,
+        "delegator_count": 5,
+        "eligible_actions": 119,
+        "votes_cast": 0,
+        "participation_rate": 0.0,
+        "rationale_rate": null,
+        "open_actions_unvoted": 7,
+        "last_vote_at": null,
+        "as_of_epoch": 321
+      },
+      {
+        "id": "drep1yfleuad6rwdgk5y640aa3d4jc3gdukyq5vcxc84lx8mlklcw50hva",
+        "hex": "7f9e75ba1b9a8b509aabfbd8b6b2c450de5880a3306c1ebf31f7fb7f",
+        "has_script": false,
+        "status": "inactive",
+        "is_active": false,
+        "active_until_epoch": 297,
+        "given_name": null,
+        "image_url": null,
+        "language": null,
+        "anchor_status": null,
+        "registered_at": "2026-03-18T10:32:09Z",
+        "age_days": 221,
+        "voting_power": 7009495872731,
+        "voting_power_epoch": 321,
+        "delegator_count": 1,
+        "eligible_actions": 36,
+        "votes_cast": 0,
+        "participation_rate": 0.0,
+        "rationale_rate": null,
+        "open_actions_unvoted": 7,
+        "last_vote_at": null,
+        "as_of_epoch": 321
+      }
+    ],
+    "total": 294,
+    "limit": 4,
+    "offset": 0,
+    "epoch": 321,
+    "status_facets": [
+      [
+        "active",
+        17
+      ],
+      [
+        "inactive",
+        187
+      ],
+      [
+        "retired",
+        526
+      ],
+      [
+        "unknown",
+        90
+      ]
+    ],
+    "anchor_facets": [
+      [
+        "unreachable",
+        51
+      ],
+      [
+        "valid",
+        50
+      ],
+      [
+        "hash_mismatch",
+        26
+      ],
+      [
+        "invalid_schema",
+        4
+      ]
+    ],
+    "language_facets": [
+      [
+        "en-us",
+        50
+      ],
+      [
+        "",
+        4
+      ]
+    ],
+    "power_buckets": [
+      {
+        "lo": 0,
+        "hi": 1,
+        "count": 109
+      },
+      {
+        "lo": 1,
+        "hi": 1000000000,
+        "count": 28
+      },
+      {
+        "lo": 1000000000,
+        "hi": 10000000000,
+        "count": 53
+      },
+      {
+        "lo": 10000000000,
+        "hi": 100000000000,
+        "count": 69
+      },
+      {
+        "lo": 100000000000,
+        "hi": 1000000000000,
+        "count": 23
+      },
+      {
+        "lo": 1000000000000,
+        "hi": null,
+        "count": 12
       }
     ]
   }

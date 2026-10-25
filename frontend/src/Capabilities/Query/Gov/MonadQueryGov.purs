@@ -10,15 +10,17 @@ module Capabilities.Query.Gov.MonadQueryGov
   ( class MonadQueryGov
   , getStatus
   , getDashboard
+  , getDRepExplorer
   ) where
 
 import Prelude
 
 import Capabilities.Query.Gov.Http (ApiError)
-import Capabilities.Query.Gov.Types (DashboardPage, GovStatus)
+import Capabilities.Query.Gov.Types (DRepExplorerPage, DashboardPage, GovStatus)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Halogen (HalogenM)
+import Route.GovQueries (DRepFilters)
 
 class Monad m <= MonadQueryGov m where
   -- | `GET /status` — rețeaua, epoca, lag-ul, pragurile și starea proiectorului, într-un singur
@@ -30,8 +32,13 @@ class Monad m <= MonadQueryGov m where
   -- | niciun control din UI nu le schimbă. Când apare un control, parametrii intră aici.
   getDashboard :: m (Either ApiError DashboardPage)
 
+  -- | `GET /pages/drep-explorer` — rândurile, totalul, cele trei faceturi și intervalele de putere,
+  -- | într-un apel. Filtrele vin din rută, deci ecranul nu-și ține o a doua copie a lor.
+  getDRepExplorer :: DRepFilters -> m (Either ApiError DRepExplorerPage)
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
   getStatus = lift getStatus
   getDashboard = lift getDashboard
+  getDRepExplorer = lift <<< getDRepExplorer

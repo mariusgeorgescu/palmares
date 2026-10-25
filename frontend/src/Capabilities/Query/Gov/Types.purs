@@ -18,6 +18,8 @@ module Capabilities.Query.Gov.Types
   , DRepSummary(..)
   , GovActionSummary(..)
   , DashboardPage(..)
+  , PowerBucket(..)
+  , DRepExplorerPage(..)
   ) where
 
 import Prelude
@@ -354,6 +356,64 @@ instance DecodeJson DashboardPage where
           , topDrepsByPower
           , closingSoon
           }
+      )
+
+-- | Un interval de putere de vot, cu numărul de DRep-i din el. `hi` lipsește la ultimul bucket:
+-- | „peste un milion de ADA" nu are plafon.
+newtype PowerBucket = PowerBucket
+  { lo :: Lovelace
+  , hi :: Maybe Lovelace
+  , count :: Int
+  }
+
+derive instance Eq PowerBucket
+
+instance DecodeJson PowerBucket where
+  decodeJson json = do
+    o <- decodeJson json
+    lo <- o .: "lo"
+    hi <- o .:? "hi"
+    count <- o .: "count"
+    pure (PowerBucket { lo, hi, count })
+
+-- | `GET /pages/drep-explorer` — rândurile, totalul, facetele barei laterale și desfășurarea pe
+-- | intervale de putere, într-un singur apel. Fără el, bara laterală ar trage patru numărători la
+-- | fiecare tastă apăsată.
+-- |
+-- | __Facetele nu însumează la `total`__, și asta nu e un bug: fiecare se numără cu propriul
+-- | predicat scos, ca bara să poată arăta „Retired (526)" în timp ce filtrul activ e
+-- | `status=active`. Măsurat: 17+187+526+90 = 820, iar `total` era 294. Deci niciun procent nu se
+-- | calculează dintr-un facet. `power_buckets` e singura excepție — fiecare DRep cade în exact un
+-- | interval, și cele șase însumau exact 294.
+newtype DRepExplorerPage = DRepExplorerPage
+  { items :: Array DRepSummary
+  , total :: Int
+  , limit :: Int
+  , offset :: Int
+  , epoch :: Int
+  , statusFacets :: Array (Tuple String Int)
+  , anchorFacets :: Array (Tuple String Int)
+  , languageFacets :: Array (Tuple String Int)
+  , powerBuckets :: Array PowerBucket
+  }
+
+derive instance Eq DRepExplorerPage
+
+instance DecodeJson DRepExplorerPage where
+  decodeJson json = do
+    o <- decodeJson json
+    items <- o .: "items"
+    total <- o .: "total"
+    limit <- o .: "limit"
+    offset <- o .: "offset"
+    epoch <- o .: "epoch"
+    statusFacets <- o .: "status_facets"
+    anchorFacets <- o .: "anchor_facets"
+    languageFacets <- o .: "language_facets"
+    powerBuckets <- o .: "power_buckets"
+    pure
+      ( DRepExplorerPage
+          { items, total, limit, offset, epoch, statusFacets, anchorFacets, languageFacets, powerBuckets }
       )
 
 -- | Culoarea chip-ului de prospețime. `Unknown` nu e decor: înseamnă „n-am putut citi starea", care

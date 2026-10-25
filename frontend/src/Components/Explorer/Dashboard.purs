@@ -36,6 +36,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Tuple (Tuple(..))
 import Format (formatAda, formatInt, formatPercent, humanize, pluralize)
+import Route.GovQueries (drepListHrefFor, emptyDRepFilters)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -58,11 +59,13 @@ data Action = Initialize
 activeInactive :: DashboardPage -> Int
 activeInactive (DashboardPage p) = p.activeDreps + p.inactiveDreps
 
--- | `status` se repetă, nu se unește cu virgulă: API-ul citește parametrii repetabili ca listă
--- | (`*FromParams`), iar `status=active,inactive` ar fi un singur status necunoscut — pe care
--- | serverul îl ignoră în silenție, deci filtrul ar da fail **deschis** pe toate cele 294.
+-- | Linkul se construiește din același codec care produce și ruta, nu dintr-un șir scris aici:
+-- | cifra de pe card și lista pe care o deschide trebuie să vină din același filtru.
+-- |
+-- | `status` se repetă, nu se unește cu virgulă: API-ul citește parametrii repetabili ca listă, iar
+-- | `status=active,inactive` ar fi un singur status necunoscut — măsurat, serverul îl refuză.
 drepListHref :: String
-drepListHref = "/dreps?status=active&status=inactive"
+drepListHref = drepListHrefFor (emptyDRepFilters { status = [ "active", "inactive" ] })
 
 participationSeries :: DashboardPage -> Array Series.Point
 participationSeries (DashboardPage p) = map point p.participationByEpoch
