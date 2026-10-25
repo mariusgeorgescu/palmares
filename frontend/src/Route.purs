@@ -5,7 +5,14 @@ module Route
 
 import Data.Generic.Rep (class Generic)
 import Prelude
-import Route.GovQueries (DRepFilters, GovActionFilters, renderDRepFilters, renderGovActionFilters)
+import Route.GovQueries
+  ( DRepFilters
+  , GovActionFilters
+  , VoteFilters
+  , renderDRepFilters
+  , renderGovActionFilters
+  , renderVoteFilters
+  )
 
 -- Rutele se adaugă pe măsură ce ecranele se livrează (plan, taskurile 5–11), nu în avans: o rută
 -- fără pagină e un link care duce la NotFound.
@@ -20,6 +27,7 @@ data Route
   | DRepList DRepFilters
   | ActionDetail String
   | ActionList GovActionFilters
+  | VoteList VoteFilters
   | NotFound
 
 derive instance eqRoute :: Eq Route
@@ -38,4 +46,5 @@ instance Show Route where
     DRepList f -> "DRepList " <> renderDRepFilters f
     ActionDetail i -> "ActionDetail " <> i
     ActionList f -> "ActionList " <> renderGovActionFilters f
+    VoteList f -> "VoteList " <> renderVoteFilters f
     NotFound -> "NotFound"

@@ -14,16 +14,25 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getDRepDetail
   , getGovActions
   , getGovActionDetail
+  , getVotes
   ) where
 
 import Prelude
 
 import Capabilities.Query.Gov.Http (ApiError)
-import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovActionDetail, GovActionPage, GovStatus)
+import Capabilities.Query.Gov.Types
+  ( DRepDetail
+  , DRepExplorerPage
+  , DashboardPage
+  , GovActionDetail
+  , GovActionPage
+  , GovStatus
+  , VotePage
+  )
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Halogen (HalogenM)
-import Route.GovQueries (DRepFilters, GovActionFilters)
+import Route.GovQueries (DRepFilters, GovActionFilters, VoteFilters)
 
 class Monad m <= MonadQueryGov m where
   -- | `GET /status` — rețeaua, epoca, lag-ul, pragurile și starea proiectorului, într-un singur
@@ -52,6 +61,9 @@ class Monad m <= MonadQueryGov m where
   -- | proponentul și documentul, într-un apel.
   getGovActionDetail :: String -> m (Either ApiError GovActionDetail)
 
+  -- | `GET /votes` — un rând per vot, cu acțiunea și votantul denormalizate în el.
+  getVotes :: VoteFilters -> m (Either ApiError VotePage)
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
@@ -61,3 +73,4 @@ instance monadQueryGovHalogenM ::
   getDRepDetail = lift <<< getDRepDetail
   getGovActions = lift <<< getGovActions
   getGovActionDetail = lift <<< getGovActionDetail
+  getVotes = lift <<< getVotes

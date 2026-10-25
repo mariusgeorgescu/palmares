@@ -10,7 +10,7 @@ import Data.Either (Either(..))
 -- nimic, iar avertismentul ar rămâne la fiecare build.
 import Prelude hiding ((/))
 import Route (Route(..))
-import Route.GovQueries (drepFiltersCodec, govActionFiltersCodec)
+import Route.GovQueries (drepFiltersCodec, govActionFiltersCodec, voteFiltersCodec)
 import Routing.Duplex (RouteDuplex', parse, path, print, root, segment)
 import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/))
@@ -23,6 +23,7 @@ routeCodec = root $ sum
   , "DRepList": path "dreps" drepFiltersCodec
   , "ActionDetail": "gov-actions" / segment
   , "ActionList": path "gov-actions" govActionFiltersCodec
+  , "VoteList": path "votes" voteFiltersCodec
   , "NotFound": path "__not_found__" noArgs
   }
 

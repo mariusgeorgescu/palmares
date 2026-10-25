@@ -39,6 +39,9 @@ module Capabilities.Query.Gov.Types
   , ActionAnchor(..)
   , GovActionDetail(..)
   , GovActionPage(..)
+  , VoteAnchor(..)
+  , VoteRow(..)
+  , VotePage(..)
   ) where
 
 import Prelude
@@ -975,6 +978,113 @@ instance DecodeJson GovActionPage where
     limit <- o .: "limit"
     offset <- o .: "offset"
     pure (GovActionPage { items, total, limit, offset })
+
+-- | Ancora unui raționament de vot: URL-ul, starea verificării, și dacă documentul respectă
+-- | CIP-100. Măsurat: din ~934 de voturi finale pe preprod, __opt__ au o ancoră validă.
+newtype VoteAnchor = VoteAnchor
+  { url :: Maybe String
+  , status :: Maybe String
+  , cip100Valid :: Maybe Boolean
+  }
+
+derive instance Eq VoteAnchor
+
+instance DecodeJson VoteAnchor where
+  decodeJson json = do
+    o <- decodeJson json
+    url <- o .:? "url"
+    status <- o .:? "status"
+    cip100Valid <- o .:? "cip100_valid"
+    pure (VoteAnchor { url, status, cip100Valid })
+
+-- | Un vot, cu acțiunea și votantul denormalizate în rând — de aceea ecranul de voturi nu face
+-- | N+1 ca să scrie un tabel.
+-- |
+-- | `is_final` și `revote_count` sunt amândouă aici pentru că un DRep __poate__ să-și schimbe
+-- | votul cât acțiunea e deschisă: un rând cu `is_final: false` e un vot care a fost înlocuit, iar
+-- | un ecran care nu face diferența numără același votant de mai multe ori. `voting_power` e
+-- | `Maybe` și măsurat era `null` pe toate rândurile verificate.
+newtype VoteRow = VoteRow
+  { govActionId :: String
+  , govActionBech32 :: String
+  , govActionType :: String
+  , govActionTitle :: Maybe String
+  , voterRole :: String
+  , voterId :: String
+  , voterHotHash :: Maybe String
+  , voterName :: Maybe String
+  , verdict :: String
+  , castAt :: ChainPoint
+  , latencyHours :: Maybe Number
+  , isFinal :: Boolean
+  , isFirst :: Boolean
+  , revoteCount :: Int
+  , anchor :: Maybe VoteAnchor
+  , votingPower :: Maybe Lovelace
+  , votingPowerEpoch :: Maybe Int
+  }
+
+derive instance Eq VoteRow
+
+instance DecodeJson VoteRow where
+  decodeJson json = do
+    o <- decodeJson json
+    govActionId <- o .: "gov_action_id"
+    govActionBech32 <- o .: "gov_action_bech32"
+    govActionType <- o .: "gov_action_type"
+    govActionTitle <- o .:? "gov_action_title"
+    voterRole <- o .: "voter_role"
+    voterId <- o .: "voter_id"
+    voterHotHash <- o .:? "voter_hot_hash"
+    voterName <- o .:? "voter_name"
+    verdict <- o .: "verdict"
+    castAt <- o .: "cast_at"
+    latencyHours <- o .:? "latency_hours"
+    isFinal <- o .: "is_final"
+    isFirst <- o .: "is_first"
+    revoteCount <- o .: "revote_count"
+    anchor <- o .:? "anchor"
+    votingPower <- o .:? "voting_power"
+    votingPowerEpoch <- o .:? "voting_power_epoch"
+    pure
+      ( VoteRow
+          { govActionId
+          , govActionBech32
+          , govActionType
+          , govActionTitle
+          , voterRole
+          , voterId
+          , voterHotHash
+          , voterName
+          , verdict
+          , castAt
+          , latencyHours
+          , isFinal
+          , isFirst
+          , revoteCount
+          , anchor
+          , votingPower
+          , votingPowerEpoch
+          }
+      )
+
+newtype VotePage = VotePage
+  { items :: Array VoteRow
+  , total :: Int
+  , limit :: Int
+  , offset :: Int
+  }
+
+derive instance Eq VotePage
+
+instance DecodeJson VotePage where
+  decodeJson json = do
+    o <- decodeJson json
+    items <- o .: "items"
+    total <- o .: "total"
+    limit <- o .: "limit"
+    offset <- o .: "offset"
+    pure (VotePage { items, total, limit, offset })
 
 -- | Culoarea chip-ului de prospețime. `Unknown` nu e decor: înseamnă „n-am putut citi starea", care
 -- | e un fapt diferit de „datele sunt proaspete" și de „datele sunt vechi". Un chip care arată verde

@@ -13,6 +13,7 @@ import Test.Capabilities.DRepListSpec as DRepListSpec
 import Test.Capabilities.HttpSpec as HttpSpec
 import Test.Capabilities.StatusSpec as StatusSpec
 import Test.FormatSpec as FormatSpec
+import Test.Capabilities.VoteSpec as VoteSpec
 import Test.Query.PageSpec as PageSpec
 import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (runSpec)
@@ -27,3 +28,4 @@ main = launchAff_ $ runSpec [ consoleReporter ] do
   DRepListSpec.spec
   DRepDetailSpec.spec
   ActionSpec.spec
+  VoteSpec.spec

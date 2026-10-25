@@ -12,6 +12,7 @@ module Capabilities.Query.Gov.Mock
   , getDRepDetailMock
   , getGovActionsMock
   , getGovActionDetailMock
+  , getVotesMock
   , decodeFixture
   ) where
 
@@ -24,13 +25,22 @@ import Capabilities.Query.Gov.Fixtures
   , govActionDetailFixture
   , govActionListFixture
   , statusFixture
+  , votesListFixture
   )
 import Capabilities.Query.Gov.Http (ApiError(..), classifyResponse)
-import Capabilities.Query.Gov.Types (DRepDetail, DRepExplorerPage, DashboardPage, GovActionDetail, GovActionPage, GovStatus)
+import Capabilities.Query.Gov.Types
+  ( DRepDetail
+  , DRepExplorerPage
+  , DashboardPage
+  , GovActionDetail
+  , GovActionPage
+  , GovStatus
+  , VotePage
+  )
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
-import Route.GovQueries (DRepFilters, GovActionFilters)
+import Route.GovQueries (DRepFilters, GovActionFilters, VoteFilters)
 
 -- | Decodează o fixtură exact cum s-ar decoda un 200 real.
 decodeFixture :: forall a. DecodeJson a => String -> Either ApiError a
@@ -60,3 +70,6 @@ getGovActionsMock _ = pure (decodeFixture govActionListFixture)
 
 getGovActionDetailMock :: forall m. Applicative m => String -> m (Either ApiError GovActionDetail)
 getGovActionDetailMock _ = pure (decodeFixture govActionDetailFixture)
+
+getVotesMock :: forall m. Applicative m => VoteFilters -> m (Either ApiError VotePage)
+getVotesMock _ = pure (decodeFixture votesListFixture)

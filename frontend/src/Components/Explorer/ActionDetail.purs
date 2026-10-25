@@ -40,7 +40,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Network.RemoteData (RemoteData(..))
-import Route.GovQueries (actionListHrefFor, emptyGovActionFilters)
+import Route.GovQueries (actionListHrefFor, emptyGovActionFilters, votesForActionHref)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -154,11 +154,17 @@ component =
   renderDetail (GovActionDetail d) =
     HH.div [ HP.class_ (HH.ClassName "space-y-4") ]
       [ headerCard d.action d.proposer
+      , votesLink d.action
       , talliesCard d.tallies
       , if null d.withdrawals then HH.text "" else withdrawalsCard d.withdrawals
       , if null d.paramChanges then HH.text "" else paramsCard d.paramChanges
       , documentCard d.action d.anchorContent
       ]
+
+  votesLink (GovActionSummary a) =
+    HH.a
+      [ HP.href (votesForActionHref a.id), HP.class_ (HH.ClassName "btn btn-sm") ]
+      [ HH.text "See every vote cast on this proposal →" ]
 
   headerCard (GovActionSummary a) proposer =
     let

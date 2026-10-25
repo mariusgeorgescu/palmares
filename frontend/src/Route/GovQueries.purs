@@ -26,6 +26,16 @@ module Route.GovQueries
   , actionListPath
   , actionListHrefFor
   , actionDetailHrefFor
+  , VoteFilters
+  , emptyVoteFilters
+  , defaultVoteFilters
+  , voteFiltersCodec
+  , voteFilterPairs
+  , renderVoteFilters
+  , voteListPath
+  , voteListHrefFor
+  , votesForDRepHref
+  , votesForActionHref
   , encodePathSegment
   , toggleIn
   ) where
@@ -231,3 +241,98 @@ actionListHrefFor f = actionListPath <> renderGovActionFilters f
 -- | deci ar cere pagina listei în loc de acțiune.
 actionDetailHrefFor :: String -> String
 actionDetailHrefFor actionId = actionListPath <> "/" <> encodePathSegment actionId
+
+-- | Filtrele explorerului de voturi.
+type VoteFilters =
+  { voter_role :: Array String
+  , verdict :: Array String
+  , gov_action_type :: Array String
+  , voter_id :: Maybe String
+  , gov_action_id :: Maybe String
+  , q :: Maybe String
+  , is_final :: Maybe String
+  , order_by :: Maybe String
+  , sort_order :: Maybe String
+  , limit :: Maybe String
+  , offset :: Maybe String
+  }
+
+emptyVoteFilters :: VoteFilters
+emptyVoteFilters =
+  { voter_role: []
+  , verdict: []
+  , gov_action_type: []
+  , voter_id: Nothing
+  , gov_action_id: Nothing
+  , q: Nothing
+  , is_final: Nothing
+  , order_by: Nothing
+  , sort_order: Nothing
+  , limit: Nothing
+  , offset: Nothing
+  }
+
+-- | Explorerul de voturi nu interoghează niciodată nefiltrat, și asta nu e o preferință de produs.
+-- |
+-- | Măsurat pe serverul care rulează: `/votes` fără niciun filtru raportează `total: 3.244.726`, pe
+-- | o rețea cu 131 de acțiuni și ~900 de voturi reale. Orice filtru îl repară — pe acțiune 43, pe
+-- | votant 1, `is_final=true` 934 — deci numărătoarea nefiltrată e un defect de server, nu un fapt
+-- | despre lanț. Un ecran care ar tipări 3,2 milioane ar minți cu un factor de 3.500, iar pagerul
+-- | ar oferi zece mii de pagini goale.
+-- |
+-- | `is_final=true` e și default-ul corect ca înțeles: un DRep poate să-și schimbe votul cât
+-- | acțiunea e deschisă, iar votul care a contat e ultimul. Filtrul se vede pe ecran ca oricare
+-- | altul și se poate scoate — dar „curăță filtrele" duce aici, nu la zero filtre.
+defaultVoteFilters :: VoteFilters
+defaultVoteFilters = emptyVoteFilters { is_final = Just "true" }
+
+voteFiltersCodec :: RouteDuplex' VoteFilters
+voteFiltersCodec =
+  record
+    # prop (Proxy :: Proxy "voter_role") (repeatedParam "voter_role")
+    # prop (Proxy :: Proxy "verdict") (repeatedParam "verdict")
+    # prop (Proxy :: Proxy "gov_action_type") (repeatedParam "gov_action_type")
+    # prop (Proxy :: Proxy "voter_id") (optional (param "voter_id"))
+    # prop (Proxy :: Proxy "gov_action_id") (optional (param "gov_action_id"))
+    # prop (Proxy :: Proxy "q") (optional (param "q"))
+    # prop (Proxy :: Proxy "is_final") (optional (param "is_final"))
+    # prop (Proxy :: Proxy "order_by") (optional (param "order_by"))
+    # prop (Proxy :: Proxy "sort_order") (optional (param "sort_order"))
+    # prop (Proxy :: Proxy "limit") (optional (param "limit"))
+    # prop (Proxy :: Proxy "offset") (optional (param "offset"))
+
+voteFilterPairs :: VoteFilters -> Array (Tuple String String)
+voteFilterPairs f =
+  map (Tuple "voter_role") f.voter_role
+    <> map (Tuple "verdict") f.verdict
+    <> map (Tuple "gov_action_type") f.gov_action_type
+    <> opt "voter_id" f.voter_id
+    <> opt "gov_action_id" f.gov_action_id
+    <> opt "q" f.q
+    <> opt "is_final" f.is_final
+    <> order
+    <> opt "limit" f.limit
+    <> opt "offset" f.offset
+  where
+  opt k = maybe [] \v -> [ Tuple k v ]
+
+  order = case f.order_by of
+    Nothing -> []
+    Just ob -> [ Tuple "order_by" ob, Tuple "sort_order" (fromMaybe "asc" f.sort_order) ]
+
+renderVoteFilters :: VoteFilters -> String
+renderVoteFilters = renderQuery <<< voteFilterPairs
+
+voteListPath :: String
+voteListPath = "/votes"
+
+voteListHrefFor :: VoteFilters -> String
+voteListHrefFor f = voteListPath <> renderVoteFilters f
+
+-- | Linkul din pagina unui DRep spre voturile lui. Fără `is_final`: pe pagina unui DRep, un vot
+-- | schimbat e parte din povestea lui.
+votesForDRepHref :: String -> String
+votesForDRepHref drepId = voteListHrefFor (emptyVoteFilters { voter_id = Just drepId })
+
+votesForActionHref :: String -> String
+votesForActionHref actionId = voteListHrefFor (emptyVoteFilters { gov_action_id = Just actionId })

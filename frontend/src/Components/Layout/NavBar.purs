@@ -28,7 +28,7 @@ import Halogen.Router.Class (class MonadRouter, navigate)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Route (Route(..))
 import Route.Codec (printRoute)
-import Route.GovQueries (emptyDRepFilters, emptyGovActionFilters)
+import Route.GovQueries (defaultVoteFilters, emptyDRepFilters, emptyGovActionFilters)
 import Store as Store
 import Type.Proxy (Proxy(..))
 import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
@@ -87,6 +87,7 @@ component =
               [ navLink Home "Home"
               , navLink (DRepList emptyDRepFilters) "DReps"
               , navLink (ActionList emptyGovActionFilters) "Actions"
+              , navLink (VoteList defaultVoteFilters) "Votes"
               ]
           , HH.slot WC._walletConnect unit WC.component walletConnectInput HandleWalletConnect
           ]

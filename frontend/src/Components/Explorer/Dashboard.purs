@@ -40,9 +40,11 @@ import Route.GovQueries
   ( actionDetailHrefFor
   , actionListHrefFor
   , drepDetailHrefFor
+  , defaultVoteFilters
   , drepListHrefFor
   , emptyDRepFilters
   , emptyGovActionFilters
+  , voteListHrefFor
   )
 import Halogen as H
 import Halogen.HTML as HH
@@ -345,7 +347,7 @@ hubEntries =
     , label: "Governance actions"
     , description: "Every proposal, its lifecycle, and who voted which way."
     }
-  , { href: "/votes"
+  , { href: voteListHrefFor defaultVoteFilters
     , label: "Votes"
     , description: "Individual votes, with the rationale when one was published."
     }

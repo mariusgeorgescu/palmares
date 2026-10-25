@@ -12,6 +12,7 @@ module Capabilities.Query.Gov.Fixtures
   , drepDetailFixture
   , govActionListFixture
   , govActionDetailFixture
+  , votesListFixture
   ) where
 
 -- | `GET /status` pe preprod, 2026-10-24. `epoch_params` e omis: niciun decodor nu-l citește încă,
@@ -983,3 +984,134 @@ govActionDetailFixture :: String
 govActionDetailFixture =
   """
   {"action":{"id":"90de87d46e6345118c01dc5ec701b4dce5621ffa3b1f98a3d55eb34e85da7392#0","bech32":"gov_action1jr0g04rwvdz3rrqpm30vwqd5mnjky8l68v0e3g74t6e5apw6wwfqq37hpcl","type":"treasury_withdrawals","title":"Rename the Chang 2 Hard Fork to the Plomin Hard Fork","abstract":"The Intersect Hard Fork Working Group proposes to name the next Cardano hard fork the “Plomin Hard Fork” in memory of Cardano community contributor Matthew Plomin.","anchor_status":"valid","proposed_at":{"slot":127034777,"epoch":297,"time":"2026-06-29T07:26:17Z","tx_hash":"90de87d46e6345118c01dc5ec701b4dce5621ffa3b1f98a3d55eb34e85da7392"},"expires_epoch":304,"last_votable_epoch":303,"lifecycle":{"state":"expired","ratified_epoch":null,"enacted_epoch":null,"expired_epoch":304,"dropped_epoch":305,"formula_id":"gov_action_state_v1"},"deposit":1000000000,"return_address":"stake_test1uppy2gm2hqzkwc80em4mlat73j4jyqvzhclrvsu72g9xg4q2yweet","treasury_amount":1000000000000,"votes_cast":58},"tallies":[{"role":"drep","epoch":304,"yes_power":0,"no_power":1095127719870,"abstain_power":0,"yes_count":7,"no_count":2,"abstain_count":49,"ratio":0.0,"threshold":0.67,"threshold_param":"dvt_treasury_withdrawal","basis":"cast_votes_only","formula_id":"tally_cast_votes_v1"}],"withdrawals":[{"beneficiary":"stake_test1uppy2gm2hqzkwc80em4mlat73j4jyqvzhclrvsu72g9xg4q2yweet","amount":1000000000000,"enacted_at":null,"paid_heuristic":false}],"param_changes":[],"proposer":{"stake_address":"stake_test1uppy2gm2hqzkwc80em4mlat73j4jyqvzhclrvsu72g9xg4q2yweet","actions_count":2},"anchor_content":{"title":"Rename the Chang 2 Hard Fork to the Plomin Hard Fork","abstract":"The Intersect Hard Fork Working Group proposes to name the next Cardano hard fork the “Plomin Hard Fork” in memory of Cardano community contributor Matthew Plomin.","motivation":"There is a tradition of naming hard forks in memory of notable historical figures or significant contributors to the Cardano community. Naming this hard fork in memory of Matthew Plomin would memorialize his actions in life to selflessly support and contribute to the Cardano blockchain ecosystem.","rationale":"Renaming the “Second Chang Hard Fork” (Chang 2) to the Plomin Hard Fork, in memory of Cardano community contributor Matthew Plomin, reflects a natural progression of Cardano’s governance growth. Phil Chang was an employee of Input Output who made significant contributions to Cardano’s governance system to help transfer control and responsibility of the blockchain into the hands of the community. Matthew Plomin was an exemplar of the Cardano community, representing every individual who stands ready to pick up the torch and carry the ecosystem forward.\n\nMatthew was a much loved and respected member of the Cardano community. He passed unexpectedly on November 14th, 2024. Originally hailing from Indiana, USA; he earned a Bachelor of Science in Management degree from Purdue University where he met and married the love of his life, Jillian (Shaw). He went on to receive his Master of Business Administration Degree from George Washington University before joining the DWS Group (Deutsche Bank) and rising to the Head of the US Money Market Credit Research team. His expertise in the traditional finance world was instrumental in his journey to found $USDM, a Cardano-native stable coin pegged to the US Dollar and fully backed by dollar reserves.\n\nAs a Cardano community member, Matthew was always eager to learn more and excited to help others work through issues they encountered with their projects in the ecosystem. He taught himself how to mint native assets, experimenting with social games and helping Jillian to publish a book she authored in a serialized, token-based format. Seeing the need for a US Dollar-backed Stablecoin on Cardano, Matthew assembled a team that would become the Moneta project. Despite limited institutional backing during a market bottom, the community stepped up to champion him and their support helped his dream become a reality.\n\nMatthew leaves behind his wife, Jillian, their seven children, and the Moneta team. His legacy lives on through the work that he accomplished and the inspiration that he kindled in others. As a devout Roman Catholic Christian, Matthew lived out the “Golden Rule” to “do unto others as you would have them do unto you,” and the world is a better place for him being in it.","references":[{"label":"Vasil Hard Fork | Cardano Docs","uri":"https://docs.cardano.org/about-cardano/evolution/upgrades/vasil/"},{"label":"Chang upgrade #1 hard fork achieved! | Intersect MBO","uri":"https://www.intersectmbo.org/news/chang-upgrade-1-hard-fork-achieved"},{"label":"Vasil Hard Fork | Cardano Docs","uri":"https://docs.cardano.org/about-cardano/evolution/upgrades/vasil/"},{"label":"Chang upgrade #1 hard fork achieved! | Intersect MBO","uri":"https://www.intersectmbo.org/news/chang-upgrade-1-hard-fork-achieved"}]}}  """
+
+-- | `GET /votes?limit=4&anchor_status=valid&order_by=cast_at&sort_order=desc` pe preprod,
+-- | 2026-10-25.
+-- |
+-- | Filtrul pe ancoră validă e deliberat: din ~934 de voturi finale, __opt__ au un raționament
+-- | verificat, iar fixtura trebuie să conțină cazul care se randează greu. Primul rând are
+-- | `is_final: false` și `revote_count: 3` — un vot care a fost înlocuit, exact rândul pe care un
+-- | ecran neatent l-ar număra ca încă unul.
+votesListFixture :: String
+votesListFixture =
+  """
+  {
+    "items": [
+      {
+        "gov_action_id": "78a9aafe2e4e14828efa8cd5202fec08c996a9a00c7d56b317b6a95a80510db3#0",
+        "gov_action_bech32": "gov_action10z564l3wfc2g9rh63n2jqtlvpryed2dqp374dvchk6544qz3pkesq7cqrfs",
+        "gov_action_type": "parameter_change",
+        "gov_action_title": null,
+        "voter_role": "drep",
+        "voter_id": "drep1y0lpypv3vgrg6scz4emwl5u9z5aq3m5z4m2x5zn0gguvu6sv8yks9",
+        "voter_hot_hash": "fe12059162068d4302ae76efd385153a08ee82aed46a0a6f4238ce6a",
+        "voter_name": null,
+        "verdict": "yes",
+        "cast_at": {
+          "slot": 130847265,
+          "epoch": 306,
+          "time": "2026-08-12T10:27:45Z",
+          "tx_hash": "952df62401da2dac25179da0ab55e0088bc164e37bdd13f5c2312e6229a26864"
+        },
+        "latency_hours": 112.63222222222223,
+        "is_final": false,
+        "is_first": true,
+        "revote_count": 3,
+        "anchor": {
+          "url": "https://gateway.pinata.cloud/ipfs/bafkreigd4cspq46cuvm2vue4vlguldgpmkc572aykn56mghd23z2lgo6sm",
+          "status": "valid",
+          "cip100_valid": true
+        },
+        "voting_power": null,
+        "voting_power_epoch": null
+      },
+      {
+        "gov_action_id": "97d5bcc30ce59be99bd808345d99be8c18aa474abb2e5dcd9183b44f976ce12d#0",
+        "gov_action_bech32": "gov_action1jl2mescvukd7nx7cpq69mxd73sv25362hvh9mnv3sw6yl9mvuyksqxdcx6k",
+        "gov_action_type": "treasury_withdrawals",
+        "gov_action_title": null,
+        "voter_role": "constitutional_committee",
+        "voter_id": "cc_cold1zdgf3h7sm6a8yhad66fpnr7r8m54n7l8umklrddxjhsxucgkudvrr",
+        "voter_hot_hash": "e3a4c41d67592a1b8d87c62e5c5d73f7e8db836171945412d13f40f8",
+        "voter_name": null,
+        "verdict": "no",
+        "cast_at": {
+          "slot": 79926192,
+          "epoch": 188,
+          "time": "2024-12-31T01:43:12Z",
+          "tx_hash": "41bcea0a3c79ca41fb4c3990f7bf060aec5786dba2dbe340d9f13673c9bf66fd"
+        },
+        "latency_hours": 346.5725,
+        "is_final": true,
+        "is_first": false,
+        "revote_count": 2,
+        "anchor": {
+          "url": "https://hornan7.github.io/mike_hornan.jsonld",
+          "status": "valid",
+          "cip100_valid": true
+        },
+        "voting_power": null,
+        "voting_power_epoch": null
+      },
+      {
+        "gov_action_id": "acc84cdb5eae8fe33793a9329bdd73b51eef7d9a33f25352783015aaa63c16fe#0",
+        "gov_action_bech32": "gov_action14nyyek674687xdun4yefhhtnk50w7lv6x0e9x5ncxq264f3uzmlqqn60xhh",
+        "gov_action_type": "treasury_withdrawals",
+        "gov_action_title": null,
+        "voter_role": "constitutional_committee",
+        "voter_id": "cc_cold1zdgf3h7sm6a8yhad66fpnr7r8m54n7l8umklrddxjhsxucgkudvrr",
+        "voter_hot_hash": "e3a4c41d67592a1b8d87c62e5c5d73f7e8db836171945412d13f40f8",
+        "voter_name": null,
+        "verdict": "no",
+        "cast_at": {
+          "slot": 79926192,
+          "epoch": 188,
+          "time": "2024-12-31T01:43:12Z",
+          "tx_hash": "41bcea0a3c79ca41fb4c3990f7bf060aec5786dba2dbe340d9f13673c9bf66fd"
+        },
+        "latency_hours": 346.56583333333333,
+        "is_final": true,
+        "is_first": false,
+        "revote_count": 2,
+        "anchor": {
+          "url": "https://hornan7.github.io/mike_hornan.jsonld",
+          "status": "valid",
+          "cip100_valid": true
+        },
+        "voting_power": null,
+        "voting_power_epoch": null
+      },
+      {
+        "gov_action_id": "b52f02288e3ce8c7e57455522f4edd09c12797749e2db32098ecbe980b645d45#0",
+        "gov_action_bech32": "gov_action1k5hsy2yw8n5v0et524fz7nkap8qj09m5nckmxgycajlfszmyt4zsqp0n7ft",
+        "gov_action_type": "parameter_change",
+        "gov_action_title": "Plutus V3 Cost Model Parameter Changes Prior to Chang#2",
+        "voter_role": "constitutional_committee",
+        "voter_id": "cc_cold1zdd8rutlfnjvrs97q56ht4ch4hn2mzsa23faq2n9eeqdfvgss2fuc",
+        "voter_hot_hash": "104f3db4e905fd008396f53a6d035e290f97f6172d3792673b213956",
+        "voter_name": null,
+        "verdict": "yes",
+        "cast_at": {
+          "slot": 75624648,
+          "epoch": 178,
+          "time": "2024-11-11T06:50:48Z",
+          "tx_hash": "0b16cf9a6f3e6b1c9fbe66b7f828786e89d8ef9dda16d53bc5cf37a08cee7bd3"
+        },
+        "latency_hours": 133.57361111111112,
+        "is_final": true,
+        "is_first": true,
+        "revote_count": 1,
+        "anchor": {
+          "url": "https://raw.githubusercontent.com/Eastern-Cardano-Council/icc-ga-rationales/refs/heads/main/preprod/ga05/ga05-rationale.jsonld",
+          "status": "valid",
+          "cip100_valid": true
+        },
+        "voting_power": null,
+        "voting_power_epoch": null
+      }
+    ],
+    "total": 8,
+    "limit": 4,
+    "offset": 0
+  }
+  """

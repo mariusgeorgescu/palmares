@@ -48,7 +48,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Network.RemoteData (RemoteData(..))
-import Route.GovQueries (drepListHrefFor, emptyDRepFilters)
+import Route.GovQueries (drepListHrefFor, emptyDRepFilters, votesForDRepHref)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -154,6 +154,7 @@ component =
   renderDetail (DRepDetail d) =
     HH.div [ HP.class_ (HH.ClassName "space-y-4") ]
       [ identityCard d.drep
+      , votesLink d.drep
       , HH.div [ HP.class_ (HH.ClassName "grid gap-4 lg:grid-cols-3") ]
           [ metricsCard d.metrics
           , delegatorsCard d.delegatorStats
@@ -166,6 +167,13 @@ component =
       , anchorCard d.drep d.anchorContent d.updates
       , formulasNote d.metrics
       ]
+
+  -- Istoricul de voturi nu e lipit aici: e propriul ecran, cu propria paginare și propriile
+  -- filtre. Linkul duce la el filtrat pe acest DRep.
+  votesLink (DRepSummary s) =
+    HH.a
+      [ HP.href (votesForDRepHref s.id), HP.class_ (HH.ClassName "btn btn-sm") ]
+      [ HH.text "See every vote this DRep cast →" ]
 
   identityCard (DRepSummary s) =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
