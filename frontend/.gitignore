@@ -28,3 +28,10 @@ playwright/.cache/
 
 # Claude Code (local worktrees, permissions with absolute paths)
 .claude/
+
+# Intermediarele de build pe care `build:spago` și `build:css` le scriu în `public/`, de unde vite le
+# consumă în `dist/`. Template-ul le avea comise; pentru palmares nu au ce căuta în git: Dockerfile-ul
+# și CI-ul construiesc singuri, iar un `index.js` urmărit înseamnă 22.000 de linii de diff la fiecare
+# build — adică fiecare schimbare reală îngropată într-un diff pe care nimeni nu-l citește.
+public/index.js
+public/output.css
