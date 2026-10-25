@@ -13,6 +13,9 @@ module Components.Layout.NavBar
 
 import Prelude
 
+import Data.Foldable (any)
+import Data.Tuple (Tuple(..))
+
 import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent, preventDefaultEvent)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
@@ -37,6 +40,8 @@ import Route.GovQueries
   , emptyGovActionFilters
   , emptyMethodologyFilters
   , emptySpoFilters
+  , emptyWithdrawalFilters
+  , emptyDelegationFilters
   )
 import Store as Store
 import Type.Proxy (Proxy(..))
@@ -118,7 +123,7 @@ component =
           ]
       , HH.div [ HP.class_ (HH.ClassName "flex-none flex items-center gap-1 sm:gap-2") ]
           [ menuButton st
-          , HH.ul [ HP.class_ (HH.ClassName "menu menu-horizontal px-1 hidden lg:flex") ] navItems
+          , HH.ul [ HP.class_ (HH.ClassName "menu menu-horizontal px-1 hidden lg:flex") ] desktopItems
           , HH.slot_ SearchBox._searchBox unit SearchBox.component unit
           , HH.slot WC._walletConnect unit WC.component walletConnectInput HandleWalletConnect
           ]
@@ -131,15 +136,57 @@ component =
         else HH.text ""
       ]
     where
-    navItems =
+    -- Bara orizontală ține patru destinații plus „More" și metodologia. Ecranele nu se opresc
+    -- aici — urmează activitatea, profilurile, atestările, disputele — iar o bară care le
+    -- înșiruie pe toate se rupe pe al doilea rând exact pe lățimile de laptop. Pe telefon nu
+    -- există submeniu: hamburgerul le listează plat, pentru că acolo e deja o coloană care se
+    -- derulează și un al doilea nivel ar cere două atingeri pentru fiecare ecran.
+    primaryItems =
       [ navLink st.route Home "Home"
       , navLink st.route (DRepList emptyDRepFilters) "DReps"
-      , navLink st.route (SpoList emptySpoFilters) "SPOs"
-      , navLink st.route Committee "Committee"
       , navLink st.route (ActionList emptyGovActionFilters) "Actions"
       , navLink st.route (VoteList defaultVoteFilters) "Votes"
-      , navLink st.route (Methodology emptyMethodologyFilters) "Methodology"
       ]
+
+    desktopItems =
+      primaryItems
+        <> [ moreMenu st ]
+        <> [ navLink st.route (Methodology emptyMethodologyFilters) "Methodology" ]
+
+    navItems =
+      primaryItems
+        <> map (\(Tuple r label) -> navLink st.route r label) (moreTargetsOf st)
+        <> [ navLink st.route (Methodology emptyMethodologyFilters) "Methodology" ]
+
+  -- `details`/`summary`, nu un dropdown cu stare: se deschide și se închide fără JavaScript, e
+  -- navigabil de la tastatură din construcție, și nu adaugă un al doilea `menuOpen` care poate
+  -- rămâne desincronizat de ruta curentă.
+  moreMenu st =
+    HH.li_
+      [ HH.details_
+          [ HH.summary
+              [ HP.class_
+                  ( HH.ClassName
+                      (if anyActive st then "font-semibold text-primary" else "")
+                  )
+              ]
+              [ HH.text "More" ]
+          , HH.ul [ HP.class_ (HH.ClassName "bg-base-200 rounded-box z-40 w-48 p-2 shadow") ]
+              (map (\(Tuple r label) -> navLink st.route r label) (moreTargetsOf st))
+          ]
+      ]
+
+  moreTargetsOf _ =
+    [ Tuple (SpoList emptySpoFilters) "SPOs"
+    , Tuple Committee "Committee"
+    , Tuple (TreasuryList emptyWithdrawalFilters) "Treasury"
+    , Tuple (DelegationList emptyDelegationFilters) "Delegations"
+    ]
+
+  -- „More" se marchează când ecranul curent e unul dintre cele dinăuntru: altfel bara nu spune
+  -- unde te afli exact pe jumătate din site.
+  anyActive st =
+    any (\(Tuple r _) -> sameSection st.route r) (moreTargetsOf st)
 
   menuButton st =
     HH.button
@@ -234,5 +281,7 @@ sameSection a b = section a == section b
     VoteList _ -> "votes"
     SpoList _ -> "spos"
     Committee -> "committee"
+    TreasuryList _ -> "treasury"
+    DelegationList _ -> "delegations"
     Methodology _ -> "methodology"
     NotFound -> "none"

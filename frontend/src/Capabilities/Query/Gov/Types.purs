@@ -50,6 +50,10 @@ module Capabilities.Query.Gov.Types
   , SpoPage(..)
   , CommitteeMember(..)
   , CommitteeState(..)
+  , WithdrawalRow(..)
+  , WithdrawalPage(..)
+  , DelegationRow(..)
+  , DelegationPage(..)
   ) where
 
 import Prelude
@@ -1375,3 +1379,102 @@ instance DecodeJson CommitteeState where
     epoch <- o .: "epoch"
     members <- o .: "members"
     pure (CommitteeState { quorumNumerator, quorumDenominator, establishedBy, epoch, members })
+
+-- | O retragere din trezorerie, ca rînd al listei globale: `GET /treasury-withdrawals`.
+-- |
+-- | Diferă de `Withdrawal` — care e rîndul din interiorul unei acțiuni — prin faptul că poartă
+-- | acțiunea cu el, pentru că lista nu e deschisă dintr-o acțiune anume.
+-- |
+-- | `enactedEpoch` și `enactedAt` sînt `null` pe TOATE cele 83 de rînduri măsurate: pe preprod nu
+-- | s-a adoptat niciodată o retragere. De-aia ecranul nu poate pune „plătit" ca stare implicită.
+newtype WithdrawalRow = WithdrawalRow
+  { govActionId :: String
+  , govActionTitle :: Maybe String
+  , beneficiary :: String
+  , amount :: Lovelace
+  , enactedEpoch :: Maybe Int
+  , enactedAt :: Maybe ChainPoint
+  , paidHeuristic :: Maybe Boolean
+  }
+
+derive instance Eq WithdrawalRow
+
+instance DecodeJson WithdrawalRow where
+  decodeJson json = do
+    o <- decodeJson json
+    govActionId <- o .: "gov_action_id"
+    govActionTitle <- o .:? "gov_action_title"
+    beneficiary <- o .: "beneficiary"
+    amount <- o .: "amount"
+    enactedEpoch <- o .:? "enacted_epoch"
+    enactedAt <- o .:? "enacted_at"
+    paidHeuristic <- o .:? "paid_heuristic"
+    pure
+      ( WithdrawalRow
+          { govActionId, govActionTitle, beneficiary, amount, enactedEpoch, enactedAt, paidHeuristic }
+      )
+
+newtype WithdrawalPage = WithdrawalPage
+  { items :: Array WithdrawalRow
+  , total :: Int
+  , limit :: Int
+  , offset :: Int
+  }
+
+derive instance Eq WithdrawalPage
+
+instance DecodeJson WithdrawalPage where
+  decodeJson json = do
+    o <- decodeJson json
+    items <- o .: "items"
+    total <- o .: "total"
+    limit <- o .: "limit"
+    offset <- o .: "offset"
+    pure (WithdrawalPage { items, total, limit, offset })
+
+-- | O delegare de putere de vot: cine a delegat, cui, cît, și cînd.
+-- |
+-- | `target` e fie un DRep, fie una dintre cele două opțiuni standard (`always_abstain`,
+-- | `always_no_confidence`), care nu sînt DRep-i și nu au pagină.
+-- |
+-- | `lovelace` e `null` pe 43 din 200 de rînduri măsurate: suma vine din `epoch_stake`, iar epoca
+-- | poate să n-aibă rîndul. `targetName` lipsește pe 182 din 200, adică numele e excepția.
+newtype DelegationRow = DelegationRow
+  { stakeAddress :: String
+  , target :: String
+  , targetName :: Maybe String
+  , lovelace :: Maybe Lovelace
+  , at :: ChainPoint
+  , isCurrent :: Boolean
+  }
+
+derive instance Eq DelegationRow
+
+instance DecodeJson DelegationRow where
+  decodeJson json = do
+    o <- decodeJson json
+    stakeAddress <- o .: "stake_address"
+    target <- o .: "target"
+    targetName <- o .:? "target_name"
+    lovelace <- o .:? "lovelace"
+    at <- o .: "at"
+    isCurrent <- o .: "is_current"
+    pure (DelegationRow { stakeAddress, target, targetName, lovelace, at, isCurrent })
+
+newtype DelegationPage = DelegationPage
+  { items :: Array DelegationRow
+  , total :: Int
+  , limit :: Int
+  , offset :: Int
+  }
+
+derive instance Eq DelegationPage
+
+instance DecodeJson DelegationPage where
+  decodeJson json = do
+    o <- decodeJson json
+    items <- o .: "items"
+    total <- o .: "total"
+    limit <- o .: "limit"
+    offset <- o .: "offset"
+    pure (DelegationPage { items, total, limit, offset })

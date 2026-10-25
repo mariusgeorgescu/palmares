@@ -46,6 +46,16 @@ module Route.GovQueries
   , spoListPath
   , spoListHrefFor
   , committeePath
+  , WithdrawalFilters
+  , emptyWithdrawalFilters
+  , withdrawalFiltersCodec
+  , withdrawalListPath
+  , withdrawalListHrefFor
+  , DelegationFilters
+  , emptyDelegationFilters
+  , delegationFiltersCodec
+  , delegationListPath
+  , delegationListHrefFor
   , MethodologyFilters
   , emptyMethodologyFilters
   , methodologyCodec
@@ -260,6 +270,82 @@ actionListHrefFor f = actionListPath <> renderGovActionFilters f
 -- | deci ar cere pagina listei în loc de acțiune.
 actionDetailHrefFor :: String -> String
 actionDetailHrefFor actionId = actionListPath <> "/" <> encodePathSegment actionId
+
+-- | Filtrele listei de retrageri din trezorerie. Sortare și paginare; filtrele pe beneficiar, pe
+-- | acțiune și pe interval de sumă n-au control în ecran, deci nu intră în rută.
+type WithdrawalFilters =
+  { order_by :: Maybe String
+  , sort_order :: Maybe String
+  , limit :: Maybe String
+  , offset :: Maybe String
+  }
+
+emptyWithdrawalFilters :: WithdrawalFilters
+emptyWithdrawalFilters = { order_by: Nothing, sort_order: Nothing, limit: Nothing, offset: Nothing }
+
+withdrawalFiltersCodec :: RouteDuplex' WithdrawalFilters
+withdrawalFiltersCodec =
+  record
+    # prop (Proxy :: Proxy "order_by") (optional (param "order_by"))
+    # prop (Proxy :: Proxy "sort_order") (optional (param "sort_order"))
+    # prop (Proxy :: Proxy "limit") (optional (param "limit"))
+    # prop (Proxy :: Proxy "offset") (optional (param "offset"))
+
+withdrawalListPath :: String
+withdrawalListPath = "/treasury"
+
+withdrawalListHrefFor :: WithdrawalFilters -> String
+withdrawalListHrefFor f = withdrawalListPath <> renderQuery (sortPairs f)
+
+-- | Filtrele listei de delegări. `drep_id` e aici și nu doar în sortare pentru că pagina unui DRep
+-- | trimite spre lista lui de delegări: e singurul filtru pe care un link din produs îl setează.
+type DelegationFilters =
+  { drep_id :: Maybe String
+  , is_current :: Maybe String
+  , order_by :: Maybe String
+  , sort_order :: Maybe String
+  , limit :: Maybe String
+  , offset :: Maybe String
+  }
+
+emptyDelegationFilters :: DelegationFilters
+emptyDelegationFilters =
+  { drep_id: Nothing, is_current: Nothing, order_by: Nothing, sort_order: Nothing, limit: Nothing, offset: Nothing }
+
+delegationFiltersCodec :: RouteDuplex' DelegationFilters
+delegationFiltersCodec =
+  record
+    # prop (Proxy :: Proxy "drep_id") (optional (param "drep_id"))
+    # prop (Proxy :: Proxy "is_current") (optional (param "is_current"))
+    # prop (Proxy :: Proxy "order_by") (optional (param "order_by"))
+    # prop (Proxy :: Proxy "sort_order") (optional (param "sort_order"))
+    # prop (Proxy :: Proxy "limit") (optional (param "limit"))
+    # prop (Proxy :: Proxy "offset") (optional (param "offset"))
+
+delegationListPath :: String
+delegationListPath = "/delegations"
+
+delegationListHrefFor :: DelegationFilters -> String
+delegationListHrefFor f =
+  delegationListPath
+    <> renderQuery
+      ( optPair "drep_id" f.drep_id
+          <> optPair "is_current" f.is_current
+          <> sortPairs f
+      )
+
+-- | Perechile de sortare și paginare, comune celor trei liste simple. `sort_order` nu se trimite
+-- | singur: serverul îl ignoră fără `order_by`, iar o rută care poartă o jumătate de sortare arată
+-- | ca o sortare care nu s-a aplicat.
+sortPairs :: forall r. { order_by :: Maybe String, sort_order :: Maybe String, limit :: Maybe String, offset :: Maybe String | r } -> Array (Tuple String String)
+sortPairs f = order <> optPair "limit" f.limit <> optPair "offset" f.offset
+  where
+  order = case f.order_by of
+    Nothing -> []
+    Just ob -> [ Tuple "order_by" ob, Tuple "sort_order" (fromMaybe "desc" f.sort_order) ]
+
+optPair :: String -> Maybe String -> Array (Tuple String String)
+optPair k = maybe [] \v -> [ Tuple k v ]
 
 -- | Filtrele listei de SPO-uri. Doar sortare și paginare: cele patru filtre numerice pe care
 -- | serverul le acceptă (`min_voting_power`, `min_votes_cast`, `active_in_epoch`) n-au niciun

@@ -21,6 +21,8 @@ const ROUTES = [
   ['/votes', 'Votes — Palmares'],
   ['/spos', 'Stake pool operators — Palmares'],
   ['/committee', 'Constitutional committee — Palmares'],
+  ['/treasury', 'Treasury withdrawals — Palmares'],
+  ['/delegations', 'Delegations — Palmares'],
   ['/methodology', 'Methodology — Palmares'],
 ];
 

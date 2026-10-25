@@ -19,6 +19,8 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getFormulas
   , getSpos
   , getCommittee
+  , getWithdrawals
+  , getDelegations
   ) where
 
 import Prelude
@@ -35,12 +37,14 @@ import Capabilities.Query.Gov.Types
   , SearchResults
   , SpoPage
   , CommitteeState
+  , WithdrawalPage
+  , DelegationPage
   , VotePage
   )
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Halogen (HalogenM)
-import Route.GovQueries (DRepFilters, GovActionFilters, SpoFilters, VoteFilters)
+import Route.GovQueries (DRepFilters, DelegationFilters, GovActionFilters, SpoFilters, VoteFilters, WithdrawalFilters)
 
 class Monad m <= MonadQueryGov m where
   -- | `GET /status` — rețeaua, epoca, lag-ul, pragurile și starea proiectorului, într-un singur
@@ -86,6 +90,14 @@ class Monad m <= MonadQueryGov m where
   -- | corpului, iar trei membri nu au nevoie de paginare.
   getCommittee :: m (Either ApiError CommitteeState)
 
+  -- | `GET /treasury-withdrawals` — fiecare retragere propusă vreodată, cu acțiunea ei. Lista e
+  -- | globală, deci rîndul poartă acțiunea cu el.
+  getWithdrawals :: WithdrawalFilters -> m (Either ApiError WithdrawalPage)
+
+  -- | `GET /delegations` — cine și-a delegat puterea de vot, cui și cînd. Filtrul pe DRep e
+  -- | singurul pe care un link din produs îl setează.
+  getDelegations :: DelegationFilters -> m (Either ApiError DelegationPage)
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
@@ -100,3 +112,5 @@ instance monadQueryGovHalogenM ::
   getFormulas = lift getFormulas
   getSpos = lift <<< getSpos
   getCommittee = lift getCommittee
+  getWithdrawals = lift <<< getWithdrawals
+  getDelegations = lift <<< getDelegations

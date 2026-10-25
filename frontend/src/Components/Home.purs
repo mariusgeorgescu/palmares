@@ -12,12 +12,14 @@ import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Components.Explorer.Committee as Committee
 import Components.Explorer.Dashboard as Dashboard
+import Components.Explorer.DelegationList as DelegationList
 import Components.Explorer.ActionDetail as ActionDetail
 import Components.Explorer.ActionList as ActionList
 import Components.Explorer.DRepDetail as DRepDetail
 import Components.Explorer.DRepList as DRepList
 import Components.Explorer.Methodology as Methodology
 import Components.Explorer.SpoList as SpoList
+import Components.Explorer.TreasuryList as TreasuryList
 import Components.Explorer.VoteList as VoteList
 import Components.Layout.NavBar as NavBar
 import Components.Shared.DRepIdentity (shortId)
@@ -61,6 +63,8 @@ type Slots =
   , actionDetail :: ActionDetail.Slot
   , spoList :: SpoList.Slot
   , committee :: Committee.Slot
+  , treasuryList :: TreasuryList.Slot
+  , delegationList :: DelegationList.Slot
   , voteList :: VoteList.Slot
   , methodology :: Methodology.Slot
   )
@@ -144,6 +148,8 @@ component =
     VoteList filters -> HH.slot_ VoteList._voteList unit VoteList.component filters
     SpoList filters -> HH.slot_ SpoList._spoList unit SpoList.component filters
     Committee -> HH.slot_ Committee._committee unit Committee.component unit
+    TreasuryList filters -> HH.slot_ TreasuryList._treasuryList unit TreasuryList.component filters
+    DelegationList filters -> HH.slot_ DelegationList._delegationList unit DelegationList.component filters
     Methodology filters -> HH.slot_ Methodology._methodology unit Methodology.component filters
     NotFound -> renderNotFound
 
@@ -170,5 +176,7 @@ documentTitle = case _ of
   VoteList _ -> "Votes — Palmares"
   SpoList _ -> "Stake pool operators — Palmares"
   Committee -> "Constitutional committee — Palmares"
+  TreasuryList _ -> "Treasury withdrawals — Palmares"
+  DelegationList _ -> "Delegations — Palmares"
   Methodology _ -> "Methodology — Palmares"
   NotFound -> "Not found — Palmares"

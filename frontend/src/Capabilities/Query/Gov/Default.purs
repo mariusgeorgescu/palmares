@@ -14,6 +14,8 @@ module Capabilities.Query.Gov.Default
   , getFormulasDefault
   , getSposDefault
   , getCommitteeDefault
+  , getWithdrawalsDefault
+  , getDelegationsDefault
   ) where
 
 import Prelude
@@ -32,15 +34,23 @@ import Capabilities.Query.Gov.Types
   , VotePage
   , SpoPage
   , CommitteeState
+  , WithdrawalPage
+  , DelegationPage
   )
 import Data.Either (Either)
+import Data.Maybe (Maybe(..))
+import Data.String as String
 import Effect.Aff.Class (class MonadAff)
 import Route.GovQueries
   ( DRepFilters
   , GovActionFilters
+  , DelegationFilters
   , SpoFilters
   , VoteFilters
+  , WithdrawalFilters
   , renderSpoFilters
+  , withdrawalListHrefFor
+  , delegationListHrefFor
   , encodePathSegment
   , renderDRepFilters
   , renderGovActionFilters
@@ -136,3 +146,31 @@ getCommitteeDefault
   => Record (HasGovEnv r)
   -> m (Either ApiError CommitteeState)
 getCommitteeDefault env = getJson (env.queryBaseUrl <> "/committee")
+
+-- | Calea se compune din exact același helper care face href-ul din UI, ca să nu existe două
+-- | definiții ale aceleiași interogări. `withdrawalListPath` e „/treasury" în rută și
+-- | „/treasury-withdrawals" în API, deci prefixul se taie aici.
+getWithdrawalsDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> WithdrawalFilters
+  -> m (Either ApiError WithdrawalPage)
+getWithdrawalsDefault env filters =
+  getJson (env.queryBaseUrl <> "/treasury-withdrawals" <> queryOf (withdrawalListHrefFor filters))
+
+getDelegationsDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> DelegationFilters
+  -> m (Either ApiError DelegationPage)
+getDelegationsDefault env filters =
+  getJson (env.queryBaseUrl <> "/delegations" <> queryOf (delegationListHrefFor filters))
+
+-- | Partea de după „?" dintr-un href, sau șirul gol. Astfel ruta și cererea poartă ACELEAȘI
+-- | parametri, și nu două liste care se pot desincroniza.
+queryOf :: String -> String
+queryOf href = case String.indexOf (String.Pattern "?") href of
+  Just i -> String.drop i href
+  Nothing -> ""

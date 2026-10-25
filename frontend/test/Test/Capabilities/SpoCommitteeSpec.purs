@@ -9,10 +9,22 @@ module Test.Capabilities.SpoCommitteeSpec (spec) where
 
 import Prelude
 
-import Capabilities.Query.Gov.Fixtures (committeeFixture, spoListFixture)
+import Capabilities.Query.Gov.Fixtures (committeeFixture, delegationListFixture, spoListFixture, withdrawalListFixture)
 import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.Mock (decodeFixture)
-import Capabilities.Query.Gov.Types (ChainPoint(..), CommitteeMember(..), CommitteeState(..), SpoPage(..), SpoRow(..))
+import Capabilities.Query.Gov.Types
+  ( ChainPoint(..)
+  , CommitteeMember(..)
+  , CommitteeState(..)
+  , DelegationPage(..)
+  , DelegationRow(..)
+  , SpoPage(..)
+  , SpoRow(..)
+  , WithdrawalPage(..)
+  , WithdrawalRow(..)
+  )
+import Components.Explorer.DelegationList (isStandingChoice, standingLabel)
+import Data.Array (any, filter)
 import Data.Array (head, length)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isNothing)
@@ -59,3 +71,33 @@ spec = do
               case m.authorizedAt of
                 Nothing -> fail "expected an authorization point"
                 Just (ChainPoint at) -> at.epoch `shouldEqual` 228
+
+  describe "WithdrawalPage decoding" do
+    it "decodes a network where nothing was ever paid out" do
+      case (decodeFixture withdrawalListFixture :: Either ApiError WithdrawalPage) of
+        Left e -> fail ("fixture did not decode: " <> show e)
+        Right (WithdrawalPage p) -> do
+          p.total `shouldEqual` 83
+          -- Plicul trebuie să fie POSIBIL: o limită mai mare decât numărul de rânduri, cu un total
+          -- peste amândouă, e un răspuns pe care serverul nu-l poate da — iar paginatorul ar
+          -- deduce din el că paginile mai adânci sunt refuzate.
+          p.limit `shouldEqual` length p.items
+          -- Niciun rând adoptat: de-aia ecranul separă „cerut" de „plătit".
+          any (\(WithdrawalRow w) -> w.enactedEpoch /= Nothing) p.items `shouldEqual` false
+
+  describe "DelegationPage decoding" do
+    it "keeps the two standing choices apart from real DReps" do
+      case (decodeFixture delegationListFixture :: Either ApiError DelegationPage) of
+        Left e -> fail ("fixture did not decode: " <> show e)
+        Right (DelegationPage p) -> do
+          p.limit `shouldEqual` length p.items
+          -- Dacă prefixul `drep_` dispare din verificare, linia asta cade, și nu ecranul live:
+          -- serverul scrie `drep_always_abstain`, nu `always_abstain`.
+          any (\(DelegationRow d) -> isStandingChoice d.target) p.items `shouldEqual` true
+          length (filter (\(DelegationRow d) -> d.lovelace == Nothing) p.items) `shouldEqual` 1
+
+    it "names the standing choices in words" do
+      standingLabel "drep_always_abstain" `shouldEqual` "always abstain"
+      standingLabel "drep_always_no_confidence" `shouldEqual` "always no confidence"
+      -- Un identificator necunoscut se scrie așa cum e, nu se înlocuiește cu o ghicire.
+      standingLabel "drep1abc" `shouldEqual` "drep1abc"

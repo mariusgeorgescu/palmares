@@ -17,6 +17,8 @@ module Capabilities.Query.Gov.Fixtures
   , formulasFixture
   , spoListFixture
   , committeeFixture
+  , withdrawalListFixture
+  , delegationListFixture
   ) where
 
 -- | `GET /status` pe preprod, 2026-10-24. `epoch_params` e omis: niciun decodor nu-l citește încă,
@@ -1205,6 +1207,10 @@ formulasFixture =
 -- |
 -- | Toate cele 511 rânduri au `ticker` și `participation_rate` `null`; cele cinci de aici nu sunt
 -- | alese ca să fie comode, ci sunt primele cinci. Vezi `SpoRow` pentru de ce.
+-- |
+-- | `limit` din plic e numărul de rînduri de aici, nu cel din cererea cu care au fost culese:
+-- | altfel fixtura ar descrie un răspuns imposibil — „limita 200, șase rînduri, total 83" —
+-- | iar paginatorul ar deduce din el că paginile mai adânci sînt refuzate.
 spoListFixture :: String
 spoListFixture =
   """
@@ -1257,7 +1263,7 @@ spoListFixture =
     }
   ],
   "total": 511,
-  "limit": 200,
+  "limit": 5,
   "offset": 0
 }
 """
@@ -1320,5 +1326,162 @@ committeeFixture =
       "resigned_at": null
     }
   ]
+}
+"""
+
+-- | `GET /treasury-withdrawals`, măsurat 2026-10-25. Șase rînduri din 83: două cu titlu și patru
+-- | fără, pentru că 80 din 83 n-au titlu. Niciunul nu e adoptat — pe preprod nu s-a plătit
+-- | niciodată din trezorerie — deci `enacted_epoch` și `enacted_at` sînt `null` peste tot.
+-- |
+-- | `limit` din plic e numărul de rînduri de aici, nu cel din cererea cu care au fost culese:
+-- | altfel fixtura ar descrie un răspuns imposibil — „limita 200, șase rînduri, total 83" —
+-- | iar paginatorul ar deduce din el că paginile mai adânci sînt refuzate.
+withdrawalListFixture :: String
+withdrawalListFixture =
+  """
+{
+  "items": [
+    {
+      "gov_action_id": "372d688faa77e146798b581b322c0f2981a9023764736ade5d12e0e4e796af8c#0",
+      "gov_action_title": "Rename the Chang 2 Hard Fork to the Plomin Hard Fork",
+      "beneficiary": "stake_test1uppy2gm2hqzkwc80em4mlat73j4jyqvzhclrvsu72g9xg4q2yweet",
+      "amount": 1000000000000,
+      "enacted_epoch": null,
+      "enacted_at": null,
+      "paid_heuristic": false
+    },
+    {
+      "gov_action_id": "e1d1d4a310b4b500310e0433eeb70fb96b13ee91a7d05f605861a6b8618ef269#0",
+      "gov_action_title": "Rename the Chang 2 Hard Fork to the Plomin Hard Fork",
+      "beneficiary": "stake_test1uz9qfhmxg7x756qa5j64c90w0480qgcvs7qhvvv39w9072g9lc4dr",
+      "amount": 1000000000000,
+      "enacted_epoch": null,
+      "enacted_at": null,
+      "paid_heuristic": false
+    },
+    {
+      "gov_action_id": "f74abd6f6f0430653ea736b7b714cc56f702288c7849ed6a79c870d342efb5ef#0",
+      "gov_action_title": null,
+      "beneficiary": "stake_test1upfpm2244k8jf00l357t3adp2hzfsuqrwqvleheqjj08uhswme5cn",
+      "amount": 1000000000000,
+      "enacted_epoch": null,
+      "enacted_at": null,
+      "paid_heuristic": false
+    },
+    {
+      "gov_action_id": "97d5bcc30ce59be99bd808345d99be8c18aa474abb2e5dcd9183b44f976ce12d#0",
+      "gov_action_title": null,
+      "beneficiary": "stake_test1upfpm2244k8jf00l357t3adp2hzfsuqrwqvleheqjj08uhswme5cn",
+      "amount": 987654321000,
+      "enacted_epoch": null,
+      "enacted_at": null,
+      "paid_heuristic": false
+    },
+    {
+      "gov_action_id": "acc84cdb5eae8fe33793a9329bdd73b51eef7d9a33f25352783015aaa63c16fe#0",
+      "gov_action_title": null,
+      "beneficiary": "stake_test1upfpm2244k8jf00l357t3adp2hzfsuqrwqvleheqjj08uhswme5cn",
+      "amount": 123456789000,
+      "enacted_epoch": null,
+      "enacted_at": null,
+      "paid_heuristic": false
+    },
+    {
+      "gov_action_id": "c24c118d4247385aa748b707bd2c270baf53b23e8a547d726b1e1cb004cd8324#0",
+      "gov_action_title": null,
+      "beneficiary": "stake_test1upeqhnsgfnweefwfacf6dyzj5f94xqc6hfnjtrnh0ezu7qclg7p6m",
+      "amount": 50000000000,
+      "enacted_epoch": null,
+      "enacted_at": null,
+      "paid_heuristic": false
+    }
+  ],
+  "total": 83,
+  "limit": 6,
+  "offset": 0
+}
+"""
+
+-- | `GET /delegations`, măsurat 2026-10-25. Rînduri alese ca să acopere FORMELE, nu ca să
+-- | arate bine: unul cu nume de DRep (18 din 200 au), unul fără sumă (43 din 200), unul către
+-- | `always_abstain` — care nu e un DRep și nu are pagină — și trei obișnuite.
+-- |
+-- | `limit` din plic e numărul de rînduri de aici, nu cel din cererea cu care au fost culese:
+-- | altfel fixtura ar descrie un răspuns imposibil — „limita 200, șase rînduri, total 83" —
+-- | iar paginatorul ar deduce din el că paginile mai adânci sînt refuzate.
+delegationListFixture :: String
+delegationListFixture =
+  """
+{
+  "items": [
+    {
+      "stake_address": "stake_test1ur3sr279lys8ry9wql40r4qcsrnfcgp70nrtjzezmuta0dqxd8k6h",
+      "target": "drep1yf3yx7ptr0hks02d7k8c8xfq58jn68nje5emscvv7a9ngpqudkpdh",
+      "target_name": "ADAtainment (Preprod)",
+      "lovelace": 7088926872,
+      "at": {
+        "slot": 136541069,
+        "epoch": 319,
+        "time": "2026-10-17T08:04:29Z",
+        "tx_hash": "cc06ad58fa4a3af8e7d34a732c4a738df6be0f5fe294d92474d35ee0dda7db5d"
+      },
+      "is_current": true
+    },
+    {
+      "stake_address": "stake_test1uz2g27lray5puxeegyjmq6d7mkxdnmmr6ter0nnefpxl6kcf342dn",
+      "target": "drep_always_abstain",
+      "target_name": null,
+      "lovelace": null,
+      "at": {
+        "slot": 137253690,
+        "epoch": 321,
+        "time": "2026-10-25T14:01:30Z",
+        "tx_hash": "d86959c594c318c722088c3617498ece812f0817213033f2116751690322ee5b"
+      },
+      "is_current": true
+    },
+    {
+      "stake_address": "stake_test1uzl34lkg3cggnsfvpag8eqecn524kpzuuh9n9tsxzvxgxygcwjha6",
+      "target": "drep1ytax4rwzvdwamnu67j2uk9z00660lpzcvmlys6266l9kt5c262k7m",
+      "target_name": null,
+      "lovelace": 129734524921,
+      "at": {
+        "slot": 137024594,
+        "epoch": 320,
+        "time": "2026-10-22T22:23:14Z",
+        "tx_hash": "ca9b62bdf1f53ac3440cb15965a19a91b701b664d4a9d0adad12f46e5537f875"
+      },
+      "is_current": true
+    },
+    {
+      "stake_address": "stake_test17qcvvnfs02dlfry0c58kqq8hhs7069ulwlsm9l4s4ws0zdc70r9wx",
+      "target": "drep1ygzqwwtgcewhzvxu942xufzl4pg7gnttw9h4e0agm30fnwsqcv00v",
+      "target_name": null,
+      "lovelace": 150000000,
+      "at": {
+        "slot": 136960123,
+        "epoch": 320,
+        "time": "2026-10-22T04:28:43Z",
+        "tx_hash": "9be82418d26fedb8f8b88b665f6653eb7adc22807c65e75f35cce8b0d302273a"
+      },
+      "is_current": true
+    },
+    {
+      "stake_address": "stake_test17quqxxcdejchr45ec6ezn9wqmepxamrt89x8fw3sewxhpyqlqsg49",
+      "target": "drep1ygpuetneftlmufa97hm5mf3xvqpdkyw656hyg6h20qaewtg3csnkc",
+      "target_name": null,
+      "lovelace": 1500000000,
+      "at": {
+        "slot": 136923215,
+        "epoch": 320,
+        "time": "2026-10-21T18:13:35Z",
+        "tx_hash": "0b647ee2201883ddbb3ce6835795649c37e164a88e51912217e2c0ce5565758d"
+      },
+      "is_current": true
+    }
+  ],
+  "total": 2025,
+  "limit": 5,
+  "offset": 0
 }
 """
