@@ -12,6 +12,7 @@ import Route.GovQueries
   , MethodologyFilters
   , ActivityFilters
   , DelegationFilters
+  , GraphFilters
   , RegistryFilters
   , SpoFilters
   , WithdrawalFilters
@@ -44,6 +45,7 @@ data Route
   | ProfileList RegistryFilters
   | AttestationList RegistryFilters
   | DisputeList RegistryFilters
+  | Graph GraphFilters
   | Methodology MethodologyFilters
   | NotFound
 
@@ -72,5 +74,6 @@ instance Show Route where
     ProfileList _ -> "ProfileList"
     AttestationList _ -> "AttestationList"
     DisputeList _ -> "DisputeList"
+    Graph f -> "Graph " <> fromMaybe "" f.drep
     Methodology f -> "Methodology " <> fromMaybe "" f.focus
     NotFound -> "NotFound"

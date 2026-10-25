@@ -27,6 +27,7 @@ const ROUTES = [
   ['/profiles', 'Profiles — Palmares'],
   ['/attestations', 'Attestations — Palmares'],
   ['/disputes', 'Disputes — Palmares'],
+  ['/graph', 'Delegation graph — Palmares'],
   ['/methodology', 'Methodology — Palmares'],
 ];
 

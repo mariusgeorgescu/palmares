@@ -197,6 +197,8 @@ test.describe('at phone width', () => {
     '/profiles',
     '/attestations',
     '/disputes',
+    '/graph',
+    '/graph?drep=drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z',
     '/gov-actions',
     '/gov-actions/90de87d46e6345118c01dc5ec701b4dce5621ffa3b1f98a3d55eb34e85da7392%230',
     '/votes',
@@ -252,6 +254,8 @@ test('the document title names the screen', async ({ page }) => {
   await expect(page).toHaveTitle('Attestations — Palmares');
   await page.goto('/disputes');
   await expect(page).toHaveTitle('Disputes — Palmares');
+  await page.goto('/graph');
+  await expect(page).toHaveTitle('Delegation graph — Palmares');
   await page.goto('/this-does-not-exist');
   await expect(page).toHaveTitle('Not found — Palmares');
 });
@@ -284,6 +288,7 @@ for (const route of [
   '/profiles',
   '/attestations',
   '/disputes',
+  '/graph',
 ]) {
   test(`${route} renders no PureScript constructor`, async ({ page }) => {
     await page.goto(route);

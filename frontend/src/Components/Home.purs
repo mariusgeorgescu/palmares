@@ -14,6 +14,7 @@ import Components.Explorer.Committee as Committee
 import Components.Explorer.Activity as Activity
 import Components.Explorer.AttestationList as AttestationList
 import Components.Explorer.DisputeList as DisputeList
+import Components.Explorer.Graph as Graph
 import Components.Explorer.Dashboard as Dashboard
 import Components.Explorer.DelegationList as DelegationList
 import Components.Explorer.ActionDetail as ActionDetail
@@ -73,6 +74,7 @@ type Slots =
   , profileList :: ProfileList.Slot
   , attestationList :: AttestationList.Slot
   , disputeList :: DisputeList.Slot
+  , graph :: Graph.Slot
   , voteList :: VoteList.Slot
   , methodology :: Methodology.Slot
   )
@@ -162,6 +164,7 @@ component =
     ProfileList filters -> HH.slot_ ProfileList._profileList unit ProfileList.component filters
     AttestationList filters -> HH.slot_ AttestationList._attestationList unit AttestationList.component filters
     DisputeList filters -> HH.slot_ DisputeList._disputeList unit DisputeList.component filters
+    Graph filters -> HH.slot_ Graph._graph unit Graph.component filters
     Methodology filters -> HH.slot_ Methodology._methodology unit Methodology.component filters
     NotFound -> renderNotFound
 
@@ -194,5 +197,6 @@ documentTitle = case _ of
   ProfileList _ -> "Profiles — Palmares"
   AttestationList _ -> "Attestations — Palmares"
   DisputeList _ -> "Disputes — Palmares"
+  Graph _ -> "Delegation graph — Palmares"
   Methodology _ -> "Methodology — Palmares"
   NotFound -> "Not found — Palmares"

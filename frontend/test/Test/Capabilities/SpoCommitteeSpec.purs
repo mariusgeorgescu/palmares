@@ -41,6 +41,9 @@ import Capabilities.Query.Gov.Types
   , WithdrawalRow(..)
   )
 import Components.Explorer.DelegationList (isStandingChoice, standingLabel)
+import Components.Explorer.Graph (buildGraph)
+import Route as R
+import Route.Codec (parseRoute, printRoute)
 import Data.Array (any, filter)
 import Data.Array (head, length)
 import Data.Either (Either(..))
@@ -161,6 +164,32 @@ spec = do
           p.total `shouldEqual` 5
           p.limit `shouldEqual` length p.items
           any (\(DisputeRow d) -> d.deposit > 0.0) p.items `shouldEqual` true
+
+  describe "the new routes round-trip" do
+    it "carries the chosen representative through the URL" do
+      -- Un graf partajat trebuie sa se deschida la fel la celalalt capat, deci DRep-ul e in URL.
+      parseRoute "/graph?drep=drep1abc" `shouldEqual` R.Graph { drep: Just "drep1abc" }
+      parseRoute (printRoute (R.Graph { drep: Just "drep1abc" }))
+        `shouldEqual` R.Graph { drep: Just "drep1abc" }
+      parseRoute "/graph" `shouldEqual` R.Graph { drep: Nothing }
+
+  describe "the delegation graph" do
+    it "puts the representative in the middle, once" do
+      case (decodeFixture delegationListFixture :: Either ApiError DelegationPage) of
+        Left e -> fail ("fixture did not decode: " <> show e)
+        Right (DelegationPage p) -> do
+          let g = buildGraph "drep1root" p.items
+          -- Radacina plus cite un nod per delegator. Daca radacina ar fi dedusa din rinduri in loc
+          -- sa fie data, un DRep fara delegari n-ar avea centru si graful ar fi gol in loc de
+          -- „niciun delegator".
+          length g.nodes `shouldEqual` (length p.items + 1)
+          length (filter (\n -> n.isRoot) g.nodes) `shouldEqual` 1
+          length g.edges `shouldEqual` length p.items
+
+    it "draws a representative with no delegators as a lone centre, not an empty canvas" do
+      let g = buildGraph "drep1root" []
+      length g.nodes `shouldEqual` 1
+      length g.edges `shouldEqual` 0
 
   where
   noSlot (ChainPoint c) = c.slot == Nothing

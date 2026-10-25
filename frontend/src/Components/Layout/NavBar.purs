@@ -44,6 +44,7 @@ import Route.GovQueries
   , emptyDelegationFilters
   , emptyActivityFilters
   , emptyRegistryFilters
+  , emptyGraphFilters
   )
 import Store as Store
 import Type.Proxy (Proxy(..))
@@ -187,6 +188,7 @@ component =
     , Tuple (ProfileList emptyRegistryFilters) "Profiles"
     , Tuple (AttestationList emptyRegistryFilters) "Attestations"
     , Tuple (DisputeList emptyRegistryFilters) "Disputes"
+    , Tuple (Graph emptyGraphFilters) "Graph"
     ]
 
   -- „More" se marchează când ecranul curent e unul dintre cele dinăuntru: altfel bara nu spune
@@ -293,5 +295,6 @@ sameSection a b = section a == section b
     ProfileList _ -> "profiles"
     AttestationList _ -> "attestations"
     DisputeList _ -> "disputes"
+    Graph _ -> "graph"
     Methodology _ -> "methodology"
     NotFound -> "none"

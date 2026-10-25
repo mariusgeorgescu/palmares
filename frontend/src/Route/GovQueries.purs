@@ -61,6 +61,11 @@ module Route.GovQueries
   , activityFiltersCodec
   , activityPath
   , activityHrefFor
+  , GraphFilters
+  , emptyGraphFilters
+  , graphFiltersCodec
+  , graphPath
+  , graphHrefFor
   , RegistryFilters
   , emptyRegistryFilters
   , registryFiltersCodec
@@ -284,6 +289,22 @@ actionListHrefFor f = actionListPath <> renderGovActionFilters f
 -- | deci ar cere pagina listei în loc de acțiune.
 actionDetailHrefFor :: String -> String
 actionDetailHrefFor actionId = actionListPath <> "/" <> encodePathSegment actionId
+
+-- | Graful se desenează în jurul unui singur DRep, iar acela vine din URL: un graf partajat
+-- | trebuie să se deschidă la fel la celălalt capăt.
+type GraphFilters = { drep :: Maybe String }
+
+emptyGraphFilters :: GraphFilters
+emptyGraphFilters = { drep: Nothing }
+
+graphFiltersCodec :: RouteDuplex' GraphFilters
+graphFiltersCodec = record # prop (Proxy :: Proxy "drep") (optional (param "drep"))
+
+graphPath :: String
+graphPath = "/graph"
+
+graphHrefFor :: String -> String
+graphHrefFor drepId = graphPath <> "?drep=" <> encodeQueryValue drepId
 
 -- | Filtrele celor trei liste din registrul de atestări. Aceeași formă pentru toate: sortarea și
 -- | paginarea sînt singurele controale, iar un tip per ecran ar fi trei copii ale aceluiași
