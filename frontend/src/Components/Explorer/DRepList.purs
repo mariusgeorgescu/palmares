@@ -35,7 +35,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.Number.Format (fixed, toStringWith)
 import Data.Tuple (Tuple(..))
-import Format (formatAda, formatInt, formatPercent, humanize, pluralize)
+import Format (formatAda, formatAdaOnly, formatInt, formatPercent, humanize, matchLine, pluralize)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -59,12 +59,21 @@ type Input = DRepFilters
 
 type State =
   { filters :: DRepFilters
+  -- Cât timp vine următorul răspuns, cel vechi rămâne pe ecran. Fără asta, orice clic pe o
+  -- fațetă, pe un cap de coloană sau pe „Next" ștergea tabelul ȘI bara de filtre de sub degetul
+  -- utilizatorului, lăsând un card de 50px cu trei puncte.
+  -- Pliat pe telefon, deschis pe desktop (prin CSS, nu prin stare): măsurat, bara de filtre cerea
+  -- peste un ecran de derulat înainte de primul rând de date.
+  , filtersOpen :: Boolean
+  , refreshing :: Boolean
   , page :: RemoteData ApiError DRepExplorerPage
   , searchDraft :: String
   }
 
 data Action
   = Initialize
+  | Retry
+  | ToggleFilters
   | Receive Input
   | SearchDraft String
   | SearchKey KE.KeyboardEvent
@@ -73,21 +82,31 @@ data Action
 -- | Eticheta unui facet. Limba e un câmp liber din metadate, iar măsurătoarea a găsit patru DRep-i
 -- | cu limba scrisă ca șir gol — ceea ce nu e același lucru cu „nu a declarat o limbă", și se vede
 -- | ca atare.
-facetLabel :: String -> String
-facetLabel "" = "(blank)"
-facetLabel s = humanize s
+-- | Eticheta unui facet. Cheia contează: `humanize` e corect pentru enumerările ledgerului
+-- | (`hash_mismatch` → „Hash mismatch"), dar aplicat unei etichete BCP-47 scotea „En-us", o formă
+-- | care nu există nici ca limbă, nici ca tag.
+facetLabel :: String -> String -> String
+facetLabel _ "" = "declared, but empty"
+facetLabel "language" value = value
+facetLabel _ value = humanize value
 
 -- | Eticheta unui interval de putere. `hi` lipsă înseamnă „și peste".
 -- |
 -- | Primul interval măsurat e `lo: 0, hi: 1` — adică exact zero lovelace, fiindcă `hi` e exclusiv.
 -- | Formatat ca ADA ar ieși „0,00 ADA – 0,00 ADA", care nu spune nimic. Are nume propriu, și e
 -- | intervalul cu cei mai mulți DRep-i din el (109 din 294).
+-- | Unitatea nu se repetă de douăsprezece ori într-o coloană de etichete: stă o singură dată, în
+-- | titlul blocului. Iar `lo == 1` lovelace formatat ca ADA dădea „0.00 ADA – 1,000 ADA", care se
+-- | citea ca același interval cu „No voting power" de deasupra lui.
 bucketLabel :: Lovelace -> Maybe Lovelace -> String
 bucketLabel lo hi
   | lo == 0.0 && hi == Just 1.0 = "No voting power"
+  | lo == 1.0 = case hi of
+      Nothing -> "any"
+      Just h -> "under " <> formatAdaOnly h
   | otherwise = case hi of
-      Nothing -> formatAda lo <> " and up"
-      Just h -> formatAda lo <> " – " <> formatAda h
+      Nothing -> formatAdaOnly lo <> " and up"
+      Just h -> formatAdaOnly lo <> " – " <> formatAdaOnly h
 
 -- | Al doilea clic pe aceeași coloană întoarce ordinea; primul clic pe o coloană nouă începe
 -- | descrescător, pentru că „cine are cea mai multă putere" e întrebarea pe care o pune cineva care
@@ -105,7 +124,13 @@ component
   => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: \filters -> { filters, page: NotAsked, searchDraft: fromMaybe "" filters.q }
+    { initialState: \filters ->
+        { filters
+        , page: NotAsked
+        , filtersOpen: false
+        , refreshing: false
+        , searchDraft: fromMaybe "" filters.q
+        }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -116,6 +141,8 @@ component =
   where
   handleAction = case _ of
     Initialize -> load
+    Retry -> load
+    ToggleFilters -> H.modify_ \st -> st { filtersOpen = not st.filtersOpen }
     Receive filters -> do
       st <- H.get
       -- Doar o schimbare reală de filtre reîncarcă. Halogen retrimite input-ul la fiecare randare a
@@ -134,10 +161,14 @@ component =
 
   load = do
     st <- H.get
-    H.modify_ _ { page = Loading }
+    -- `Loading` doar la prima încărcare; la o re-filtrare rămâne ce era, cu un semn discret.
+    H.modify_ \s0 -> case s0.page of
+      Success _ -> s0 { refreshing = true }
+      _ -> s0 { page = Loading }
     res <- getDRepExplorer st.filters
     H.modify_ _
-      { page = case res of
+      { refreshing = false
+      , page = case res of
           Left e -> Failure e
           Right p -> Success p
       }
@@ -197,28 +228,66 @@ component =
       [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
           [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The DRep list could not be loaded." ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
+          -- Un ecran de eroare fără nimic de apăsat e un fund de sac: singura ieșire rămâne
+          -- reîncărcarea din browser, care pe ruta asta costă încă o dată cele ~30 de secunde de
+          -- așteptare. `isRetryable` există deja în transport, dar nu-l folosea nimeni.
+          , HH.button
+              [ HP.class_ (HH.ClassName "btn btn-sm")
+              , HP.type_ HP.ButtonButton
+              , HE.onClick (const Retry)
+              ]
+              [ HH.text "Try again" ]
           ]
       ]
 
   body st page@(DRepExplorerPage p) =
     HH.div [ HP.class_ (HH.ClassName "grid gap-4 lg:grid-cols-4") ]
-      [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1 min-w-0 space-y-4") ] [ sidebar st page ]
+      -- Pe telefon bara de filtre ajunge DEASUPRA rezultatelor, și e lungă: măsurat, peste un
+      -- ecran întreg de derulat până la primul rând de date. Pliată, rămâne la un rând; pe desktop
+      -- `open` o ține mereu deschisă, deci nu se schimbă nimic acolo.
+      [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1 min-w-0 space-y-2") ]
+          [ HH.button
+              [ HP.class_ (HH.ClassName "btn btn-sm btn-ghost w-full justify-start lg:hidden")
+              , HP.type_ HP.ButtonButton
+              , HE.onClick (const ToggleFilters)
+              , HP.attr (HH.AttrName "aria-expanded") (if st.filtersOpen then "true" else "false")
+              ]
+              [ HH.text (if st.filtersOpen then "Hide filters" else "Filters") ]
+          , HH.div
+              [ HP.class_
+                  (HH.ClassName (if st.filtersOpen then "space-y-4" else "hidden lg:block space-y-4"))
+              ]
+              [ sidebar st page ]
+          ]
       , HH.div [ HP.class_ (HH.ClassName "lg:col-span-3 min-w-0 space-y-3") ]
           [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline justify-between gap-2") ]
               [ HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-                  [ HH.text
-                      ( formatInt p.total <> " DReps match"
-                          <> ", showing "
-                          <> show (p.offset + 1)
-                          <> "–"
-                          <> show (p.offset + length p.items)
-                      )
+                  [ HH.text (matchLine p.total p.offset (length p.items) "DRep")
+                  , if st.refreshing then
+                      HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-xs ml-2") ] []
+                    else HH.text ""
                   ]
-              , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+              , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
                   [ HH.text ("Voting power as of epoch " <> show p.epoch <> ".") ]
               ]
-          , table st page
-          , pager st page
+          , if null p.items then emptyState st else table st page
+          , if null p.items then HH.text "" else pager st page
+          ]
+      ]
+
+  -- Zero rezultate nu e un tabel gol cu capete de coloană: e o propoziție care spune ce s-a
+  -- întâmplat și un drum înapoi. „showing 1–0" nu înseamnă nimic pentru nimeni.
+  emptyState st =
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
+          [ HH.p_ [ HH.text "No DReps match these filters." ]
+          , if hasAnyFilter st.filters then
+              HH.a
+                [ HP.href (drepListHrefFor emptyDRepFilters)
+                , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+                ]
+                [ HH.text "Clear the filters" ]
+            else HH.text ""
           ]
       ]
 
@@ -229,14 +298,15 @@ component =
       , facetBlock st "Language" "language" p.languageFacets
       , HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
           [ HH.div [ HP.class_ (HH.ClassName "card-body p-3 gap-2") ]
-              [ HH.h3 [ HP.class_ (HH.ClassName "font-medium text-sm") ] [ HH.text "Voting power" ]
+              [ HH.h3 [ HP.class_ (HH.ClassName "font-medium text-sm") ] [ HH.text "Voting power (ADA)" ]
               , Histogram.render (map (bucketBar st.filters) p.powerBuckets)
               ]
           ]
-      , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+      , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
           [ HH.text
-              "Facet counts are each computed with their own filter removed, so they do not add up \
-              \to the number of matches. Voting-power ranges do."
+              "Each count shows how many DReps you would get by picking that option on its own, so \
+              \the options overlap and do not add up to the number of matches. The voting-power \
+              \ranges do add up."
           ]
       ]
 
@@ -245,7 +315,7 @@ component =
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-3 gap-1") ]
           [ HH.h3 [ HP.class_ (HH.ClassName "font-medium text-sm") ] [ HH.text title ]
           , if null facets then
-              HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ] [ HH.text "No values yet." ]
+              HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text "No values yet." ]
             else HH.div [ HP.class_ (HH.ClassName "space-y-0.5") ] (map (facetRow st key) facets)
           ]
       ]
@@ -265,7 +335,7 @@ component =
                 )
             )
         ]
-        [ HH.span_ [ HH.text (facetLabel value) ]
+        [ HH.span_ [ HH.text (facetLabel key value) ]
         , HH.span [ HP.class_ (HH.ClassName "font-mono opacity-70") ] [ HH.text (formatInt count) ]
         ]
 
@@ -296,7 +366,7 @@ component =
                   , sortHeader st "participation_rate" "Participation" true
                   , sortHeader st "rationale_rate" "Rationale" true
                   , HH.th [ HP.class_ (HH.ClassName "text-right") ] [ HH.text "Open, unvoted" ]
-                  , HH.th_ [ HH.text "Metadata" ]
+                  , HH.th [ HP.scope HP.ScopeCol ] [ HH.text "Metadata" ]
                   ]
               ]
           , HH.tbody_ (map row p.items)
@@ -306,12 +376,25 @@ component =
   sortHeader st column label alignRight =
     let
       sorted = st.filters.order_by == Just column
+      -- Semn neutru pe coloanele sortabile, nu nimic: altfel șase capete din opt sunt linkuri și
+      -- două nu, iar nimic nu le deosebește până nu dai clic. Săgeata e un nod separat și ascuns
+      -- de cititoarele de ecran — starea o spune `aria-sort` pe celulă, nu un caracter în nume.
+      -- U+FE0E după săgeata neutră: fără el, „↕" se randează ca emoji colorat pe telefon.
       arrow =
-        if not sorted then ""
-        else if st.filters.sort_order == Just "asc" then " ▲"
-        else " ▼"
+        if not sorted then "↕\xfe0e"
+        else if st.filters.sort_order == Just "asc" then "▲"
+        else "▼"
+
+      sortState =
+        if not sorted then "none"
+        else if st.filters.sort_order == Just "asc" then "ascending"
+        else "descending"
     in
-      HH.th [ HP.class_ (HH.ClassName (if alignRight then "text-right" else "")) ]
+      HH.th
+        [ HP.class_ (HH.ClassName (if alignRight then "text-right" else ""))
+        , HP.attr (HH.AttrName "aria-sort") sortState
+        , HP.scope HP.ScopeCol
+        ]
         [ HH.a
             [ HP.href (drepListHrefFor (sortToggle column st.filters))
             , HP.class_ (HH.ClassName ("link link-hover inline-block py-1.5 " <> (if sorted then "font-semibold" else "")))
@@ -320,7 +403,7 @@ component =
         ]
 
   row (DRepSummary d) =
-    HH.tr_
+    HH.tr [ HP.class_ (HH.ClassName "hover:bg-base-300") ]
       [ HH.td [ HP.class_ (HH.ClassName "max-w-xs") ]
           [ HH.a [ HP.href (drepDetailHrefFor d.id), HP.class_ (HH.ClassName "hover:underline") ]
               [ DRepIdentity.render { givenName: d.givenName, drepId: d.id, hasScript: d.hasScript } ]
@@ -329,8 +412,10 @@ component =
           [ HH.div [ HP.class_ (HH.ClassName "flex flex-col gap-0.5") ]
               [ HH.span [ HP.class_ (HH.ClassName ("badge badge-sm " <> statusClass d.status)) ]
                   [ HH.text (humanize d.status) ]
-              , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
-                  [ HH.text (maybe "no expiry on record" (\e -> "until epoch " <> show e) d.activeUntilEpoch) ]
+              -- „until epoch 296" cu epoca curentă 321 se citea „inactiv până în 296", adică
+              -- exact pe dos. Timpul verbal vine din status, care e în același rând de date.
+              , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
+                  [ HH.text (activeUntilLabel d.status d.activeUntilEpoch) ]
               ]
           ]
       , HH.td [ HP.class_ (HH.ClassName "text-right font-mono whitespace-nowrap") ]
@@ -338,7 +423,7 @@ component =
       , HH.td [ HP.class_ (HH.ClassName "text-right font-mono") ] [ HH.text (formatInt d.delegatorCount) ]
       , HH.td [ HP.class_ (HH.ClassName "text-right font-mono") ]
           [ HH.div_ [ HH.text (formatPercent d.participationRate) ]
-          , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+          , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
               [ HH.text (pluralize d.votesCast "vote" <> " of " <> formatInt d.eligibleActions) ]
           ]
       -- `rationale_rate` e `null` la 172 din 200 de DRep-i măsurați. „n/a", nu „0%": zero ar fi o
@@ -349,10 +434,20 @@ component =
           [ HH.text (maybe "none" humanize d.anchorStatus) ]
       ]
 
+  -- Timpul verbal al epocii de expirare, derivat din status: același număr înseamnă „până când
+  -- rămâne activ" pentru unul activ și „de când nu mai e" pentru unul expirat.
+  activeUntilLabel status = case _ of
+    Nothing -> "no expiry on record"
+    Just e ->
+      if status == "active" then "active until epoch " <> show e
+      else "was active until epoch " <> show e
+
   statusClass = case _ of
     "active" -> "badge-success"
     "inactive" -> "badge-warning"
-    "retired" -> "badge-ghost"
+    "retired" -> -- `badge-ghost` are fundalul `base-200`, adică exact culoarea cardului în care stă: starea
+      -- neutră era singura invizibilă. `badge-outline` are contur și text, deci se vede.
+      "badge-outline"
     _ -> "badge-outline"
 
   pager st (DRepExplorerPage p) =
@@ -364,7 +459,7 @@ component =
     in
       HH.div [ HP.class_ (HH.ClassName "flex items-center justify-between gap-2") ]
         [ pagerLink prev hrefFor "Previous"
-        , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+        , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
             [ HH.text
                 ( case next of
                     Just _ -> ""

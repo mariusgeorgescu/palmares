@@ -61,7 +61,7 @@ render ident =
         ]
     -- `font-mono` și `title` complet: ID-ul scurtat e pentru citit, cel întreg pentru copiat.
     , HH.span
-        [ HP.class_ (HH.ClassName "font-mono text-xs opacity-60 truncate")
+        [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 truncate")
         , HP.title ident.drepId
         ]
         [ HH.text text.id ]

@@ -24,7 +24,7 @@ import Data.Array (elem, length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
-import Format (formatAda, formatInt, humanize, pluralize)
+import Format (formatAda, formatInt, humanize, matchLine, pluralize)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -48,12 +48,21 @@ type Input = GovActionFilters
 
 type State =
   { filters :: GovActionFilters
+  -- Cât timp vine următorul răspuns, cel vechi rămâne pe ecran. Fără asta, orice clic pe o
+  -- fațetă, pe un cap de coloană sau pe „Next" ștergea tabelul ȘI bara de filtre de sub degetul
+  -- utilizatorului, lăsând un card de 50px cu trei puncte.
+  -- Pliat pe telefon, deschis pe desktop (prin CSS, nu prin stare): măsurat, bara de filtre cerea
+  -- peste un ecran de derulat înainte de primul rând de date.
+  , filtersOpen :: Boolean
+  , refreshing :: Boolean
   , page :: RemoteData ApiError GovActionPage
   , searchDraft :: String
   }
 
 data Action
   = Initialize
+  | Retry
+  | ToggleFilters
   | Receive Input
   | SearchDraft String
   | SearchKey KE.KeyboardEvent
@@ -80,7 +89,9 @@ stateClass = case _ of
   "proposed" -> "badge-info"
   "ratified" -> "badge-success"
   "enacted" -> "badge-success"
-  "expired" -> "badge-ghost"
+  "expired" -> -- `badge-ghost` are fundalul `base-200`, adică exact culoarea cardului în care stă: starea
+    -- neutră era singura invizibilă. `badge-outline` are contur și text, deci se vede.
+    "badge-outline"
   "dropped" -> "badge-error"
   _ -> "badge-outline"
 
@@ -91,7 +102,13 @@ component
   => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: \filters -> { filters, page: NotAsked, searchDraft: fromMaybe "" filters.q }
+    { initialState: \filters ->
+        { filters
+        , page: NotAsked
+        , filtersOpen: false
+        , refreshing: false
+        , searchDraft: fromMaybe "" filters.q
+        }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -102,6 +119,8 @@ component =
   where
   handleAction = case _ of
     Initialize -> load
+    Retry -> load
+    ToggleFilters -> H.modify_ \st -> st { filtersOpen = not st.filtersOpen }
     Receive filters -> do
       st <- H.get
       when (filters /= st.filters) do
@@ -116,10 +135,14 @@ component =
 
   load = do
     st <- H.get
-    H.modify_ _ { page = Loading }
+    -- `Loading` doar la prima încărcare; la o re-filtrare rămâne ce era, cu un semn discret.
+    H.modify_ \s0 -> case s0.page of
+      Success _ -> s0 { refreshing = true }
+      _ -> s0 { page = Loading }
     res <- getGovActions st.filters
     H.modify_ _
-      { page = case res of
+      { refreshing = false
+      , page = case res of
           Left e -> Failure e
           Right p -> Success p
       }
@@ -177,23 +200,60 @@ component =
       [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
           [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The proposals could not be loaded." ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
+          -- Un ecran de eroare fără nimic de apăsat e un fund de sac: singura ieșire rămâne
+          -- reîncărcarea din browser, care pe ruta asta costă încă o dată cele ~30 de secunde de
+          -- așteptare. `isRetryable` există deja în transport, dar nu-l folosea nimeni.
+          , HH.button
+              [ HP.class_ (HH.ClassName "btn btn-sm")
+              , HP.type_ HP.ButtonButton
+              , HE.onClick (const Retry)
+              ]
+              [ HH.text "Try again" ]
           ]
       ]
 
   body st page@(GovActionPage p) =
     HH.div [ HP.class_ (HH.ClassName "grid gap-4 lg:grid-cols-4") ]
-      [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1 min-w-0 space-y-4") ] [ sidebar st ]
+      -- Pe telefon bara de filtre ajunge DEASUPRA rezultatelor, și e lungă: măsurat, peste un
+      -- ecran întreg de derulat până la primul rând de date. Pliată, rămâne la un rând; pe desktop
+      -- `open` o ține mereu deschisă, deci nu se schimbă nimic acolo.
+      [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1 min-w-0 space-y-2") ]
+          [ HH.button
+              [ HP.class_ (HH.ClassName "btn btn-sm btn-ghost w-full justify-start lg:hidden")
+              , HP.type_ HP.ButtonButton
+              , HE.onClick (const ToggleFilters)
+              , HP.attr (HH.AttrName "aria-expanded") (if st.filtersOpen then "true" else "false")
+              ]
+              [ HH.text (if st.filtersOpen then "Hide filters" else "Filters") ]
+          , HH.div
+              [ HP.class_
+                  (HH.ClassName (if st.filtersOpen then "space-y-4" else "hidden lg:block space-y-4"))
+              ]
+              [ sidebar st ]
+          ]
       , HH.div [ HP.class_ (HH.ClassName "lg:col-span-3 min-w-0 space-y-3") ]
           [ HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-              [ HH.text
-                  ( formatInt p.total <> " proposals match, showing "
-                      <> show (p.offset + 1)
-                      <> "–"
-                      <> show (p.offset + length p.items)
-                  )
+              [ HH.text (matchLine p.total p.offset (length p.items) "proposal")
+              , if st.refreshing then
+                  HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-xs ml-2") ] []
+                else HH.text ""
               ]
-          , table st page
-          , pager st page
+          , if null p.items then emptyState st else table st page
+          , if null p.items then HH.text "" else pager st page
+          ]
+      ]
+
+  emptyState st =
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
+          [ HH.p_ [ HH.text "No proposals match these filters." ]
+          , if hasAnyFilter st.filters then
+              HH.a
+                [ HP.href (actionListHrefFor emptyGovActionFilters)
+                , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+                ]
+                [ HH.text "Clear the filters" ]
+            else HH.text ""
           ]
       ]
 
@@ -201,11 +261,8 @@ component =
     HH.div [ HP.class_ (HH.ClassName "space-y-4") ]
       [ filterBlock st "Kind" "type" actionTypes
       , filterBlock st "Outcome" "state" actionStates
-      , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
-          [ HH.text
-              "These are the values the ledger allows, not counts: this route has no facet \
-              \endpoint, so nothing here claims how many there are."
-          ]
+      , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
+          [ HH.text "Filter options, not counts." ]
       ]
 
   filterBlock st title key values =
@@ -245,7 +302,6 @@ component =
                   , sortHeader st "expires_epoch" "Expires" true
                   , sortHeader st "votes_cast" "Votes" true
                   , sortHeader st "treasury_amount" "Asked for" true
-                  , HH.th_ [ HH.text "Metadata" ]
                   ]
               ]
           , HH.tbody_ (map row p.items)
@@ -255,10 +311,19 @@ component =
   sortHeader st column label alignRight =
     let
       sorted = st.filters.order_by == Just column
+      -- Semn neutru pe coloanele sortabile, nu nimic: altfel șase capete din opt sunt linkuri și
+      -- două nu, iar nimic nu le deosebește până nu dai clic. Săgeata e un nod separat și ascuns
+      -- de cititoarele de ecran — starea o spune `aria-sort` pe celulă, nu un caracter în nume.
+      -- U+FE0E după săgeata neutră: fără el, „↕" se randează ca emoji colorat pe telefon.
       arrow =
-        if not sorted then ""
-        else if st.filters.sort_order == Just "asc" then " ▲"
-        else " ▼"
+        if not sorted then "↕\xfe0e"
+        else if st.filters.sort_order == Just "asc" then "▲"
+        else "▼"
+
+      sortState =
+        if not sorted then "none"
+        else if st.filters.sort_order == Just "asc" then "ascending"
+        else "descending"
 
       next =
         if sorted then
@@ -268,12 +333,22 @@ component =
             }
         else st.filters { order_by = Just column, sort_order = Just "desc", offset = Nothing }
     in
-      HH.th [ HP.class_ (HH.ClassName (if alignRight then "text-right" else "")) ]
+      HH.th
+        [ HP.class_ (HH.ClassName (if alignRight then "text-right" else ""))
+        , HP.attr (HH.AttrName "aria-sort") sortState
+        , HP.scope HP.ScopeCol
+        ]
         [ HH.a
             [ HP.href (actionListHrefFor next)
             , HP.class_ (HH.ClassName ("link link-hover inline-block py-1.5 " <> (if sorted then "font-semibold" else "")))
             ]
-            [ HH.text (label <> arrow) ]
+            [ HH.text label
+            , HH.span
+                [ HP.class_ (HH.ClassName ("ml-1 " <> (if sorted then "" else "opacity-70")))
+                , HP.attr (HH.AttrName "aria-hidden") "true"
+                ]
+                [ HH.text arrow ]
+            ]
         ]
 
   row (GovActionSummary a) =
@@ -281,14 +356,19 @@ component =
       ChainPoint at = a.proposedAt
       Lifecycle lc = a.lifecycle
     in
-      HH.tr_
-        [ HH.td [ HP.class_ (HH.ClassName "max-w-md") ]
+      HH.tr [ HP.class_ (HH.ClassName "hover:bg-base-300") ]
+        -- `max-w-xs` ca în celelalte două liste, iar starea documentului coboară aici, sub titlu:
+        -- cu opt coloane, „Asked for" — cifra de bani a propunerii — rămânea în afara ecranului
+        -- chiar și la 1280px, fără nicio bară de derulare vizibilă.
+        [ HH.td [ HP.class_ (HH.ClassName "max-w-xs") ]
             [ HH.a [ HP.href (actionDetailHrefFor a.id), HP.class_ (HH.ClassName "hover:underline") ]
                 [ HH.div [ HP.class_ (HH.ClassName "font-medium truncate") ]
                     [ HH.text (fromMaybe "Untitled proposal" a.title) ]
-                , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-60 truncate"), HP.title a.id ]
+                , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 truncate"), HP.title a.id ]
                     [ HH.text a.bech32 ]
                 ]
+            , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
+                [ HH.text ("metadata: " <> maybe "none" humanize a.anchorStatus) ]
             ]
         , HH.td [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (humanize a.type_) ]
         , HH.td_
@@ -299,13 +379,12 @@ component =
             [ HH.text ("epoch " <> show at.epoch) ]
         , HH.td [ HP.class_ (HH.ClassName "text-right text-sm whitespace-nowrap") ]
             [ HH.div_ [ HH.text ("epoch " <> show a.expiresEpoch) ]
-            , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+            , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
                 [ HH.text ("votable to " <> show a.lastVotableEpoch) ]
             ]
         , HH.td [ HP.class_ (HH.ClassName "text-right font-mono") ] [ HH.text (formatInt a.votesCast) ]
         , HH.td [ HP.class_ (HH.ClassName "text-right font-mono whitespace-nowrap") ]
             [ HH.text (maybe "—" formatAda a.treasuryAmount) ]
-        , HH.td [ HP.class_ (HH.ClassName "text-xs") ] [ HH.text (maybe "none" humanize a.anchorStatus) ]
         ]
 
   pager st (GovActionPage p) =
@@ -317,7 +396,7 @@ component =
     in
       HH.div [ HP.class_ (HH.ClassName "flex items-center justify-between gap-2") ]
         [ pagerLink prev hrefFor "Previous"
-        , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+        , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
             [ HH.text
                 ( case next of
                     Just _ -> pluralize p.total "proposal" <> " in total"

@@ -110,12 +110,24 @@ component =
 
   render st =
     HH.div [ HP.class_ (HH.ClassName "min-h-screen bg-base-100") ]
-      [ HH.slot NavBar._navbar unit NavBar.component st.route HandleNavBar
+      -- Linkul de sărire e primul lucru tabulabil din pagină și se vede doar când îl ții cu
+      -- tastatura. Fără el, pe fiecare navigare se trec la Tab brandul, cinci linkuri, căutarea și
+      -- butonul de wallet înainte de primul rând de date.
+      [ HH.a
+          [ HP.href "#main"
+          , HP.class_
+              (HH.ClassName "sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 btn btn-sm btn-primary")
+          ]
+          [ HH.text "Skip to content" ]
+      , HH.slot NavBar._navbar unit NavBar.component st.route HandleNavBar
       -- Chip-ul stă în afara slotului de rută, nu în fiecare pagină: prospețimea e o proprietate a
       -- datelor, nu a ecranului, și un singur apel o acoperă pe toate.
-      , HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 pt-4") ]
+      -- Înălțimea e rezervată, nu descoperită: banda crește de la o pastilă („checking…") la
+      -- câteva fapte când răspunde `/status`, iar fără rezervare tot ce e sub ea — titlul,
+      -- cardurile, primul tabel — sare în jos exact când utilizatorul a început să citească.
+      , HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 pt-4 min-h-14 sm:min-h-10") ]
           [ HH.slot_ StatusChip._statusChip unit StatusChip.component unit ]
-      , HH.main [ HP.class_ (HH.ClassName "min-h-[80vh]") ]
+      , HH.main [ HP.id "main", HP.class_ (HH.ClassName "min-h-[80vh]") ]
           [ renderRoute st.route ]
       ]
 

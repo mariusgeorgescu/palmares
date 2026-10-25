@@ -31,8 +31,7 @@ import Data.Array (elem, length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
-import Data.Number.Format (fixed, toStringWith)
-import Format (formatInt, humanize, pluralize, roleLabel)
+import Format (formatDay, formatHours, humanize, matchLine, pluralize, roleLabel)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -63,12 +62,21 @@ type Input = VoteFilters
 
 type State =
   { filters :: VoteFilters
+  -- Cât timp vine următorul răspuns, cel vechi rămâne pe ecran. Fără asta, orice clic pe o
+  -- fațetă, pe un cap de coloană sau pe „Next" ștergea tabelul ȘI bara de filtre de sub degetul
+  -- utilizatorului, lăsând un card de 50px cu trei puncte.
+  -- Pliat pe telefon, deschis pe desktop (prin CSS, nu prin stare): măsurat, bara de filtre cerea
+  -- peste un ecran de derulat înainte de primul rând de date.
+  , filtersOpen :: Boolean
+  , refreshing :: Boolean
   , page :: RemoteData ApiError VotePage
   , searchDraft :: String
   }
 
 data Action
   = Initialize
+  | Retry
+  | ToggleFilters
   | Receive Input
   | SearchDraft String
   | SearchKey KE.KeyboardEvent
@@ -84,7 +92,9 @@ verdictClass :: String -> String
 verdictClass = case _ of
   "yes" -> "badge-success"
   "no" -> "badge-error"
-  "abstain" -> "badge-ghost"
+  "abstain" -> -- `badge-ghost` are fundalul `base-200`, adică exact culoarea cardului în care stă: starea
+    -- neutră era singura invizibilă. `badge-outline` are contur și text, deci se vede.
+    "badge-outline"
   _ -> "badge-outline"
 
 -- | Filtrele cu care se interoghează chiar: dacă URL-ul n-a cerut niciunul, se pune default-ul.
@@ -112,6 +122,8 @@ component =
     { initialState: \filters ->
         { filters: effectiveFilters filters
         , page: NotAsked
+        , filtersOpen: false
+        , refreshing: false
         , searchDraft: fromMaybe "" filters.q
         }
     , render
@@ -124,6 +136,8 @@ component =
   where
   handleAction = case _ of
     Initialize -> load
+    Retry -> load
+    ToggleFilters -> H.modify_ \st -> st { filtersOpen = not st.filtersOpen }
     Receive incoming -> do
       st <- H.get
       let filters = effectiveFilters incoming
@@ -139,10 +153,14 @@ component =
 
   load = do
     st <- H.get
-    H.modify_ _ { page = Loading }
+    -- `Loading` doar la prima încărcare; la o re-filtrare rămâne ce era, cu un semn discret.
+    H.modify_ \s0 -> case s0.page of
+      Success _ -> s0 { refreshing = true }
+      _ -> s0 { page = Loading }
     res <- getVotes st.filters
     H.modify_ _
-      { page = case res of
+      { refreshing = false
+      , page = case res of
           Left e -> Failure e
           Right p -> Success p
       }
@@ -163,7 +181,7 @@ component =
       , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
           [ HH.text
               "Every vote cast, who cast it, how long after the proposal opened, and whether they \
-              \published a reason."
+              \published a rationale."
           ]
       , HH.div [ HP.class_ (HH.ClassName "flex flex-wrap gap-2 items-center") ]
           [ HH.input
@@ -214,23 +232,58 @@ component =
       [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
           [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The votes could not be loaded." ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
+          -- Un ecran de eroare fără nimic de apăsat e un fund de sac: singura ieșire rămâne
+          -- reîncărcarea din browser, care pe ruta asta costă încă o dată cele ~30 de secunde de
+          -- așteptare. `isRetryable` există deja în transport, dar nu-l folosea nimeni.
+          , HH.button
+              [ HP.class_ (HH.ClassName "btn btn-sm")
+              , HP.type_ HP.ButtonButton
+              , HE.onClick (const Retry)
+              ]
+              [ HH.text "Try again" ]
           ]
       ]
 
   body st page@(VotePage p) =
     HH.div [ HP.class_ (HH.ClassName "grid gap-4 lg:grid-cols-4") ]
-      [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1 min-w-0 space-y-4") ] [ sidebar st ]
+      -- Pe telefon bara de filtre ajunge DEASUPRA rezultatelor, și e lungă: măsurat, peste un
+      -- ecran întreg de derulat până la primul rând de date. Pliată, rămâne la un rând; pe desktop
+      -- `open` o ține mereu deschisă, deci nu se schimbă nimic acolo.
+      [ HH.div [ HP.class_ (HH.ClassName "lg:col-span-1 min-w-0 space-y-2") ]
+          [ HH.button
+              [ HP.class_ (HH.ClassName "btn btn-sm btn-ghost w-full justify-start lg:hidden")
+              , HP.type_ HP.ButtonButton
+              , HE.onClick (const ToggleFilters)
+              , HP.attr (HH.AttrName "aria-expanded") (if st.filtersOpen then "true" else "false")
+              ]
+              [ HH.text (if st.filtersOpen then "Hide filters" else "Filters") ]
+          , HH.div
+              [ HP.class_
+                  (HH.ClassName (if st.filtersOpen then "space-y-4" else "hidden lg:block space-y-4"))
+              ]
+              [ sidebar st ]
+          ]
       , HH.div [ HP.class_ (HH.ClassName "lg:col-span-3 min-w-0 space-y-3") ]
           [ HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-              [ HH.text
-                  ( formatInt p.total <> " votes match, showing "
-                      <> show (p.offset + 1)
-                      <> "–"
-                      <> show (p.offset + length p.items)
-                  )
+              [ HH.text (matchLine p.total p.offset (length p.items) "vote")
+              , if st.refreshing then
+                  HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-xs ml-2") ] []
+                else HH.text ""
               ]
-          , table st page
-          , pager st page
+          , if null p.items then emptyState st else table st page
+          , if null p.items then HH.text "" else pager st page
+          ]
+      ]
+
+  emptyState _ =
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
+          [ HH.p_ [ HH.text "No votes match these filters." ]
+          , HH.a
+              [ HP.href (voteListHrefFor defaultVoteFilters)
+              , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+              ]
+              [ HH.text "Back to final votes" ]
           ]
       ]
 
@@ -293,7 +346,7 @@ component =
                   )
               ]
               [ HH.text "Superseded votes only" ]
-          , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60 pt-1") ]
+          , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70 pt-1") ]
               [ HH.text "A voter may change its vote while an action is open; only the last one counts." ]
           ]
       ]
@@ -307,8 +360,8 @@ component =
                   , HH.th_ [ HH.text "Vote" ]
                   , HH.th_ [ HH.text "Proposal" ]
                   , sortHeader st "cast_at" "Cast" false
-                  , sortHeader st "latency" "After" true
-                  , HH.th_ [ HH.text "Reason" ]
+                  , sortHeader st "latency" "Voted after" true
+                  , HH.th [ HP.scope HP.ScopeCol ] [ HH.text "Rationale" ]
                   ]
               ]
           , HH.tbody_ (map row p.items)
@@ -318,10 +371,19 @@ component =
   sortHeader st column label alignRight =
     let
       sorted = st.filters.order_by == Just column
+      -- Semn neutru pe coloanele sortabile, nu nimic: altfel șase capete din opt sunt linkuri și
+      -- două nu, iar nimic nu le deosebește până nu dai clic. Săgeata e un nod separat și ascuns
+      -- de cititoarele de ecran — starea o spune `aria-sort` pe celulă, nu un caracter în nume.
+      -- U+FE0E după săgeata neutră: fără el, „↕" se randează ca emoji colorat pe telefon.
       arrow =
-        if not sorted then ""
-        else if st.filters.sort_order == Just "asc" then " ▲"
-        else " ▼"
+        if not sorted then "↕\xfe0e"
+        else if st.filters.sort_order == Just "asc" then "▲"
+        else "▼"
+
+      sortState =
+        if not sorted then "none"
+        else if st.filters.sort_order == Just "asc" then "ascending"
+        else "descending"
 
       next =
         if sorted then
@@ -331,25 +393,35 @@ component =
             }
         else st.filters { order_by = Just column, sort_order = Just "desc", offset = Nothing }
     in
-      HH.th [ HP.class_ (HH.ClassName (if alignRight then "text-right" else "")) ]
+      HH.th
+        [ HP.class_ (HH.ClassName (if alignRight then "text-right" else ""))
+        , HP.attr (HH.AttrName "aria-sort") sortState
+        , HP.scope HP.ScopeCol
+        ]
         [ HH.a
             [ HP.href (voteListHrefFor next)
             , HP.class_ (HH.ClassName ("link link-hover inline-block py-1.5 " <> (if sorted then "font-semibold" else "")))
             ]
-            [ HH.text (label <> arrow) ]
+            [ HH.text label
+            , HH.span
+                [ HP.class_ (HH.ClassName ("ml-1 " <> (if sorted then "" else "opacity-70")))
+                , HP.attr (HH.AttrName "aria-hidden") "true"
+                ]
+                [ HH.text arrow ]
+            ]
         ]
 
   row (VoteRow v) =
     let
       ChainPoint at = v.castAt
     in
-      HH.tr_
+      HH.tr [ HP.class_ (HH.ClassName "hover:bg-base-300") ]
         [ HH.td [ HP.class_ (HH.ClassName "max-w-xs") ]
             [ HH.a [ HP.href (drepDetailHrefFor v.voterId), HP.class_ (HH.ClassName "hover:underline") ]
                 [ DRepIdentity.render
                     { givenName: v.voterName, drepId: v.voterId, hasScript: false }
                 ]
-            , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-60") ] [ HH.text (roleLabel v.voterRole) ]
+            , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text (roleLabel v.voterRole) ]
             ]
         , HH.td_
             [ HH.span [ HP.class_ (HH.ClassName ("badge badge-sm " <> verdictClass v.verdict)) ]
@@ -357,7 +429,7 @@ component =
             -- Un vot înlocuit nu se ascunde și nu se numără ca încă unul: se spune ce e.
             , if v.isFinal then HH.text ""
               else
-                HH.div [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+                HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
                   [ HH.text ("superseded, " <> pluralize v.revoteCount "vote" <> " in all") ]
             ]
         , HH.td [ HP.class_ (HH.ClassName "max-w-xs") ]
@@ -367,29 +439,39 @@ component =
                 ]
                 [ HH.div [ HP.class_ (HH.ClassName "truncate text-sm") ]
                     [ HH.text (fromMaybe "Untitled proposal" v.govActionTitle) ]
-                , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-60") ] [ HH.text (humanize v.govActionType) ]
+                , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text (humanize v.govActionType) ]
                 ]
             ]
         , HH.td [ HP.class_ (HH.ClassName "text-sm whitespace-nowrap") ]
             [ HH.div_ [ HH.text ("epoch " <> show at.epoch) ]
-            , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-60") ] [ HH.text at.time ]
+            -- Data fără oră: secundele și „T…Z" sunt douăzeci de caractere de zgomot într-o
+            -- coloană. Ora exactă rămâne în `title`.
+            , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70"), HP.title at.time ]
+                [ HH.text (formatDay at.time) ]
             ]
+        -- Ore până la două zile, apoi zile: „346.6 h" cerea o împărțire la 24 în cap ca să afli
+        -- că votul a venit după două săptămâni.
         , HH.td [ HP.class_ (HH.ClassName "text-right font-mono whitespace-nowrap") ]
-            [ HH.text (maybe "n/a" (\h -> toStringWith (fixed 1) h <> " h") v.latencyHours) ]
+            [ HH.text (maybe "n/a" formatHours v.latencyHours) ]
         , HH.td [ HP.class_ (HH.ClassName "text-xs") ] [ reason v.anchor ]
         ]
 
   -- Raționamentul: linkul se filtrează pe schemă, ca orice document străin, iar „valid" nu se
   -- confundă cu „conform CIP-100" — serverul le raportează separat, deci se arată separat.
   reason = case _ of
-    Nothing -> HH.span [ HP.class_ (HH.ClassName "opacity-50") ] [ HH.text "none published" ]
+    Nothing -> HH.span [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "none published" ]
     Just (VoteAnchor a) ->
       HH.div [ HP.class_ (HH.ClassName "space-y-0.5") ]
-        [ HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-outline") ]
+        -- Două rânduri spuneau „valid" despre lucruri diferite: că documentul se potrivește cu
+        -- hash-ul din lanț, și că respectă standardul. Al doilea o spune acum în cuvinte.
+        [ HH.span
+            [ HP.class_ (HH.ClassName "badge badge-sm badge-outline")
+            , HP.title "Whether the document matches the hash recorded on chain"
+            ]
             [ HH.text (maybe "unknown" humanize a.status) ]
         , case a.cip100Valid of
-            Just true -> HH.div [ HP.class_ (HH.ClassName "opacity-60") ] [ HH.text "CIP-100 valid" ]
-            Just false -> HH.div [ HP.class_ (HH.ClassName "opacity-60") ] [ HH.text "not CIP-100" ]
+            Just true -> HH.div [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "follows the standard" ]
+            Just false -> HH.div [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "does not follow the standard" ]
             Nothing -> HH.text ""
         , case a.url of
             Nothing -> HH.text ""
@@ -398,7 +480,7 @@ component =
               -- cititorului. Se arată adresa, ca omul să decidă ce face cu ea.
               Nothing ->
                 HH.span
-                  [ HP.class_ (HH.ClassName "font-mono opacity-50 break-all"), HP.title url ]
+                  [ HP.class_ (HH.ClassName "font-mono opacity-70 break-all"), HP.title url ]
                   [ HH.text (Anchor.clampText 40 url) ]
               Just href ->
                 HH.a
@@ -407,7 +489,7 @@ component =
                   , HP.rel "nofollow noopener noreferrer"
                   , HP.class_ (HH.ClassName "link link-hover")
                   ]
-                  [ HH.text "read it" ]
+                  [ HH.text "Read the reason" ]
         ]
 
   -- Pagerul se oprește la 600, nu la 10.000: dincolo de treapta măsurată, o pagină ia 12 secunde.
@@ -427,9 +509,9 @@ component =
             Just _ -> HH.text ""
             Nothing ->
               if p.offset + length p.items >= p.total then
-                HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ] [ HH.text "End of results." ]
+                HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text "End of results." ]
               else
-                HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+                HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
                   [ HH.text
                       ( "This explorer stops at offset " <> show votesOffsetCeiling
                           <>

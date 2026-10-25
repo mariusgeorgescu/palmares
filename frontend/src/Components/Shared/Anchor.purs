@@ -115,7 +115,7 @@ renderAction (ActionAnchor a) =
     ]
 
 fieldLabel :: forall w i. String -> HH.HTML w i
-fieldLabel t = HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-60") ] [ HH.text t ]
+fieldLabel t = HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-70") ] [ HH.text t ]
 
 longField :: forall w i. String -> Maybe String -> HH.HTML w i
 longField title = case _ of
@@ -125,7 +125,10 @@ longField title = case _ of
     else
       HH.div_
         [ fieldLabel title
-        , HH.p [ HP.class_ (HH.ClassName "text-sm whitespace-pre-line") ]
+        -- `max-w-3xl`: pe un card lat, un paragraf ajunge la 170-180 de caractere pe rând, iar la
+        -- al treilea rând ochiul nu mai nimerește începutul rândului următor. Doar paragrafele se
+        -- îngustează; tabelele și listele rămân pe lățimea cardului.
+        , HH.p [ HP.class_ (HH.ClassName "text-sm whitespace-pre-line max-w-3xl") ]
             [ HH.text (clampText 10000 value) ]
         ]
 
@@ -140,7 +143,7 @@ referenceItem (AnchorRef ref) =
           Just uri ->
             HH.span [ HP.class_ (HH.ClassName "space-x-2") ]
               [ externalLink uri text
-              , HH.span [ HP.class_ (HH.ClassName "font-mono text-xs opacity-60 break-all") ]
+              , HH.span [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all") ]
                   [ HH.text (clampText 160 uri) ]
               ]
       ]
@@ -187,7 +190,7 @@ render (AnchorContent a) =
       else
         HH.div_
           [ label title
-          , HH.p [ HP.class_ (HH.ClassName "text-sm whitespace-pre-line") ]
+          , HH.p [ HP.class_ (HH.ClassName "text-sm whitespace-pre-line max-w-3xl") ]
               [ HH.text (clampText 2000 value) ]
           ]
 

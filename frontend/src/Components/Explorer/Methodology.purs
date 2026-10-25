@@ -24,6 +24,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Format (formatInt, pluralize)
 import Halogen as H
 import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.RemoteData (RemoteData(..))
 import Route.GovQueries (MethodologyFilters)
@@ -45,6 +46,7 @@ type State =
 
 data Action
   = Initialize
+  | Retry
   | Receive Input
 
 component
@@ -63,19 +65,26 @@ component =
     }
   where
   handleAction = case _ of
-    Initialize -> do
-      H.modify_ _ { formulas = Loading }
-      res <- getFormulas
-      H.modify_ _
-        { formulas = case res of
-            Left e -> Failure e
-            Right fs -> Success fs
-        }
+    Initialize -> load
+    Retry -> load
+
     -- Doar evidențierea se schimbă la navigare; formulele nu se cer din nou.
     Receive f -> H.modify_ _ { focus = f.focus }
 
+  load = do
+    H.modify_ _ { formulas = Loading }
+    res <- getFormulas
+    H.modify_ _
+      { formulas = case res of
+          Left e -> Failure e
+          Right fs -> Success fs
+      }
+
   render st =
-    HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-4 max-w-4xl") ]
+    -- Lățimea paginii e cea a celorlalte șase ecrane. Cu `max-w-4xl` pe container, titlul sărea cu
+    -- ~200px spre dreapta față de banda de stare de deasupra lui, la fiecare trecere din navbar.
+    -- Lungimea de rând se păstrează acolo unde contează: pe lista de carduri.
+    HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-4") ]
       [ HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
           [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Methodology" ]
           , HH.p [ HP.class_ (HH.ClassName "opacity-80") ]
@@ -91,10 +100,10 @@ component =
           Failure e -> failure e
           Success fs ->
             if null fs then
-              HH.p [ HP.class_ (HH.ClassName "opacity-60") ] [ HH.text "No formulas are published." ]
+              HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "No formulas are published." ]
             else
-              HH.div [ HP.class_ (HH.ClassName "space-y-4") ]
-                ( [ HH.p [ HP.class_ (HH.ClassName "text-sm opacity-60") ]
+              HH.div [ HP.class_ (HH.ClassName "space-y-4 max-w-4xl") ]
+                ( [ HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
                       [ HH.text (pluralize (length fs) "published formula" <> ".") ]
                   ] <> map (formulaCard st.focus) fs
                 )
@@ -113,6 +122,15 @@ component =
       [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
           [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The formulas could not be loaded." ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
+          -- Un ecran de eroare fără nimic de apăsat e un fund de sac: singura ieșire rămâne
+          -- reîncărcarea din browser, care pe ruta asta costă încă o dată cele ~30 de secunde de
+          -- așteptare. `isRetryable` există deja în transport, dar nu-l folosea nimeni.
+          , HH.button
+              [ HP.class_ (HH.ClassName "btn btn-sm")
+              , HP.type_ HP.ButtonButton
+              , HE.onClick (const Retry)
+              ]
+              [ HH.text "Try again" ]
           ]
       ]
 
@@ -130,13 +148,21 @@ component =
         [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
             [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline justify-between gap-2") ]
                 [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text f.name ]
-                , HH.span [ HP.class_ (HH.ClassName "font-mono text-xs opacity-60") ]
+                , HH.span [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70") ]
                     [ HH.text (f.formulaId <> maybe "" (\v -> " · version " <> formatInt v) f.version) ]
                 ]
             , case f.expression of
                 Nothing -> HH.text ""
                 Just e ->
-                  HH.pre [ HP.class_ (HH.ClassName "bg-base-300 rounded p-2 text-sm overflow-x-auto") ]
+                  -- Formula se ÎNFĂȘOARĂ, nu se derulează. E o singură linie fără indentare
+                  -- semnificativă, iar tăiată la marginea blocului se citea
+                  -- „|actions_voted| / |actions_eligibl" — adică exact lucrul pe care se vinde
+                  -- produsul, arătat incomplet, fără niciun semn că mai e text. SQL-ul de mai jos
+                  -- rămâne cu derulare: acolo indentarea chiar înseamnă ceva.
+                  HH.pre
+                    [ HP.class_
+                        (HH.ClassName "bg-base-300 rounded p-2 text-sm whitespace-pre-wrap break-words")
+                    ]
                     [ HH.code_ [ HH.text e ] ]
             , labelled "Field" (map (\x -> x) f.field)
             , labelled "Denominator" f.denominator
@@ -148,7 +174,7 @@ component =
             , case f.spec of
                 Nothing -> HH.text ""
                 Just sp ->
-                  HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+                  HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
                     [ HH.text ("Specified in " <> sp) ]
             , case f.sql of
                 Nothing -> HH.text ""
@@ -171,7 +197,7 @@ component =
     Nothing -> HH.text ""
     Just value ->
       HH.div_
-        [ HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-60") ] [ HH.text title ]
+        [ HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-70") ] [ HH.text title ]
         , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text value ]
         ]
 
@@ -179,7 +205,7 @@ component =
     if null values then HH.text ""
     else
       HH.div_
-        [ HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-60") ] [ HH.text title ]
+        [ HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-70") ] [ HH.text title ]
         , HH.ul [ HP.class_ (HH.ClassName "list-disc list-inside text-sm space-y-0.5") ]
             (map (\v -> HH.li_ [ HH.text v ]) values)
         ]

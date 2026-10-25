@@ -133,11 +133,16 @@ spec = do
   describe "facet and bucket labels" do
     it "names the empty language for what it is" do
       -- Măsurat: patru DRep-i au limba scrisă ca șir gol. Nu e același lucru cu „n-a declarat".
-      facetLabel "" `shouldEqual` "(blank)"
-      facetLabel "hash_mismatch" `shouldEqual` "Hash mismatch"
+      facetLabel "language" "" `shouldEqual` "declared, but empty"
+      facetLabel "status" "hash_mismatch" `shouldEqual` "Hash mismatch"
+
+    it "leaves a language tag alone instead of capitalising it into something that does not exist" do
+      -- `humanize` scotea „En-us", care nu e nici limbă, nici tag BCP-47.
+      facetLabel "language" "en-us" `shouldEqual` "en-us"
 
     it "says a top bucket is open-ended instead of inventing a ceiling" do
-      bucketLabel 1000000000000.0 Nothing `shouldEqual` "1,000,000 ADA and up"
+      -- Unitatea stă o singură dată, în titlul blocului de filtre, nu pe fiecare etichetă.
+      bucketLabel 1000000000000.0 Nothing `shouldEqual` "1,000,000 and up"
       -- `hi` e exclusiv, deci primul interval măsurat (0 → 1 lovelace) e „exact zero".
       bucketLabel 0.0 (Just 1.0) `shouldEqual` "No voting power"
-      bucketLabel 1000000000.0 (Just 10000000000.0) `shouldEqual` "1,000 ADA – 10,000 ADA"
+      bucketLabel 1000000000.0 (Just 10000000000.0) `shouldEqual` "1,000 – 10,000"

@@ -37,19 +37,20 @@ import Components.Chart.Series as Series
 import Components.Shared.Anchor as Anchor
 import Components.Shared.DRepIdentity as DRepIdentity
 import Components.Shared.MetricInfo as MetricInfo
-import Data.Array (last, null)
+import Data.Array (concatMap, last, null, uncons)
+import Data.Foldable (maximum, minimum)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
-import Data.Number.Format (fixed, toStringWith)
 import Data.String as String
 import Data.Tuple (Tuple(..))
-import Format (formatAda, formatInt, formatPercent, humanize, pluralize)
+import Format (formatAda, formatDay, formatHours, formatInt, formatPercent, humanize, pluralize)
 import Halogen as H
 import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.RemoteData (RemoteData(..))
-import Route.GovQueries (drepListHrefFor, emptyDRepFilters, votesForDRepHref)
+import Route.GovQueries (drepListHrefFor, emptyDRepFilters, methodologyHrefFor, votesForDRepHref)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -68,6 +69,7 @@ type State =
 
 data Action
   = Initialize
+  | Retry
   | Receive Input
 
 -- | Desfășurarea raționamentelor, ca etichete și numere.
@@ -89,7 +91,7 @@ rationaleBreakdown (DRepMetrics m) =
 latencyLabel :: Maybe Number -> Int -> String
 latencyLabel hours sample = case hours of
   Nothing -> "n/a"
-  Just h -> toStringWith (fixed 1) h <> " h (" <> pluralize sample "vote" <> ")"
+  Just h -> formatHours h <> " (" <> pluralize sample "vote" <> ")"
 
 component
   :: forall q m
@@ -108,6 +110,7 @@ component =
   where
   handleAction = case _ of
     Initialize -> load
+    Retry -> load
     Receive drepId -> do
       st <- H.get
       when (drepId /= st.drepId) do
@@ -149,6 +152,15 @@ component =
           [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "This DRep could not be loaded." ]
           , HH.p [ HP.class_ (HH.ClassName "font-mono text-xs break-all") ] [ HH.text drepId ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
+          -- Un ecran de eroare fără nimic de apăsat e un fund de sac: singura ieșire rămâne
+          -- reîncărcarea din browser, care pe ruta asta costă încă o dată cele ~30 de secunde de
+          -- așteptare. `isRetryable` există deja în transport, dar nu-l folosea nimeni.
+          , HH.button
+              [ HP.class_ (HH.ClassName "btn btn-sm")
+              , HP.type_ HP.ButtonButton
+              , HE.onClick (const Retry)
+              ]
+              [ HH.text "Try again" ]
           ]
       ]
 
@@ -179,12 +191,25 @@ component =
   identityCard (DRepSummary s) =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
-          [ HH.div [ HP.class_ (HH.ClassName "text-2xl") ]
+          -- `h1`, nu `div`: numele DRep-ului E titlul paginii. Fără el, lista de titluri începea cu
+          -- „Voting record", deci cine navighează cu un cititor de ecran nu afla pe CINE se uită.
+          [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ]
               [ DRepIdentity.render { givenName: s.givenName, drepId: s.id, hasScript: s.hasScript } ]
           , HH.div [ HP.class_ (HH.ClassName "flex flex-wrap gap-2 items-center text-sm") ]
-              [ HH.span [ HP.class_ (HH.ClassName "badge badge-outline") ] [ HH.text (humanize s.status) ]
+              -- Aceeași culoare ca în listă: cine a filtrat după „Inactive" nu trebuie să piardă
+              -- reperul exact când ajunge pe pagina pe care a dat clic.
+              [ HH.span [ HP.class_ (HH.ClassName ("badge badge-sm " <> statusBadgeClass s.status)) ]
+                  [ HH.text (humanize s.status) ]
               , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
-                  [ HH.text (maybe "no expiry on record" (\e -> "active until epoch " <> show e) s.activeUntilEpoch) ]
+                  [ HH.text
+                      ( maybe "no expiry on record"
+                          ( \e ->
+                              if s.status == "active" then "active until epoch " <> show e
+                              else "was active until epoch " <> show e
+                          )
+                          s.activeUntilEpoch
+                      )
+                  ]
               , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
                   [ HH.text ("registered " <> s.registeredAt <> " (" <> formatInt s.ageDays <> " days ago)") ]
               , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
@@ -198,16 +223,21 @@ component =
               , figure "Open and unvoted" (formatInt s.openActionsUnvoted) "actions still open"
               ]
           -- `hex` nu e decor: e forma în care apare credențialul în tranzacții și în `required_signers`.
-          , HH.p [ HP.class_ (HH.ClassName "font-mono text-xs opacity-50 break-all") ]
+          -- ID-ul întreg se selectează și se copiază. Scurtarea de sub nume e bună pentru citit,
+          -- dar dintr-un `title` nu se copiază nimic, iar cine vrea să verifice în alt explorer are
+          -- nevoie de forma completă.
+          , HH.p [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all") ]
+              [ HH.text s.id ]
+          , HH.p [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all") ]
               [ HH.text ("credential: " <> s.hex) ]
           ]
       ]
 
   figure title value hint =
     HH.div_
-      [ HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-60") ] [ HH.text title ]
+      [ HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-70") ] [ HH.text title ]
       , HH.div [ HP.class_ (HH.ClassName "text-xl font-semibold") ] [ HH.text value ]
-      , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-60") ] [ HH.text hint ]
+      , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text hint ]
       ]
 
   metricsCard metrics@(DRepMetrics m) =
@@ -222,11 +252,11 @@ component =
           , lineWithFormula "Median time to vote"
               (latencyLabel m.voteLatencyMedianHours m.voteLatencySample)
               "vote_latency_median_hours_v1"
-          , line "Slowest 10%" (latencyLabel m.voteLatencyP90Hours m.voteLatencySample)
+          , line "Their slowest votes" (latencyLabel m.voteLatencyP90Hours m.voteLatencySample)
           , line "Metrics as of epoch" (show m.asOfEpoch)
           ]
       , HH.div [ HP.class_ (HH.ClassName "divider my-1") ] []
-      , HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-60") ]
+      , HH.div [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-70") ]
           [ HH.text "Rationales" ]
       , HH.div [ HP.class_ (HH.ClassName "space-y-1 text-sm") ]
           (map (\(Tuple label value) -> line label (formatInt value)) (rationaleBreakdown metrics))
@@ -236,7 +266,7 @@ component =
     card "Delegators"
       [ HH.div [ HP.class_ (HH.ClassName "space-y-1 text-sm") ]
           [ line "Now" (formatInt s.delegatorCount)
-          , line ("Was, " <> pluralize s.windowEpochs "epoch" <> " ago") (formatInt s.delegatorCountPrev)
+          , line (pluralize s.windowEpochs "epoch" <> " ago") (formatInt s.delegatorCountPrev)
           , line "Stayed" (formatInt s.delegatorsRetained)
           , line "Joined" (formatInt s.delegatorsJoined)
           , line "Left" (formatInt s.delegatorsLeft)
@@ -255,20 +285,35 @@ component =
             , line "No" (formatInt v.no)
             , line "Abstain" (formatInt v.abstain)
             ]
-        , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60 pt-2") ]
+        , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70 pt-2") ]
             [ HH.text
                 "Counted from the last vote cast on each action, because a DRep may change its \
                 \vote while the action is open."
             ]
         ]
 
+  -- Barele sunt relative la vârf. Puterea unui DRep variază de obicei cu procente, nu cu ordine de
+  -- mărime, deci graficul iese aproape plat — ceea ce E adevărul, dar arată ca un bloc desenat
+  -- greșit. Intervalul scris dedesubt e diferența dintre cele două citiri.
   powerCard points =
     card "Voting power by epoch"
       [ Series.render (map powerPoint points)
-      , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+      , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
+          [ HH.text
+              ( case
+                  minimum (map (\(PowerPoint p) -> p.lovelace) points),
+                  maximum (map (\(PowerPoint p) -> p.lovelace) points)
+                  of
+                  Just lo, Just hi | lo /= hi ->
+                    "Between " <> formatAda lo <> " and " <> formatAda hi <> " across these epochs."
+                  Just lo, Just _ -> "Flat at " <> formatAda lo <> " across these epochs."
+                  _, _ -> "No power recorded yet."
+              )
+          ]
+      , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
           [ HH.text
               ( case last points of
-                  Nothing -> "No power recorded yet."
+                  Nothing -> ""
                   Just (PowerPoint p) ->
                     "Latest: " <> formatAda p.lovelace <> " from "
                       <> pluralize p.delegatorCount "delegator"
@@ -287,7 +332,7 @@ component =
 
   votesByTypeCard (DRepMetrics m) =
     card "By kind of action"
-      [ HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+      [ HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
           [ MetricInfo.renderLabelled "How this is counted" "votes_by_type_v1" ]
       , HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
           [ HH.table [ HP.class_ (HH.ClassName "table table-sm") ]
@@ -305,7 +350,7 @@ component =
               , HH.tbody_ (map voteTypeRow m.votesByType)
               ]
           ]
-      , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+      , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
           [ HH.text
               "Each row is measured against the actions of that kind alone, so the rates here \
               \answer \"do they show up for this\", not \"what share of everything is this\"."
@@ -326,7 +371,7 @@ component =
   topDelegatorsCard delegators =
     card "Largest delegators"
       [ if null delegators then
-          HH.p [ HP.class_ (HH.ClassName "text-sm opacity-60") ] [ HH.text "Nobody has delegated here yet." ]
+          HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text "Nobody has delegated here yet." ]
         else
           HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
             [ HH.table [ HP.class_ (HH.ClassName "table table-sm") ]
@@ -354,9 +399,19 @@ component =
             -- Suma vine din `epoch_stake`; când epoca n-are rândul, e „unknown", nu zero.
             [ HH.text (maybe "unknown" formatAda d.lovelace) ]
         , HH.td [ HP.class_ (HH.ClassName "text-xs") ]
-            [ HH.text ("epoch " <> show at.epoch <> " · " <> at.time) ]
+            [ HH.text ("epoch " <> show at.epoch <> " · " <> formatDay at.time) ]
         , HH.td_
-            [ HH.span [ HP.class_ (HH.ClassName ("badge badge-sm " <> if d.isCurrent then "badge-success" else "badge-ghost")) ]
+            [ HH.span
+                [ HP.class_
+                    ( HH.ClassName
+                        ( "badge badge-sm " <>
+                            if d.isCurrent then "badge-success"
+                            else -- `badge-ghost` are fundalul `base-200`, adică exact culoarea cardului în care stă: starea
+                              -- neutră era singura invizibilă. `badge-outline` are contur și text, deci se vede.
+                              "badge-outline"
+                        )
+                    )
+                ]
                 [ HH.text (if d.isCurrent then "yes" else "no") ]
             ]
         ]
@@ -364,7 +419,7 @@ component =
   updatesCard updates =
     card "Registration history"
       [ if null updates then
-          HH.p [ HP.class_ (HH.ClassName "text-sm opacity-60") ] [ HH.text "No events recorded." ]
+          HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text "No events recorded." ]
         else HH.ul [ HP.class_ (HH.ClassName "divide-y divide-base-300") ] (map updateRow updates)
       ]
 
@@ -376,14 +431,14 @@ component =
         [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline gap-2") ]
             [ HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-outline") ] [ HH.text (humanize u.kind) ]
             , HH.span [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-                [ HH.text ("epoch " <> show at.epoch <> " · " <> at.time) ]
+                [ HH.text ("epoch " <> show at.epoch <> " · " <> formatDay at.time) ]
             , case u.deposit of
                 Nothing -> HH.text ""
                 Just dep ->
                   HH.span [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
                     [ HH.text ("deposit " <> formatAda dep) ]
             ]
-        , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-50 break-all") ]
+        , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all") ]
             [ HH.text ("tx " <> at.txHash) ]
         , case u.anchorUrl of
             Nothing -> HH.text ""
@@ -415,8 +470,16 @@ component =
   formulasNote (DRepMetrics m) =
     if null m.formulaIds then HH.text ""
     else
-      HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
-        [ HH.text ("Formulas behind these figures: " <> String.joinWith ", " m.formulaIds <> ".") ]
+      -- Singurul loc de pe site unde un id de formulă apărea fără să ducă la ea.
+      HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
+        ( [ HH.text "Formulas behind these figures: " ]
+            <> intercalateHtml (HH.text ", ") (map formulaLink m.formulaIds)
+            <> [ HH.text "." ]
+        )
+
+  formulaLink fid =
+    HH.a [ HP.href (methodologyHrefFor fid), HP.class_ (HH.ClassName "link link-hover") ]
+      [ HH.text fid ]
 
   card title children =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
@@ -440,3 +503,18 @@ component =
   shorten s =
     if String.length s <= 28 then s
     else String.take 14 s <> "…" <> String.drop (String.length s - 8) s
+
+-- | `HH.HTML` nu e un `Monoid`, deci `intercalate` din `Data.Foldable` nu se aplică pe el.
+intercalateHtml :: forall w i. HH.HTML w i -> Array (HH.HTML w i) -> Array (HH.HTML w i)
+intercalateHtml sep items = case uncons items of
+  Nothing -> []
+  Just { head: first, tail: rest } -> [ first ] <> concatMap (\x -> [ sep, x ]) rest
+
+-- | Culoarea stării unui DRep. Aceeași în listă și în detaliu — altfel filtrul vizual se rupe fix
+-- | la clic.
+statusBadgeClass :: String -> String
+statusBadgeClass = case _ of
+  "active" -> "badge-success"
+  "inactive" -> "badge-warning"
+  "retired" -> "badge-outline"
+  _ -> "badge-outline"

@@ -18,10 +18,13 @@ render :: forall w i. String -> HH.HTML w i
 render formulaId =
   HH.a
     [ HP.href (methodologyHrefFor formulaId)
-    , HP.class_ (HH.ClassName "opacity-50 hover:opacity-100 text-xs align-super")
+    , HP.class_ (HH.ClassName "opacity-70 hover:opacity-100 text-xs align-super px-2 py-2")
     , HP.title ("How " <> formulaId <> " is computed")
+    -- Glifa singură nu e un nume: un cititor de ecran anunța „circled latin small letter i, link".
+    -- Numele accesibil spune unde duce, iar glifa rămâne doar decor.
+    , HP.attr (HH.AttrName "aria-label") ("How " <> formulaId <> " is computed")
     ]
-    [ HH.text "ⓘ" ]
+    [ HH.span [ HP.attr (HH.AttrName "aria-hidden") "true" ] [ HH.text "ⓘ" ] ]
 
 -- | Eticheta unei metrici cu „ⓘ" lipit de ea.
 renderLabelled :: forall w i. String -> String -> HH.HTML w i

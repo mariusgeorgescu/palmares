@@ -10,9 +10,13 @@
 module Format
   ( formatAda
   , formatInt
+  , formatAdaOnly
+  , formatDay
+  , formatHours
   , formatPercent
   , groupDigits
   , humanize
+  , matchLine
   , pluralize
   , roleLabel
   ) where
@@ -39,13 +43,39 @@ groupDigits s
 formatInt :: Int -> String
 formatInt = groupDigits <<< show
 
-formatAda :: Lovelace -> String
-formatAda lovelace =
+-- | Suma în ADA, fără unitate. Unitatea se lipește în `formatAda`; cine o declară o singură dată pe
+-- | ecran (titlul unei coloane, al unui bloc de filtre) folosește varianta asta și nu o repetă pe
+-- | fiecare rând.
+-- |
+-- | Pragul e la 1 ADA, nu la 1000: cu pragul vechi aceeași coloană amesteca „1,000,000 ADA",
+-- | „42.00 ADA" și „0.00 ADA", iar într-o coloană monospace aliniată la dreapta zecimalele nu se
+-- | aliniau cu nimic. Zero are cazul lui, pentru că „0.00" se citește ca o sumă măruntă rotunjită,
+-- | când de fapt nu există nicio sumă.
+formatAdaOnly :: Lovelace -> String
+formatAdaOnly lovelace =
   let
     ada = lovelace / 1000000.0
   in
-    if ada >= 1000.0 || ada <= -1000.0 then groupDigits (toStringWith (fixed 0) ada) <> " ADA"
-    else toStringWith (fixed 2) ada <> " ADA"
+    if ada == 0.0 then "0"
+    else if ada >= 1.0 || ada <= -1.0 then groupDigits (toStringWith (fixed 0) ada)
+    else toStringWith (fixed 2) ada
+
+formatAda :: Lovelace -> String
+formatAda lovelace = formatAdaOnly lovelace <> " ADA"
+
+-- | Data unui eveniment, fără ora. ISO-8601 e fix-width, deci primele zece caractere sunt exact
+-- | `YYYY-MM-DD` — nicio parsare de dată și nicio dependență nouă. Ora exactă rămâne în `title`
+-- | acolo unde contează: pentru cineva care alege cui deleagă, secundele sunt zgomot.
+formatDay :: String -> String
+formatDay = CU.take 10
+
+-- | Cât a durat, în unitatea pe care o citește un om. Peste două zile, orele cer o împărțire în
+-- | cap: „346.6 h" e „paisprezece zile". Pragul e la 48 și nu la 24, ca „30 h" să nu devină „1.3 d",
+-- | care e mai greu de citit decât orele.
+formatHours :: Number -> String
+formatHours h =
+  if h < 48.0 then toStringWith (fixed 1) h <> " h"
+  else toStringWith (fixed 1) (h / 24.0) <> " d"
 
 -- | O rată din răspuns (0..1) ca procent cu o zecimală. `Nothing` e „n/a", nu zero.
 formatPercent :: Maybe Number -> String
@@ -56,6 +86,17 @@ formatPercent = case _ of
 -- | `1 vote`, `0 votes`. Textul e public și în engleză, deci „1 votes" e o greșeală vizibilă.
 pluralize :: Int -> String -> String
 pluralize n word = formatInt n <> " " <> word <> (if n == 1 then "" else "s")
+
+-- | Linia de deasupra unui tabel de rezultate. Zero potriviri nu promite un interval: „showing
+-- | 1–0" e o propoziție care nu înseamnă nimic, iar un tabel gol sub ea arată ca un defect.
+matchLine :: Int -> Int -> Int -> String -> String
+matchLine total offset shown noun =
+  if total == 0 || shown == 0 then "No " <> noun <> "s match these filters."
+  else
+    pluralize total noun <> " match, showing "
+      <> formatInt (offset + 1)
+      <> "–"
+      <> formatInt (offset + shown)
 
 -- | Rolurile de votant au majuscule proprii: `humanize` ar da „Drep" și „Spo", care pe un site
 -- | public arată ca o greșeală, nu ca o abreviere.

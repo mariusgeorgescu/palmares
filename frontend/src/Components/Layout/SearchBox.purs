@@ -75,6 +75,7 @@ data Action
   | Fire Int
   | KeyPressed KE.KeyboardEvent
   | GlobalKey KE.KeyboardEvent
+  | Close
   | Dismiss
 
 -- | Unde duce un rezultat. Doar două feluri au ecran livrat; restul se arată fără link, în loc să
@@ -146,13 +147,19 @@ component =
                 Right r -> Success r
             }
 
+    -- Escape ÎNCHIDE, nu golește: „vreau să văd pagina de sub panou" nu înseamnă „aruncă ce am
+    -- scris". Golirea rămâne pentru clicul pe un rezultat, unde oricum pleci de pe ecran.
     KeyPressed ev ->
-      when (KE.key ev == "Escape") (handleAction Dismiss)
+      when (KE.key ev == "Escape") (handleAction Close)
+
+    Close -> H.modify_ _ { open = false }
 
     Dismiss -> H.modify_ _ { draft = "", results = NotAsked, open = false }
 
   render st =
-    HH.div [ HP.class_ (HH.ClassName "relative") ]
+    -- `onKeyDown` stă și pe înveliș, nu doar pe câmp: după un Tab în panou, Escape trebuie să
+    -- închidă tot de acolo, nu doar cât timp focusul e în input.
+    HH.div [ HP.class_ (HH.ClassName "relative"), HE.onKeyDown KeyPressed ]
       [ HH.input
           [ HP.type_ HP.InputSearch
           , HP.ref inputRef
@@ -167,7 +174,7 @@ component =
       -- `pointer-events-none` ca eticheta să nu fure clicul pe câmp.
       , HH.span
           [ HP.class_
-              (HH.ClassName "hidden lg:flex absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 text-xs")
+              (HH.ClassName "hidden lg:flex absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-70 text-xs")
           , HP.attr (HH.AttrName "aria-hidden") "true"
           ]
           [ HH.text "⌘K" ]
@@ -178,17 +185,21 @@ component =
     HH.div
       [ HP.class_
           ( HH.ClassName
-              "absolute right-0 mt-1 w-80 sm:w-96 max-h-96 overflow-y-auto z-50 card bg-base-100 \
-              \shadow-xl border border-base-300"
+              -- Pe telefon panoul se ancorează de ECRAN, nu de câmp: câmpul alunecă spre stânga
+              -- când linkurile intră în meniu, iar un panou de lățime fixă ancorat `right-0` ar
+              -- ieși din ecran exact acolo unde nu există derulare orizontală.
+              "fixed inset-x-2 top-28 w-auto sm:absolute sm:inset-x-auto sm:right-0 sm:top-full \
+              \sm:w-96 sm:mt-1 max-h-96 overflow-y-auto z-50 card bg-base-100 shadow-xl \
+              \border border-base-300"
           )
       ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-2 gap-1") ]
           [ case st.results of
               NotAsked ->
-                HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60 p-2") ]
+                HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70 p-2") ]
                   [ HH.text "Type at least two characters." ]
               Loading ->
-                HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60 p-2") ] [ HH.text "Searching…" ]
+                HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70 p-2") ] [ HH.text "Searching…" ]
               Failure e ->
                 HH.p [ HP.class_ (HH.ClassName "text-xs p-2") ] [ HH.text (renderApiError e) ]
               Success r -> results r
@@ -209,18 +220,18 @@ component =
       nonEmpty = filter (\g -> case g.group of SearchGroup s -> not (null s.items)) groups
     in
       if null nonEmpty then
-        HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60 p-2") ] [ HH.text "Nothing matches." ]
+        HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70 p-2") ] [ HH.text "Nothing matches." ]
       else HH.div [ HP.class_ (HH.ClassName "space-y-2") ] (map groupBlock nonEmpty)
 
   groupBlock g = case g.group of
     SearchGroup s ->
       HH.div_
         [ HH.div [ HP.class_ (HH.ClassName "flex items-baseline justify-between px-2 pt-1") ]
-            [ HH.span [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-60") ]
+            [ HH.span [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-70") ]
                 [ HH.text g.label ]
             -- Numărul vine din grup, nu din totalul de sus: grupul poate fi tăiat de
             -- `limit_per_group`, iar „3 din 12" e altceva decât „3".
-            , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+            , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
                 [ HH.text (formatInt s.total) ]
             ]
         , HH.div_ (map hitRow s.items)
@@ -231,7 +242,7 @@ component =
       body =
         [ HH.div [ HP.class_ (HH.ClassName "text-sm truncate") ]
             [ HH.text (fromMaybe h.id h.title) ]
-        , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-60 truncate") ]
+        , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 truncate") ]
             [ HH.text (fromMaybe h.id h.subtitle) ]
         , if null h.badges && h.status == Nothing then HH.text ""
           else

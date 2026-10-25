@@ -99,7 +99,10 @@ component =
   -- telefon, câmpul de căutare se îngustează, iar ce tot nu încape trece pe al doilea rând în loc
   -- să iasă din ecran.
   render st =
-    HH.div [ HP.class_ (HH.ClassName "navbar bg-base-200 shadow-sm sticky top-0 z-30 flex-wrap gap-y-1") ]
+    HH.nav
+      [ HP.class_ (HH.ClassName "navbar bg-base-200 shadow-sm sticky top-0 z-30 flex-wrap gap-y-1")
+      , HP.attr (HH.AttrName "aria-label") "Main"
+      ]
       -- FĂRĂ `min-w-0` aici, și e intenționat: cu el, containerul mărcii se micșora la 52px în timp
       -- ce linkul dinăuntru rămânea 103px (un `btn` nu-și rupe textul), iar hamburgerul se desena
       -- PESTE cuvântul „Palmares". Fără el, marca își ține lățimea și ce nu mai încape trece pe

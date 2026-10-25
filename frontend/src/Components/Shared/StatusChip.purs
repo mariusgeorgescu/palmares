@@ -68,22 +68,38 @@ component =
   render st = case st.status of
     NotAsked -> badge Unknown "status unknown"
     Loading -> badge Unknown "checking data freshness…"
-    Failure e -> badge Unknown ("freshness unknown — " <> renderApiError e)
+    -- Pastila rămâne scurtă și de lungime fixă; mesajul serverului (de lungime necontrolată) merge
+    -- lângă ea, unde poate să se rupă pe rânduri fără să deformeze banda. Ambar, nu gri: „nu știu
+    -- cât de vechi sunt datele" e un avertisment, nu o informație neutră.
+    Failure e ->
+      HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-center gap-2 text-xs") ]
+        [ badge Amber "freshness unknown"
+        , HH.span [ HP.class_ (HH.ClassName "opacity-70"), HP.title (renderApiError e) ]
+            [ HH.text "the status service did not answer" ]
+        ]
     Success s -> renderStatus s
 
+  -- Banda spune ce e NOU, nu tot ce știe. Când metricile și distribuția de stake sunt din epoca
+  -- curentă — cazul obișnuit — a le scrie oricum înseamnă același număr de trei ori pe fiecare
+  -- ecran, iar repetiția face banda să cântărească mai mult decât titlul paginii de sub ea. Când
+  -- diferă, însă, diferența e exact faptul important, și atunci se scrie.
   renderStatus s@(GovStatus st) =
     let
       GovSync gov = st.governance
     in
-      HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-center gap-2 text-sm") ]
-        [ HH.span [ HP.class_ (HH.ClassName "badge badge-outline") ] [ HH.text st.network ]
+      HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-center gap-x-3 gap-y-1 text-xs") ]
+        [ HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-outline") ] [ HH.text st.network ]
         , badge (chipStateFor s) (freshnessLabel gov.lagSeconds)
         , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
             [ HH.text ("epoch " <> show gov.epoch) ]
-        , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
-            [ HH.text ("metrics as of epoch " <> show st.metricsAsOfEpoch) ]
-        , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
-            [ HH.text ("stake distribution: epoch " <> show st.drepDistrEpoch) ]
+        , if st.metricsAsOfEpoch == gov.epoch then HH.text ""
+          else
+            HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
+              [ HH.text ("metrics as of epoch " <> show st.metricsAsOfEpoch) ]
+        , if st.drepDistrEpoch == gov.epoch then HH.text ""
+          else
+            HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
+              [ HH.text ("voting power as of epoch " <> show st.drepDistrEpoch) ]
         , renderAttestation st.attestation
         ]
 
@@ -91,7 +107,7 @@ component =
   -- asta e o configurație validă pe care ecranul trebuie să o numească.
   renderAttestation = case _ of
     Nothing ->
-      HH.span [ HP.class_ (HH.ClassName "opacity-50") ]
+      HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
         [ HH.text "attestations: not deployed" ]
     Just (AttestSync a) ->
       HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
@@ -103,11 +119,13 @@ component =
 
   badge state label =
     HH.span
-      [ HP.class_ (HH.ClassName ("badge " <> badgeClass state)) ]
+      [ HP.class_ (HH.ClassName ("badge badge-sm " <> badgeClass state)) ]
       [ HH.text label ]
 
   badgeClass = case _ of
     Green -> "badge-success"
     Amber -> "badge-warning"
     Red -> "badge-error"
-    Unknown -> "badge-ghost"
+    -- NU `badge-ghost`: are fundalul lui `base-200`, adică exact culoarea cardului în care stă,
+    -- deci starea pe care n-o cunoaștem ar fi singura care nu se vede.
+    Unknown -> "badge-outline"

@@ -33,9 +33,15 @@ spec = do
     it "renders a large figure as whole ADA with separators" do
       formatAda 505754377083269.0 `shouldEqual` "505,754,377 ADA"
 
-    it "keeps two decimals below a thousand ADA, so a small amount is not rounded to zero" do
-      formatAda 42000000.0 `shouldEqual` "42.00 ADA"
+    it "keeps two decimals only below one ADA, so a column of sums aligns" do
+      -- Pragul vechi era la 1000, deci aceeași coloană amesteca „1,000,000 ADA", „42.00 ADA" și
+      -- „0.00 ADA", iar zecimalele nu se aliniau cu nimic. Sub 1 ADA zecimalele rămân, fiindcă
+      -- acolo rotunjirea ar transforma o sumă reală în zero.
+      formatAda 42000000.0 `shouldEqual` "42 ADA"
       formatAda 500000.0 `shouldEqual` "0.50 ADA"
+
+    it "says plain zero instead of a rounded-looking 0.00" do
+      formatAda 0.0 `shouldEqual` "0 ADA"
 
     it "renders exactly a thousand ADA with separators" do
       formatAda 1000000000.0 `shouldEqual` "1,000 ADA"

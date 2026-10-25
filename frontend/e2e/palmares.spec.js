@@ -33,7 +33,9 @@ test.describe('palmares, on recorded fixtures', () => {
     // „Enacted" apare și în desfășurarea pe rezultate; aici ne interesează cardul de trezorerie.
     await expect(page.getByText('Enacted', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('656,466,092 ADA')).toBeVisible();
-    await expect(page.getByText('0.00 ADA')).toBeVisible();
+    // „0 ADA", nu „0.00 ADA": zecimalele se păstrează doar sub un ADA, unde rotunjirea ar
+    // transforma o sumă reală în zero. Zero adevărat se scrie scurt.
+    await expect(page.getByText('0 ADA', { exact: true })).toBeVisible();
 
     // Seria de participare: 20 de puncte, fiecare cu valoarea exactă în `title`.
     await expect(page.getByTitle(/^epoch 302: 20\.7%/)).toBeVisible();
@@ -45,8 +47,11 @@ test.describe('palmares, on recorded fixtures', () => {
     await page.goto('/');
     await expect(page.getByText('preprod', { exact: true })).toBeVisible();
     await expect(page.getByText('epoch 321', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('stake distribution: epoch 321')).toBeVisible();
     await expect(page.getByText(/attestations: following/)).toBeVisible();
+    // Banda spune ce e NOU. Când metricile și puterea de vot sunt din epoca curentă — cazul
+    // fixturii — a le mai scrie o dată înseamnă același număr de trei ori pe fiecare ecran.
+    await expect(page.getByText(/metrics as of epoch/)).toBeHidden();
+    await expect(page.getByText(/voting power as of epoch 321$/)).toBeHidden();
   });
 
   test('a deep link into the DRep list arrives filtered, not on the home page', async ({ page }) => {
