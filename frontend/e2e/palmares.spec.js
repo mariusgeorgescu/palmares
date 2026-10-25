@@ -394,3 +394,58 @@ test('a flow deep-linked with a subject arrives without breaking the route', asy
   await expect(page).toHaveTitle('Act on chain — Palmares');
   await expect(page.getByRole('heading', { name: 'Open a dispute', exact: true })).toBeVisible();
 });
+
+// R1: markdown doar GFM, FARA cale pentru HTML brut.
+//
+// Documentele de ancora — CIP-100/CIP-119 — sint input neincrezut: le scrie oricine si noi doar le
+// citim de pe lant. Regula nu e „sa curatam HTML-ul", e „sa nu existe calea": fara cale, fara clasa
+// de XSS.
+//
+// Testul e pe SURSA, nu pe ecran, fiindca asta e forma afirmatiei. Un test care ar randa un
+// document si ar cauta un `<script>` ar trece si daca un singur ecran randeaza HTML pe o ramura pe
+// care fixtura n-o atinge.
+test('there is no raw-HTML render path anywhere in the app', async () => {
+  const { readFileSync, readdirSync, statSync } = await import('node:fs');
+  const { join } = await import('node:path');
+
+  const walk = (dir) =>
+    readdirSync(dir).flatMap((entry) => {
+      const full = join(dir, entry);
+      return statSync(full).isDirectory() ? walk(full) : [full];
+    });
+
+  // Caile prin care Halogen sau DOM-ul pot primi markup in loc de text.
+  const forbidden = [/innerHTML/, /outerHTML/, /insertAdjacentHTML/, /dangerously/i, /document\.write/];
+
+  const offenders = [];
+  for (const file of walk('src')) {
+    if (!/\.(purs|js)$/.test(file)) continue;
+    const text = readFileSync(file, 'utf8');
+    for (const pattern of forbidden) {
+      // Comentariile se scot inainte de cautare: un comentariu care EXPLICA de ce nu folosim
+      // `innerHTML` n-are voie sa pice testul care verifica tocmai asta.
+      const code = text
+        .split('\n')
+        .filter((l) => !/^\s*(--|\/\/)/.test(l))
+        .join('\n');
+      if (pattern.test(code)) offenders.push(`${file}: ${pattern}`);
+    }
+  }
+  expect(offenders).toEqual([]);
+});
+
+// R2 pe ecran, nu doar in `clampText`: un document de ancora poate avea un cimp de 2 MB, iar
+// limitele din CIP nu sint invarianti on-chain. Nicio linie randata nu trebuie sa fie absurda.
+test('no rendered line runs away, whatever the document says', async ({ page }) => {
+  await page.goto('/dreps/drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z');
+  const longest = await page.evaluate(() => {
+    const seen = [];
+    document.querySelectorAll('p, dd, span, td, li').forEach((el) => {
+      if (el.children.length === 0) seen.push(el.innerText.length);
+    });
+    return Math.max(0, ...seen);
+  });
+  // Pragul e generos: ce se vaneaza e un cimp netaiat de zeci de mii de caractere, nu un paragraf
+  // lung scris de noi.
+  expect(longest).toBeLessThan(4000);
+});
