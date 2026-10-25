@@ -2,6 +2,7 @@ module MainDemo where
 
 import Prelude
 
+import App.CopyOnClick (installCopyOnClick)
 import App.SpaLinkInterceptor (installSpaLinkInterceptor)
 import AppEnv (defaultEnv)
 import Components.Home as Home
@@ -17,6 +18,7 @@ import Store (initialStore)
 main :: Effect Unit
 main = do
   installSpaLinkInterceptor
+  installCopyOnClick
   HA.runHalogenAff do
     rootComponent <- runDemoM defaultEnv initialStore Home.component
     body <- HA.awaitBody

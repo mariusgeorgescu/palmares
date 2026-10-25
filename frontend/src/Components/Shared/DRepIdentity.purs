@@ -17,6 +17,8 @@ import Prelude
 import Data.Maybe (Maybe(..))
 import Data.String as String
 import Data.String.CodeUnits as CU
+import AppEnv as AppEnv
+import Components.Shared.OnchainId as OnchainId
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 
@@ -59,12 +61,17 @@ render ident =
             HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-outline") ] [ HH.text "script" ]
           else HH.text ""
         ]
-    -- `font-mono` și `title` complet: ID-ul scurtat e pentru citit, cel întreg pentru copiat.
-    , HH.span
-        [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 truncate")
-        , HP.title ident.drepId
+    -- Scurtat pentru citit, întreg pentru copiat — iar „pentru copiat" cere mai mult decît un
+    -- `title`: textul unui tooltip nativ nu e selectabil, deci vechea versiune promitea ceva ce nu
+    -- livra. Chipul deschide valoarea întreagă, un link către explorer și o copiere adevărată.
+    , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
+        [ OnchainId.withChip
+            { value: ident.drepId
+            , shown: text.id
+            , kind: OnchainId.DRep
+            , explorerBase: AppEnv.explorerBase
+            }
         ]
-        [ HH.text text.id ]
     ]
   where
   text = identityText ident

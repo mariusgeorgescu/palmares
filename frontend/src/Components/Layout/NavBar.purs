@@ -249,11 +249,13 @@ component =
   walletConnectInput :: WC.Input
   walletConnectInput =
     { buttons: []
+    -- Cele patru erau string-uri goale, adică patru sloturi goale pe deploy. Fișierele vin din
+    -- `bjj-frontend/public/images`, care le avea de mult — lipsea doar copierea lor.
     , assets:
-        { connectIcon: ""
-        , disconnectIcon: ""
-        , onrampIcon: ""
-        , copyIcon: ""
+        { connectIcon: "/images/walletsymbol.svg"
+        , disconnectIcon: "/images/disconnectsymbol.svg"
+        , onrampIcon: "/images/onramp.svg"
+        , copyIcon: "/images/copy-icon.svg"
         }
     , renderMode: Standalone
     , utxosConfig: Nothing

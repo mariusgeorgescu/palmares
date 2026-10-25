@@ -11,6 +11,8 @@ module AppEnv
   , mainnetMagic
   , Env
   , defaultEnv
+  , explorerBaseFor
+  , explorerBase
   ) where
 
 import Prelude
@@ -49,6 +51,20 @@ type Env =
   , allowedNetworkMagic :: NetworkMagic
   }
 
+-- | Baza explorerului pentru rețeaua pe care rulăm, derivată din magic-ul pe care `Env` îl are deja.
+-- |
+-- | O funcție pură, nu o variabilă `VITE_*`: adresa unui explorer public e o constantă per rețea, iar
+-- | o variabilă de mediu pentru o constantă e un loc în plus unde deployul poate să mintă.
+-- |
+-- | `cexplorer`, nu `cardanoscan`, și e o alegere măsurată: cardanoscan întoarce 403 chiar și la un
+-- | Chromium headless, deci nicio cale a lui nu se poate verifica automat. Pe cexplorer fiecare cale
+-- | folosită a fost deschisă într-un browser — vezi `Components.Shared.OnchainId.explorerUrl`.
+explorerBaseFor :: NetworkMagic -> String
+explorerBaseFor magic
+  | magic == mainnetMagic = "https://cexplorer.io"
+  | magic == previewMagic = "https://preview.cexplorer.io"
+  | otherwise = "https://preprod.cexplorer.io"
+
 foreign import queryBaseUrlImpl :: String
 foreign import interactionBaseUrlImpl :: String
 foreign import networkMagicImpl :: String
@@ -61,3 +77,12 @@ defaultEnv =
   , interactionBaseUrl: interactionBaseUrlImpl
   , allowedNetworkMagic: NetworkMagic (fromMaybe (unNetworkMagic preprodMagic) (Int.fromString networkMagicImpl))
   }
+
+-- | Baza explorerului pentru ACEST build, ca valoare pură.
+-- |
+-- | `defaultEnv` e construit din constante înlocuite de Vite la build, deci nu e un efect — iar asta
+-- | înseamnă că un chip de identificator nu trebuie să primească mediul prin parametru sau prin
+-- | `MonadAsk`. Fără ea, fiecare loc care arată un id ar fi trebuit să devină componentă sau să
+-- | capete un argument în plus, în vreo zece fișiere.
+explorerBase :: String
+explorerBase = explorerBaseFor defaultEnv.allowedNetworkMagic

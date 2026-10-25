@@ -21,7 +21,9 @@ import AppEnv (Env)
 import Capabilities.Interaction.MonadInteract (class MonadInteract, buildFlow, interactionStatus, submitSigned, txStatus)
 import Capabilities.Query.Gov.Http (renderApiError)
 import Capabilities.Wallet.Governance (class MonadGovWallet, GateVerdict(..), blockMessage, connectGovernance, hasExtension)
+import AppEnv as AppEnv
 import Capabilities.Interaction.Types (InteractionStatus(..), OracleGate(..), OracleParams(..), UserAddresses, oracleGate)
+import Components.Shared.OnchainId as OnchainId
 import Components.Shared.DRepIdentity (shortId)
 import Components.Write.Flows (FieldKind(..), buildRequest, flowSpecs, missingFields, specFor)
 import Components.Write.TxSummaryDecode (summarise)
@@ -559,13 +561,25 @@ component =
     Submitting ->
       HH.div [ HP.class_ (HH.ClassName "alert alert-info text-sm") ]
         [ HH.span_ [ HH.text "Signed. Submitting…" ] ]
-    Submitted txId -> submittedCard txId false
-    Confirmed txId -> submittedCard txId true
+    Submitted txId -> submittedCard st txId false
+    Confirmed txId -> submittedCard st txId true
 
   -- Trimis, și apoi confirmat. Cele două sunt stări DIFERITE: „trimis" înseamnă că nodul a primit
   -- tranzacția, „confirmat" că e într-un bloc. Un singur mesaj pentru amândouă ar face pe cineva să
   -- creadă că s-a terminat când încă se poate pierde în mempool.
-  submittedCard txId confirmed =
+  -- Unde se vede ce-ai scris. Fără linkul ăsta, ecranul spune „trimis" și te lasă acolo: registrul
+  -- e la două click-uri în bara de navigare, dar nimic nu leagă fapta de locul unde apare. Prima
+  -- întrebare a oricui a scris ceva e „și unde o văd?".
+  registerFor flow = case flow of
+    Just "issue-attestation" -> Just { href: "/attestations", label: "See it in the attestations register" }
+    Just "accept-attestation" -> Just { href: "/attestations", label: "See it in the attestations register" }
+    Just "open-dispute" -> Just { href: "/disputes", label: "See it in the disputes register" }
+    Just "resolve-dispute" -> Just { href: "/disputes", label: "See it in the disputes register" }
+    Just "expire-dispute" -> Just { href: "/disputes", label: "See it in the disputes register" }
+    Just _ -> Just { href: "/profiles", label: "See it in the profiles register" }
+    Nothing -> Nothing
+
+  submittedCard st txId confirmed =
     HH.div [ HP.class_ (HH.ClassName ("alert text-sm flex-col items-start gap-2 " <> if confirmed then "alert-success" else "alert-info")) ]
       [ HH.span_
           [ HH.text
@@ -573,7 +587,26 @@ component =
                 else "Submitted. The node has it; it is not in a block yet."
               )
           ]
-      , HH.code [ HP.class_ (HH.ClassName "font-mono text-xs break-all opacity-80") ] [ HH.text txId ]
+      -- Id-ul tranzacției, copiabil și verificabil. Era un `<code>` gol de afordanțe: singurul
+      -- lucru care dovedește ce s-a întîmplat, și nu se putea nici copia, nici deschide.
+      , OnchainId.withChip
+          { value: txId
+          , shown: txId
+          , kind: OnchainId.Tx
+          , explorerBase: AppEnv.explorerBase
+          }
+      , case registerFor st.filters.flow of
+          Nothing -> HH.text ""
+          Just r ->
+            HH.a
+              [ HP.href r.href, HP.class_ (HH.ClassName "link link-hover text-xs") ]
+              [ HH.text
+                  ( r.label <>
+                      ( if confirmed then "."
+                        else " — it appears once the indexer reaches this slot."
+                      )
+                  )
+              ]
       ]
 
   summaryCard st tx sum =

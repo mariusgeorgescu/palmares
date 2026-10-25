@@ -479,3 +479,48 @@ test('the reproducible stack includes the frontend and its build', async () => {
   const readme = readFileSync('../README.md', 'utf8');
   expect(readme).toMatch(/--profile app --profile write up -d/);
 });
+
+test('an on-chain identifier is readable, linkable and copyable', async ({ page }) => {
+  // Defectul pe care îl fixează, măsurat pe deploy: identificatorii apărau trunchiați cu elipsă,
+  // iar valoarea întreagă nu era accesibilă nicăieri. Unele locuri puneau un `HP.title`, cu un
+  // comentariu care spunea „cel întreg e pentru copiat" — dar textul unui tooltip nativ nu e
+  // selectabil, deci promisiunea nu se livra.
+  //
+  // Iar id-ul unei ATESTĂRI nu era randat deloc: exista doar în `href`-urile de acțiune, în timp ce
+  // `/write` cere omului să-l „lipească". Calea de scriere documentată nu se putea parcurge din
+  // interfață — și exact asta m-a costat o rulare pe lanț, în care testul a încercat să citească
+  // id-ul de pe ecran și a primit un șir tăiat.
+  await page.goto('/attestations');
+  await expect(page.getByRole('table')).toBeVisible();
+
+  const chips = page.locator('.dropdown [data-copy]');
+  expect(await chips.count(), 'no identifier carries a copy affordance').toBeGreaterThan(0);
+
+  // Valoarea din `data-copy` e ÎNTREAGĂ: fără elipsă și de lungimea unui id real.
+  const value = await chips.first().getAttribute('data-copy');
+  expect(value).not.toContain('…');
+  expect(value).toMatch(/^[0-9a-f]{56}\.[0-9a-f]+$/);
+
+  // Și linkul către explorer păstrează punctul. MĂSURAT pe preprod.cexplorer.io: fără punct,
+  // `/asset/` cade pe pagina de pornire fără nicio eroare — ceea ce arată ca „nu există".
+  const link = page.locator('.dropdown-content a[href*="/asset/"]').first();
+  const href = await link.getAttribute('href');
+  expect(href).toContain('/asset/');
+  expect(href).toContain('.');
+  // Link extern deschis în tab nou, cu `rel` — altfel e reverse tabnabbing.
+  expect(await link.getAttribute('rel')).toContain('noopener');
+
+  // Textul linkului e id-ul COMPLET, nu unul scurtat: panoul există ca să arate ce lista nu poate.
+  expect((await link.innerText()).trim()).toBe(value);
+});
+
+test('the four wallet icons are not empty strings any more', async ({ page }) => {
+  // `NavBar.purs` trimitea patru string-uri goale în componenta de wallet, adică patru sloturi
+  // goale pe deploy. Fișierele existau în bjj-frontend de mult; lipsea copierea lor.
+  await page.goto('/');
+  for (const name of ['walletsymbol', 'disconnectsymbol', 'onramp', 'copy-icon']) {
+    const res = await page.request.get(`/images/${name}.svg`);
+    expect(res.status(), `/images/${name}.svg must be served`).toBe(200);
+    expect((await res.text()).slice(0, 400)).toContain('svg');
+  }
+});

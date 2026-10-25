@@ -5,6 +5,7 @@ module Test.FormatSpec (spec) where
 import Prelude
 
 import Components.Shared.DRepIdentity (identityText, shortId)
+import Components.Shared.OnchainId (IdKind(..), explorerUrl)
 import Data.Array (replicate)
 import Data.Maybe (Maybe(..))
 import Data.String as String
@@ -145,3 +146,25 @@ spec = do
       -- R2. Un nume de 200 de caractere vine dintr-un document pe care îl scrie oricine.
       let t = identityText { givenName: Just longName, drepId: "drep1abc", hasScript: false }
       String.length t.name `shouldEqual` 81
+
+  -- Adresele din explorer. Fiecare a fost deschisă într-un browser pe `preprod.cexplorer.io`
+  -- înainte de a fi scrisă, iar testul le fixează — o cale greșită nu dă eroare, dă pagina de
+  -- pornire a explorerului, ceea ce arată ca „nu există" și nu ca „am greșit linkul".
+  describe "explorer links" do
+    it "an asset keeps the dot between policy and name" do
+      -- MĂSURAT: `/asset/<policy>.<name>` se rezolvă și explorerul afișează `asset1…`; fără punct
+      -- cade pe pagina de pornire. De aceea id-ul nu se curăță, se trimite cum e.
+      explorerUrl "https://preprod.cexplorer.io" Asset "aa.bb"
+        `shouldEqual` "https://preprod.cexplorer.io/asset/aa.bb"
+
+    it "a transaction goes to /tx" do
+      explorerUrl "https://preprod.cexplorer.io" Tx "deadbeef"
+        `shouldEqual` "https://preprod.cexplorer.io/tx/deadbeef"
+
+    it "a DRep goes to /drep, bech32 as-is" do
+      explorerUrl "https://preprod.cexplorer.io" DRep "drep1abc"
+        `shouldEqual` "https://preprod.cexplorer.io/drep/drep1abc"
+
+    it "a policy goes to /policy" do
+      explorerUrl "https://preprod.cexplorer.io" Policy "aa"
+        `shouldEqual` "https://preprod.cexplorer.io/policy/aa"

@@ -21,3 +21,43 @@
     min-width: 0;
   }
 }
+
+/* Confirmarea copierii, fără stare în Halogen.
+ *
+ * `App.CopyOnClick` pune clasa `copied` pe buton pentru ~1,2 s, iar cele două etichete stau
+ * suprapuse în același `grid`, deci butonul nu-și schimbă lățimea când textul se schimbă — altfel
+ * rândul ar sări la fiecare copiere.
+ *
+ * Varianta din `bjj-frontend` face schimbul pe `:focus`, ceea ce arată „Copied!" când ajungi pe
+ * buton cu Tab, înainte să se copieze ceva. Aici clasa vine din JavaScript, după ce clipboard-ul a
+ * confirmat. */
+.copy-btn .copy-label,
+.copy-btn .copy-confirm {
+  grid-area: 1 / 1;
+  transition: opacity 120ms ease-in-out;
+}
+
+.copy-btn .copy-label,
+.copy-btn .copy-confirm {
+  display: block;
+}
+
+.copy-btn {
+  display: inline-flex;
+}
+
+.copy-btn > span:not([aria-hidden]) {
+  display: grid;
+}
+
+.copy-btn .copy-confirm {
+  opacity: 0;
+}
+
+.copy-btn.copied .copy-label {
+  opacity: 0;
+}
+
+.copy-btn.copied .copy-confirm {
+  opacity: 1;
+}

@@ -30,6 +30,8 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Format (formatAda, formatDay, formatInt, humanize, matchLine)
 import Halogen as H
+import AppEnv as AppEnv
+import Components.Shared.OnchainId as OnchainId
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -202,13 +204,18 @@ component =
       ]
 
   target st i = case Map.lookup i st.names of
-    Nothing ->
-      HH.span [ HP.class_ (HH.ClassName "font-mono text-xs"), HP.title i ] [ HH.text (shortId i) ]
+    Nothing -> idChip i
     Just n ->
       HH.div_
         [ HH.div [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text n ]
-        , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70"), HP.title i ] [ HH.text (shortId i) ]
+        , HH.div [ HP.class_ (HH.ClassName "opacity-70") ] [ idChip i ]
         ]
+
+  -- Un `title` promitea valoarea întreagă „pentru copiat", dar textul unui tooltip nativ nu e
+  -- selectabil. Chipul o deschide cu adevărat, cu link și copiere.
+  idChip i =
+    OnchainId.withChip
+      { value: i, shown: shortId i, kind: OnchainId.Asset, explorerBase: AppEnv.explorerBase }
 
   row st (DisputeRow d) =
     HH.tr_

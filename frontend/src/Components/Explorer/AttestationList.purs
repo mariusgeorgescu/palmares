@@ -33,6 +33,8 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Format (formatDay, formatInt, humanize, matchLine)
 import Halogen as H
+import AppEnv as AppEnv
+import Components.Shared.OnchainId as OnchainId
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -198,20 +200,35 @@ component =
   -- Numele deasupra, identificatorul dedesubt — nu unul SAU altul. Numele e ce caută omul, iar
   -- identificatorul e ce verifică pe lanț, şi regula casei (R3) cere să fie amîndouă.
   party st i = case Map.lookup i st.names of
-    Nothing ->
-      HH.span [ HP.class_ (HH.ClassName "font-mono text-xs"), HP.title i ] [ HH.text (shortId i) ]
+    Nothing -> idChip i
     Just n ->
       HH.div_
         [ HH.div [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text n ]
-        , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70"), HP.title i ]
-            [ HH.text (shortId i) ]
+        , HH.div [ HP.class_ (HH.ClassName "opacity-70") ] [ idChip i ]
         ]
+
+  idChip i =
+    OnchainId.withChip
+      { value: i, shown: shortId i, kind: OnchainId.Asset, explorerBase: AppEnv.explorerBase }
 
   row st (AttestationRow a) =
     HH.tr_
       [ HH.td_
           [ HH.div_ [ HH.text a.name ]
           , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text (humanize a.kind) ]
+          -- IDENTIFICATORUL ATESTĂRII, care nu era randat nicăieri. Exista doar în `href`-urile de
+          -- mai jos, iar `/write` îi cere omului să-l „lipească" — deci calea de scriere
+          -- documentată nu se putea parcurge din interfață. Linkurile îl purtau cu ele, ceea ce
+          -- acoperea cazul obișnuit și ascundea lipsa: oricine voia id-ul pentru altceva (un
+          -- raport, un test, o verificare pe lanț) nu-l avea de unde lua.
+          , HH.div [ HP.class_ (HH.ClassName "mt-0.5 opacity-70") ]
+              [ OnchainId.withChip
+                  { value: a.id
+                  , shown: shortId a.id
+                  , kind: OnchainId.Asset
+                  , explorerBase: AppEnv.explorerBase
+                  }
+              ]
           ]
       , HH.td_ [ party st a.subject ]
       , HH.td_ [ party st a.issuer ]

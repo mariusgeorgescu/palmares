@@ -26,6 +26,8 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
 import Format (formatInt, humanize, matchLine, pluralize)
 import Halogen as H
+import AppEnv as AppEnv
+import Components.Shared.OnchainId as OnchainId
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -170,8 +172,24 @@ component =
               , HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-outline") ] [ HH.text (humanize r.kind) ]
               ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-80") ] [ HH.text r.description ]
-          , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all"), HP.title r.id ]
-              [ HH.text r.id ]
+          -- Scurtat pe card, întreg în chip. Înainte, cardul randa id-ul INTEGRAL cu un `title`
+          -- redundant, iar la douăzeci și șapte de linii mai jos credențiala era scurtată FĂRĂ
+          -- `title`, deci inaccesibilă — două decizii contradictorii pe același card. Acum e o
+          -- singură regulă, aceeași peste tot.
+          --
+          -- Prima variantă a păstrat id-ul integral lîngă chip și a RUPT R2: testul „/profiles does
+          -- not scroll sideways" la 390px a căzut imediat. Șaizeci și patru de caractere monospațiate
+          -- plus un buton nu încap pe un telefon, iar `truncate` într-un `inline-flex` nu le
+          -- strînge. De aceea panoul de hover există: ca lista să nu plătească pentru valoarea
+          -- întreagă.
+          , HH.div [ HP.class_ (HH.ClassName "opacity-70") ]
+              [ OnchainId.withChip
+                  { value: r.id
+                  , shown: shortId r.id
+                  , kind: OnchainId.Asset
+                  , explorerBase: AppEnv.explorerBase
+                  }
+              ]
           , credentialLine r
           , HH.div [ HP.class_ (HH.ClassName "card-actions") ]
               [ HH.a
@@ -199,6 +217,10 @@ component =
         [ HH.text "Claims "
         , HH.a [ HP.href (drepDetailHrefFor c), HP.class_ (HH.ClassName "link link-hover font-mono") ]
             [ HH.text (shortId c) ]
+        -- Credențiala era scurtată fără nicio cale către valoarea întreagă. Chipul stă lîngă link,
+        -- nu în locul lui: linkul duce în registru, chipul duce pe lanț.
+        , OnchainId.chip
+            { value: c, kind: OnchainId.DRep, explorerBase: AppEnv.explorerBase }
         , HH.text
             ( if r.credentialIsScript == Just true then " (a script credential)"
               else " (a key credential)"
