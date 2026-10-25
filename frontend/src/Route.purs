@@ -13,6 +13,7 @@ import Route.GovQueries
   , ActivityFilters
   , DelegationFilters
   , EmbedFilters
+  , WriteFilters
   , GraphFilters
   , RegistryFilters
   , SpoFilters
@@ -48,6 +49,7 @@ data Route
   | DisputeList RegistryFilters
   | Graph GraphFilters
   | Embed EmbedFilters
+  | Write WriteFilters
   | Methodology MethodologyFilters
   | NotFound
 
@@ -78,5 +80,6 @@ instance Show Route where
     DisputeList _ -> "DisputeList"
     Graph f -> "Graph " <> fromMaybe "" f.drep
     Embed f -> "Embed " <> fromMaybe "" f.drep
+    Write f -> "Write " <> fromMaybe "" f.flow
     Methodology f -> "Methodology " <> fromMaybe "" f.focus
     NotFound -> "NotFound"

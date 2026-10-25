@@ -33,7 +33,7 @@ import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
 import Route (Route)
-import Route.GovQueries (RegistryFilters, drepDetailHrefFor, profileListHrefFor)
+import Route.GovQueries (RegistryFilters, drepDetailHrefFor, profileListHrefFor, writeHrefFor)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -107,6 +107,11 @@ component =
                   "Identities in the attestation registry. A profile is a token: whoever holds it \
                   \holds the profile, and a profile may or may not claim a governance credential."
               ]
+          , HH.a
+              [ HP.href (writeHrefFor { flow: Just "claim-profile", subject: Nothing })
+              , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+              ]
+              [ HH.text "Claim a profile" ]
           ]
       , case st.page of
           NotAsked -> loading
@@ -168,6 +173,18 @@ component =
           , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70 break-all"), HP.title r.id ]
               [ HH.text r.id ]
           , credentialLine r
+          , HH.div [ HP.class_ (HH.ClassName "card-actions") ]
+              [ HH.a
+                  [ HP.href (writeHrefFor { flow: Just "update-profile", subject: Just r.id })
+                  , HP.class_ (HH.ClassName "link link-hover text-xs")
+                  ]
+                  [ HH.text "Edit" ]
+              , HH.a
+                  [ HP.href (writeHrefFor { flow: Just "claim-credential", subject: Just r.id })
+                  , HP.class_ (HH.ClassName "link link-hover text-xs")
+                  ]
+                  [ HH.text "Claim a credential" ]
+              ]
           ]
       ]
 

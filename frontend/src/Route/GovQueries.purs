@@ -61,6 +61,11 @@ module Route.GovQueries
   , activityFiltersCodec
   , activityPath
   , activityHrefFor
+  , WriteFilters
+  , emptyWriteFilters
+  , writeFiltersCodec
+  , writePath
+  , writeHrefFor
   , EmbedFilters
   , emptyEmbedFilters
   , embedPreviewHref
@@ -293,6 +298,30 @@ actionListHrefFor f = actionListPath <> renderGovActionFilters f
 -- | deci ar cere pagina listei în loc de acțiune.
 actionDetailHrefFor :: String -> String
 actionDetailHrefFor actionId = actionListPath <> "/" <> encodePathSegment actionId
+
+-- | Ecranul de scriere: ce flux, și pe ce obiect. Amândouă în URL, pentru că un link din listă
+-- | („contestă atestarea asta") trebuie să aducă identificatorul cu el — altfel omul copiază de
+-- | mână șaizeci de caractere dintr-un tabel.
+type WriteFilters =
+  { flow :: Maybe String
+  , subject :: Maybe String
+  }
+
+emptyWriteFilters :: WriteFilters
+emptyWriteFilters = { flow: Nothing, subject: Nothing }
+
+writeFiltersCodec :: RouteDuplex' WriteFilters
+writeFiltersCodec =
+  record
+    # prop (Proxy :: Proxy "flow") (optional (param "flow"))
+    # prop (Proxy :: Proxy "subject") (optional (param "subject"))
+
+writePath :: String
+writePath = "/write"
+
+writeHrefFor :: WriteFilters -> String
+writeHrefFor f =
+  writePath <> renderQuery (optPair "flow" f.flow <> optPair "subject" f.subject)
 
 -- | Fișa de încorporat primește DRep-ul tot prin URL, pentru că `iframe`-ul de pe site-ul gazdă
 -- | n-are alt canal: `src` e tot ce poate să trimită.

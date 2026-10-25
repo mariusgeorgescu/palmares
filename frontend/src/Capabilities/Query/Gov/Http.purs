@@ -23,12 +23,14 @@ module Capabilities.Query.Gov.Http
   , lookupHeader
   , getJson
   , getJsonWithFreshness
+  , postJson
   , renderApiError
   , isRetryable
   ) where
 
 import Prelude
 
+import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
 import Affjax.ResponseHeader (ResponseHeader, name, value)
 import Affjax.StatusCode (StatusCode(..))
@@ -196,5 +198,21 @@ getJsonWithFreshness url = liftAff do
       Right json -> case decodeJson json of
         Left e -> Left (Decode (printJsonDecodeError e))
         Right b -> Right { body: b, freshness: readFreshness r.headers }
+  where
+  statusOf (StatusCode s) = s
+
+-- | `POST` cu corp JSON, răspuns JSON. Aceeași clasificare ca la citire — un 400 cu cod de
+-- | eroare al serverului rămâne un `Api`, nu devine `Transport` — pentru că fluxurile de scriere
+-- | ÎȘI citesc codurile: „oracle_paused" și „deposit prea mic" nu se tratează la fel.
+postJson :: forall m a. MonadAff m => DecodeJson a => String -> Json -> m (Either ApiError a)
+postJson url body = liftAff do
+  res <- AX.post ResponseFormat.string url (Just (RequestBody.json body))
+  pure case res of
+    Left err -> Left (Transport (AX.printError err))
+    Right r -> case classifyResponse (statusOf r.status) r.body of
+      Left e -> Left e
+      Right json -> case decodeJson json of
+        Left e -> Left (Decode (printJsonDecodeError e))
+        Right b -> Right b
   where
   statusOf (StatusCode s) = s

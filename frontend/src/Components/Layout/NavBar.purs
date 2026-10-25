@@ -45,6 +45,7 @@ import Route.GovQueries
   , emptyActivityFilters
   , emptyRegistryFilters
   , emptyGraphFilters
+  , emptyWriteFilters
   )
 import Store as Store
 import Type.Proxy (Proxy(..))
@@ -149,6 +150,9 @@ component =
       , navLink st.route (DRepList emptyDRepFilters) "DReps"
       , navLink st.route (ActionList emptyGovActionFilters) "Actions"
       , navLink st.route (VoteList defaultVoteFilters) "Votes"
+      -- Scrierea stă în linie, nu sub „More": e singura secțiune care schimbă ceva, iar dacă
+      -- cineva o caută și n-o găsește, concluzia e că produsul doar citește.
+      , navLink st.route (Write emptyWriteFilters) "Write"
       ]
 
     desktopItems =
@@ -298,5 +302,6 @@ sameSection a b = section a == section b
     Graph _ -> "graph"
     -- Fișa de încorporat nu apare în bară, pentru că nu se navighează la ea: se pune în `iframe`.
     Embed _ -> "embed"
+    Write _ -> "write"
     Methodology _ -> "methodology"
     NotFound -> "none"

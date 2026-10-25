@@ -34,7 +34,7 @@ import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
 import Route (Route)
-import Route.GovQueries (RegistryFilters, disputeListHrefFor)
+import Route.GovQueries (RegistryFilters, disputeListHrefFor, writeHrefFor)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -178,6 +178,7 @@ component =
                           , HH.th_ [ HH.text "Opened" ]
                           , HH.th [ HP.class_ (HH.ClassName "text-right") ] [ HH.text "Deposit" ]
                           , HH.th_ [ HH.text "Outcome" ]
+                          , HH.th_ [ HH.text "Act" ]
                           ]
                       ]
                   , HH.tbody_ (map row items)
@@ -203,6 +204,25 @@ component =
       , HH.td_
           [ HH.span [ HP.class_ (HH.ClassName ("badge badge-sm " <> verdictClass d.verdict)) ]
               [ HH.text (maybe' d.verdict) ]
+          ]
+      -- Doar pe disputele încă deschise: a oferi „rezolvă" pe una deja judecată ar fi un buton
+      -- care duce la un refuz al serverului.
+      , HH.td [ HP.class_ (HH.ClassName "whitespace-nowrap") ]
+          [ case d.verdict of
+              Just _ -> HH.text ""
+              Nothing ->
+                HH.span_
+                  [ HH.a
+                      [ HP.href (writeHrefFor { flow: Just "resolve-dispute", subject: Just d.id })
+                      , HP.class_ (HH.ClassName "link link-hover text-xs mr-2")
+                      ]
+                      [ HH.text "Resolve" ]
+                  , HH.a
+                      [ HP.href (writeHrefFor { flow: Just "expire-dispute", subject: Just d.id })
+                      , HP.class_ (HH.ClassName "link link-hover text-xs")
+                      ]
+                      [ HH.text "Expire" ]
+                  ]
           ]
       ]
 

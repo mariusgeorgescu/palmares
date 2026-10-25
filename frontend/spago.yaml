@@ -55,7 +55,7 @@ workspace:
 
     cardano-capabilities:
       git: https://github.com/mariusgeorgescu/purescript-cardano-capabilities.git
-      ref: f0a6772
+      ref: 09c5af6779ad8a3b5a732cdd1da38677da46b50b
 
     cardano-serialization-lib:
       git: https://github.com/mariusgeorgescu/purescript-cardano-serialization-lib.git
@@ -67,7 +67,7 @@ workspace:
 
     cip30:
       git: https://github.com/mariusgeorgescu/purescript-cip30.git
-      ref: fb4b90fcca1f57edaacd6405965bf245d3504583
+      ref: 2bc91f34e6c2c0249b8c18d178520742a5045499
 
     halogen-cardano-wallet-connect-component:
       git: https://github.com/mariusgeorgescu/halogen-cardano-wallet-connect-component.git

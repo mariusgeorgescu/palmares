@@ -33,7 +33,11 @@ import Capabilities.Query.Gov.Default
   , getVotesDefault
   , searchAllDefault
   )
+import Capabilities.Interaction.Default (buildFlowDefault, submitSignedDefault, txStatusDefault)
+import Capabilities.Interaction.MonadInteract (class MonadInteract)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
+import Capabilities.Wallet.Governance (class MonadGovWallet)
+import Capabilities.Wallet.GovernanceDefault (connectGovernanceDefault)
 import Cardano.Capabilities.Transaction.MonadInteraction (class MonadInteraction)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Control.Monad.Error.Class (class MonadThrow)
@@ -119,3 +123,14 @@ instance MonadQueryGov AppM where
   getProfiles f = ask >>= \env -> getProfilesDefault env f
   getAttestations f = ask >>= \env -> getAttestationsDefault env f
   getDisputes f = ask >>= \env -> getDisputesDefault env f
+
+-- | Scrierea. Trei metode pentru nouă fluxuri; mediul poartă prefixul BFF-ului.
+instance monadInteractAppM :: MonadInteract AppM where
+  buildFlow r = ask >>= \env -> buildFlowDefault env r
+  submitSigned p = ask >>= \env -> submitSignedDefault env p
+  txStatus i = ask >>= \env -> txStatusDefault env i
+
+-- | Poarta de wallet. Magic-ul AȘTEPTAT vine din mediu, nu din wallet: altfel „e pe rețeaua
+-- | potrivită" ar fi o tautologie.
+instance monadGovWalletAppM :: MonadGovWallet AppM where
+  connectGovernance w = ask >>= \env -> connectGovernanceDefault env.allowedNetworkMagic w

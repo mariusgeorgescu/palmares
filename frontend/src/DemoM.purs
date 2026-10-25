@@ -12,7 +12,11 @@ import AppEnv (Env)
 import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.LogMessages (class LogMessages)
+import Capabilities.Interaction.MonadInteract (class MonadInteract)
+import Capabilities.Interaction.Mock (buildFlowMock, submitSignedMock, txStatusMock)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
+import Capabilities.Wallet.Governance (class MonadGovWallet)
+import Capabilities.Wallet.GovernanceMock (connectGovernanceMock)
 import Capabilities.Query.Gov.Mock
   ( getDRepDetailMock
   , getDRepExplorerMock
@@ -114,3 +118,11 @@ instance MonadQueryGov DemoM where
   getProfiles = getProfilesMock
   getAttestations = getAttestationsMock
   getDisputes = getDisputesMock
+
+instance monadInteractDemoM :: MonadInteract DemoM where
+  buildFlow = buildFlowMock
+  submitSigned = submitSignedMock
+  txStatus = txStatusMock
+
+instance monadGovWalletDemoM :: MonadGovWallet DemoM where
+  connectGovernance = connectGovernanceMock

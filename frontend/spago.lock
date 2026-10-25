@@ -816,7 +816,7 @@
     "extra_packages": {
       "cardano-capabilities": {
         "git": "https://github.com/mariusgeorgescu/purescript-cardano-capabilities.git",
-        "ref": "f0a6772"
+        "ref": "09c5af6779ad8a3b5a732cdd1da38677da46b50b"
       },
       "cardano-serialization-lib": {
         "git": "https://github.com/mariusgeorgescu/purescript-cardano-serialization-lib.git",
@@ -824,7 +824,7 @@
       },
       "cip30": {
         "git": "https://github.com/mariusgeorgescu/purescript-cip30.git",
-        "ref": "fb4b90fcca1f57edaacd6405965bf245d3504583"
+        "ref": "2bc91f34e6c2c0249b8c18d178520742a5045499"
       },
       "cip30-typesafe": {
         "git": "https://github.com/mariusgeorgescu/purescript-cip30-typesafe.git",
@@ -1071,7 +1071,7 @@
     "cardano-capabilities": {
       "type": "git",
       "url": "https://github.com/mariusgeorgescu/purescript-cardano-capabilities.git",
-      "rev": "f0a6772dd25e0d2ff98200d7d971c687bc0d1192",
+      "rev": "09c5af6779ad8a3b5a732cdd1da38677da46b50b",
       "dependencies": [
         "affjax",
         "affjax-web",
@@ -1124,7 +1124,7 @@
     "cip30": {
       "type": "git",
       "url": "https://github.com/mariusgeorgescu/purescript-cip30.git",
-      "rev": "fb4b90fcca1f57edaacd6405965bf245d3504583",
+      "rev": "2bc91f34e6c2c0249b8c18d178520742a5045499",
       "dependencies": [
         "aff",
         "aff-promise",

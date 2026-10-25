@@ -37,7 +37,7 @@ import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
 import Route (Route)
-import Route.GovQueries (RegistryFilters, attestationListHrefFor)
+import Route.GovQueries (RegistryFilters, attestationListHrefFor, writeHrefFor)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -170,6 +170,7 @@ component =
                           , HH.th_ [ HH.text "Date" ]
                           , HH.th_ [ HH.text "Accepted" ]
                           , HH.th_ [ HH.text "Disputes" ]
+                          , HH.th_ [ HH.text "Act" ]
                           ]
                       ]
                   , HH.tbody_ (map row items)
@@ -194,6 +195,22 @@ component =
               [ HH.text (if a.accepted then "accepted" else "not yet accepted") ]
           ]
       , HH.td_ [ disputeCell a ]
+      -- Linkurile duc identificatorul CU ELE. Fără asta, „contestă atestarea asta" înseamnă că
+      -- omul copiază de mână un identificator de şaizeci de caractere dintr-un tabel.
+      , HH.td [ HP.class_ (HH.ClassName "whitespace-nowrap") ]
+          [ if a.accepted then HH.text ""
+            else
+              HH.a
+                [ HP.href (writeHrefFor { flow: Just "accept-attestation", subject: Just a.id })
+                , HP.class_ (HH.ClassName "link link-hover text-xs mr-2")
+                ]
+                [ HH.text "Accept" ]
+          , HH.a
+              [ HP.href (writeHrefFor { flow: Just "open-dispute", subject: Just a.id })
+              , HP.class_ (HH.ClassName "link link-hover text-xs")
+              ]
+              [ HH.text "Dispute" ]
+          ]
       ]
 
   -- Zero dispute e cazul obișnuit și se scrie discret; o dispută deschisă e o întrebare în curs,

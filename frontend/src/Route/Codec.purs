@@ -16,6 +16,7 @@ import Route.GovQueries
   , drepFiltersCodec
   , govActionFiltersCodec
   , embedFiltersCodec
+  , writeFiltersCodec
   , graphFiltersCodec
   , methodologyCodec
   , registryFiltersCodec
@@ -46,6 +47,7 @@ routeCodec = root $ sum
   , "DisputeList": path "disputes" registryFiltersCodec
   , "Graph": path "graph" graphFiltersCodec
   , "Embed": path "embed" embedFiltersCodec
+  , "Write": path "write" writeFiltersCodec
   , "Methodology": path "methodology" methodologyCodec
   , "NotFound": path "__not_found__" noArgs
   }

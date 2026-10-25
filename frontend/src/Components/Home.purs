@@ -8,13 +8,18 @@ import Prelude
 
 import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent)
+import AppEnv (Env)
+import Capabilities.Interaction.MonadInteract (class MonadInteract)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
+import Capabilities.Wallet.Governance (class MonadGovWallet)
+import Control.Monad.Reader (class MonadAsk)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Components.Explorer.Committee as Committee
 import Components.Explorer.Activity as Activity
 import Components.Explorer.AttestationList as AttestationList
 import Components.Explorer.DisputeList as DisputeList
 import Components.Embed as Embed
+import Components.Write.Runner as WriteRunner
 import Components.Explorer.Graph as Graph
 import Components.Explorer.Dashboard as Dashboard
 import Components.Explorer.DelegationList as DelegationList
@@ -77,6 +82,7 @@ type Slots =
   , disputeList :: DisputeList.Slot
   , graph :: Graph.Slot
   , embed :: Embed.Slot
+  , writeRunner :: WriteRunner.Slot
   , voteList :: VoteList.Slot
   , methodology :: Methodology.Slot
   )
@@ -90,6 +96,9 @@ component
   => MonadRouter Route m
   => MonadStore Store.Action Store.Store m
   => MonadQueryGov m
+  => MonadInteract m
+  => MonadGovWallet m
+  => MonadAsk Env m
   => H.Component Query Input Output m
 component =
   H.mkComponent
@@ -175,6 +184,7 @@ component =
     AttestationList filters -> HH.slot_ AttestationList._attestationList unit AttestationList.component filters
     DisputeList filters -> HH.slot_ DisputeList._disputeList unit DisputeList.component filters
     Graph filters -> HH.slot_ Graph._graph unit Graph.component filters
+    Write filters -> HH.slot_ WriteRunner._writeRunner unit WriteRunner.component filters
     Embed filters -> HH.slot_ Embed._embed unit Embed.component filters
     Methodology filters -> HH.slot_ Methodology._methodology unit Methodology.component filters
     NotFound -> renderNotFound
@@ -210,5 +220,6 @@ documentTitle = case _ of
   DisputeList _ -> "Disputes — Palmares"
   Graph _ -> "Delegation graph — Palmares"
   Embed _ -> "Palmares governance record"
+  Write _ -> "Act on chain — Palmares"
   Methodology _ -> "Methodology — Palmares"
   NotFound -> "Not found — Palmares"
