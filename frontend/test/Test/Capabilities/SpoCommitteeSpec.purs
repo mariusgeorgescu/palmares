@@ -11,6 +11,9 @@ import Prelude
 
 import Capabilities.Query.Gov.Fixtures
   ( activityFixture
+  , attestationListFixture
+  , disputeListFixture
+  , profileListFixture
   , committeeFixture
   , delegationListFixture
   , spoListFixture
@@ -26,6 +29,12 @@ import Capabilities.Query.Gov.Types
   , DelegationRow(..)
   , ActivityEvent(..)
   , ActivityPage(..)
+  , AttestationPage(..)
+  , AttestationRow(..)
+  , DisputePage(..)
+  , DisputeRow(..)
+  , ProfilePage(..)
+  , ProfileRow(..)
   , SpoPage(..)
   , SpoRow(..)
   , WithdrawalPage(..)
@@ -123,5 +132,35 @@ spec = do
           length (filter (\(ActivityEvent e) -> e.actorId == Nothing) p.items) `shouldEqual` 4
           -- `total` nu exista pe ruta asta (`D-18`) si de-aia plicul nici nu-l are.
           isJust p.nextCursor `shouldEqual` true
+
+  describe "the attestation registry decodes" do
+    it "profiles, half of which claim no governance credential" do
+      case (decodeFixture profileListFixture :: Either ApiError ProfilePage) of
+        Left e -> fail ("fixture did not decode: " <> show e)
+        Right (ProfilePage p) -> do
+          p.total `shouldEqual` 12
+          p.limit `shouldEqual` length p.items
+          -- Un profil fara credential nu e incomplet: e un profil care nu pretinde o identitate pe
+          -- lant. Daca `.:?` devine `.:`, jumatate din registru nu se mai randeaza.
+          length (filter (\(ProfileRow r) -> r.credential == Nothing) p.items) `shouldEqual` 3
+
+    it "attestations, where accepted and disputed are separate questions" do
+      case (decodeFixture attestationListFixture :: Either ApiError AttestationPage) of
+        Left e -> fail ("fixture did not decode: " <> show e)
+        Right (AttestationPage p) -> do
+          p.total `shouldEqual` 19
+          p.limit `shouldEqual` length p.items
+          -- Exista o atestare ACCEPTATA si totusi contestata cu verdict impotriva ei. Daca ecranul
+          -- ar avea o singura „stare", cazul asta ar trebui mintit intr-un fel sau altul.
+          any (\(AttestationRow a) -> a.accepted && a.upheldDisputeCount > 0) p.items `shouldEqual` true
+
+    it "disputes, with the deposit that separates a challenge from an opinion" do
+      case (decodeFixture disputeListFixture :: Either ApiError DisputePage) of
+        Left e -> fail ("fixture did not decode: " <> show e)
+        Right (DisputePage p) -> do
+          p.total `shouldEqual` 5
+          p.limit `shouldEqual` length p.items
+          any (\(DisputeRow d) -> d.deposit > 0.0) p.items `shouldEqual` true
+
   where
   noSlot (ChainPoint c) = c.slot == Nothing

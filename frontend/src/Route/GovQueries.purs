@@ -61,6 +61,15 @@ module Route.GovQueries
   , activityFiltersCodec
   , activityPath
   , activityHrefFor
+  , RegistryFilters
+  , emptyRegistryFilters
+  , registryFiltersCodec
+  , profileListPath
+  , profileListHrefFor
+  , attestationListPath
+  , attestationListHrefFor
+  , disputeListPath
+  , disputeListHrefFor
   , MethodologyFilters
   , emptyMethodologyFilters
   , methodologyCodec
@@ -275,6 +284,45 @@ actionListHrefFor f = actionListPath <> renderGovActionFilters f
 -- | deci ar cere pagina listei în loc de acțiune.
 actionDetailHrefFor :: String -> String
 actionDetailHrefFor actionId = actionListPath <> "/" <> encodePathSegment actionId
+
+-- | Filtrele celor trei liste din registrul de atestări. Aceeași formă pentru toate: sortarea și
+-- | paginarea sînt singurele controale, iar un tip per ecran ar fi trei copii ale aceluiași
+-- | record.
+type RegistryFilters =
+  { order_by :: Maybe String
+  , sort_order :: Maybe String
+  , limit :: Maybe String
+  , offset :: Maybe String
+  }
+
+emptyRegistryFilters :: RegistryFilters
+emptyRegistryFilters = { order_by: Nothing, sort_order: Nothing, limit: Nothing, offset: Nothing }
+
+registryFiltersCodec :: RouteDuplex' RegistryFilters
+registryFiltersCodec =
+  record
+    # prop (Proxy :: Proxy "order_by") (optional (param "order_by"))
+    # prop (Proxy :: Proxy "sort_order") (optional (param "sort_order"))
+    # prop (Proxy :: Proxy "limit") (optional (param "limit"))
+    # prop (Proxy :: Proxy "offset") (optional (param "offset"))
+
+profileListPath :: String
+profileListPath = "/profiles"
+
+profileListHrefFor :: RegistryFilters -> String
+profileListHrefFor f = profileListPath <> renderQuery (sortPairs f)
+
+attestationListPath :: String
+attestationListPath = "/attestations"
+
+attestationListHrefFor :: RegistryFilters -> String
+attestationListHrefFor f = attestationListPath <> renderQuery (sortPairs f)
+
+disputeListPath :: String
+disputeListPath = "/disputes"
+
+disputeListHrefFor :: RegistryFilters -> String
+disputeListHrefFor f = disputeListPath <> renderQuery (sortPairs f)
 
 -- | Filtrele fluxului de activitate. Se paginează pe CURSOR, nu pe offset: `before` e cursorul
 -- | ultimului eveniment văzut, iar serverul nu publică un total (`D-18`), pentru că un flux pe

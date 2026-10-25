@@ -26,6 +26,9 @@ import Capabilities.Query.Gov.Default
   , getWithdrawalsDefault
   , getDelegationsDefault
   , getActivityDefault
+  , getProfilesDefault
+  , getAttestationsDefault
+  , getDisputesDefault
   , getStatusDefault
   , getVotesDefault
   , searchAllDefault
@@ -113,3 +116,6 @@ instance MonadQueryGov AppM where
   getWithdrawals f = ask >>= \env -> getWithdrawalsDefault env f
   getDelegations f = ask >>= \env -> getDelegationsDefault env f
   getActivity f = ask >>= \env -> getActivityDefault env f
+  getProfiles f = ask >>= \env -> getProfilesDefault env f
+  getAttestations f = ask >>= \env -> getAttestationsDefault env f
+  getDisputes f = ask >>= \env -> getDisputesDefault env f

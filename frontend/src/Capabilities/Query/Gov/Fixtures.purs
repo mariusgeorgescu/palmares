@@ -20,6 +20,9 @@ module Capabilities.Query.Gov.Fixtures
   , withdrawalListFixture
   , delegationListFixture
   , activityFixture
+  , profileListFixture
+  , attestationListFixture
+  , disputeListFixture
   ) where
 
 -- | `GET /status` pe preprod, 2026-10-24. `epoch_params` e omis: niciun decodor nu-l citește încă,
@@ -1650,5 +1653,242 @@ activityFixture =
   "limit": 11,
   "offset": 0,
   "next_cursor": "137243903:1:1:0"
+}
+"""
+
+-- | `GET /profiles?limit=6`, măsurat 2026-10-25. Cîmpurile pe care ecranul le citește; restul
+-- | (slot, hash de bloc) sînt în răspuns și nu sînt aici, pentru că o fixtură e pentru decodor,
+-- | nu o copie a bazei. Jumătate din profiluri n-au credențial de guvernanță, ceea ce e cazul
+-- | normal: un profil poate exista fără să pretindă o identitate pe lanț.
+profileListFixture :: String
+profileListFixture =
+  """
+{
+  "items": [
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043",
+      "name": "palmares-smoke-20261024T205314Z-subject",
+      "description": "subject profile for smoke-20261024T205314Z",
+      "image_uri": "ipfs://palmares-smoke-placeholder",
+      "kind": "person_d_rep",
+      "credential": "drep1yfdqa29j3hhsf9lsj490j59t7cgf0k5la5q8nqgkqkahpwq5hl35n",
+      "credential_is_script": false,
+      "claimant_count": 6
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0de31c9a96041fdeafb91d5d8f6b24f26826b3d740c4fc40090ffcae9",
+      "name": "palmares-smoke-20261024T205314Z-issuer",
+      "description": "issuer profile for smoke-20261024T205314Z",
+      "image_uri": "ipfs://palmares-smoke-placeholder",
+      "kind": "auditor",
+      "credential": null,
+      "credential_is_script": null,
+      "claimant_count": null
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b06e4117ca2181d9382c0719e1782c8141abbcb58633b4bf180cd1458b",
+      "name": "palmares-smoke-20261024T192629Z-subject",
+      "description": "subject profile for smoke-20261024T192629Z",
+      "image_uri": "ipfs://palmares-smoke-placeholder",
+      "kind": "person_d_rep",
+      "credential": "drep1yfdqa29j3hhsf9lsj490j59t7cgf0k5la5q8nqgkqkahpwq5hl35n",
+      "credential_is_script": false,
+      "claimant_count": 6
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b03e7345404e3b0c0b795ac2d545f5eea7c1d3831261f386a225aafb0a",
+      "name": "palmares-smoke-20261024T192629Z-issuer",
+      "description": "issuer profile for smoke-20261024T192629Z",
+      "image_uri": "ipfs://palmares-smoke-placeholder",
+      "kind": "auditor",
+      "credential": null,
+      "credential_is_script": null,
+      "claimant_count": null
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b034a141578feb8318767614d9b1e0f3d9e747a4d37cc4ce40a3dc25e0",
+      "name": "palmares-smoke-20261024T175134Z-subject",
+      "description": "subject profile for smoke-20261024T175134Z",
+      "image_uri": "ipfs://palmares-smoke-placeholder",
+      "kind": "person_d_rep",
+      "credential": "drep1yfdqa29j3hhsf9lsj490j59t7cgf0k5la5q8nqgkqkahpwq5hl35n",
+      "credential_is_script": false,
+      "claimant_count": 6
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0132c592ca23fb2334e0a0a1132306d50c174002626a523a522a88649",
+      "name": "palmares-smoke-20261024T175134Z-issuer",
+      "description": "issuer profile for smoke-20261024T175134Z",
+      "image_uri": "ipfs://palmares-smoke-placeholder",
+      "kind": "auditor",
+      "credential": null,
+      "credential_is_script": null,
+      "claimant_count": null
+    }
+  ],
+  "total": 12,
+  "limit": 6,
+  "offset": 0
+}
+"""
+
+-- | `GET /attestations?limit=6`, măsurat 2026-10-25. `accepted` e al SUBIECTULUI, iar cele trei
+-- | numere de dispute sînt separate tocmai pentru că „neacceptată" și „contestată" nu sînt
+-- | același lucru.
+attestationListFixture :: String
+attestationListFixture =
+  """
+{
+  "items": [
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010708aa68abb20aa664efe2f68a46d4dc28c0ffe5f20b3dbd01b7ecc9df5",
+      "subject": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043",
+      "issuer": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0de31c9a96041fdeafb91d5d8f6b24f26826b3d740c4fc40090ffcae9",
+      "kind": "audit_passed",
+      "date": "2026-10-24T21:11:39Z",
+      "accepted": false,
+      "name": "smoke-20261024T205314Z-unresolvable",
+      "description": "unresolvable anchor for smoke-20261024T205314Z",
+      "dispute_count": 0,
+      "open_dispute_count": 0,
+      "upheld_dispute_count": 0
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.00001070ef7917d1f7cfea84f171d00db00b741a50303bd18c9c170b62a62225",
+      "subject": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043",
+      "issuer": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0de31c9a96041fdeafb91d5d8f6b24f26826b3d740c4fc40090ffcae9",
+      "kind": "milestone_delivered",
+      "date": "2026-10-24T21:09:47Z",
+      "accepted": false,
+      "name": "smoke-20261024T205314Z-anchored",
+      "description": "anchored attestation for smoke-20261024T205314Z",
+      "dispute_count": 0,
+      "open_dispute_count": 0,
+      "upheld_dispute_count": 0
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.0000107051c34a05faa589d9ea5707dbbd366bd3df5a6338f042a7241c1f4a3f",
+      "subject": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043",
+      "issuer": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0de31c9a96041fdeafb91d5d8f6b24f26826b3d740c4fc40090ffcae9",
+      "kind": "role_held",
+      "date": "2026-10-24T20:58:30Z",
+      "accepted": true,
+      "name": "palmares-smoke-20261024T205314Z-attestation",
+      "description": "attestation for smoke-20261024T205314Z",
+      "dispute_count": 1,
+      "open_dispute_count": 0,
+      "upheld_dispute_count": 1
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.0000107086c39b42ae97c949ff998da0ec3b721204cf1cb5395961b5f60821ea",
+      "subject": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043",
+      "issuer": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043",
+      "kind": "credential_claim",
+      "date": "2026-10-24T20:57:02Z",
+      "accepted": false,
+      "name": "credential claim for smoke-20261024T205314Z",
+      "description": "binds the subject profile to its DRep credential",
+      "dispute_count": 0,
+      "open_dispute_count": 0,
+      "upheld_dispute_count": 0
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.0000107020216e9e05b7df72d4343b1defc8414d31c3749e34145ae8d140ccff",
+      "subject": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b06e4117ca2181d9382c0719e1782c8141abbcb58633b4bf180cd1458b",
+      "issuer": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b03e7345404e3b0c0b795ac2d545f5eea7c1d3831261f386a225aafb0a",
+      "kind": "audit_passed",
+      "date": "2026-10-24T19:39:58Z",
+      "accepted": false,
+      "name": "smoke-20261024T192629Z-unresolvable",
+      "description": "unresolvable anchor for smoke-20261024T192629Z",
+      "dispute_count": 0,
+      "open_dispute_count": 0,
+      "upheld_dispute_count": 0
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010700ac278b7708337dd0cec39516a8aad00e3576133ccc8dc8103741dab",
+      "subject": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b06e4117ca2181d9382c0719e1782c8141abbcb58633b4bf180cd1458b",
+      "issuer": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b03e7345404e3b0c0b795ac2d545f5eea7c1d3831261f386a225aafb0a",
+      "kind": "milestone_delivered",
+      "date": "2026-10-24T19:38:28Z",
+      "accepted": false,
+      "name": "smoke-20261024T192629Z-anchored",
+      "description": "anchored attestation for smoke-20261024T192629Z",
+      "dispute_count": 0,
+      "open_dispute_count": 0,
+      "upheld_dispute_count": 0
+    }
+  ],
+  "total": 19,
+  "limit": 6,
+  "offset": 0
+}
+"""
+
+-- | `GET /disputes?limit=5`, măsurat 2026-10-25. Toate cele cinci dispute de pe preprod.
+disputeListFixture :: String
+disputeListFixture =
+  """
+{
+  "items": [
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e019fd9551ab85480b95ed2c9ddb7524c1c6e56cb76f4d2f98a12f33db",
+      "target": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.0000107051c34a05faa589d9ea5707dbbd366bd3df5a6338f042a7241c1f4a3f",
+      "opened_by": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0de31c9a96041fdeafb91d5d8f6b24f26826b3d740c4fc40090ffcae9",
+      "opened_at": "2026-10-24T21:06:38Z",
+      "stale_after": "2026-11-23T21:06:38Z",
+      "deposit": 5000000,
+      "verdict": "upheld",
+      "name": "palmares-smoke-20261024T205314Z-dispute",
+      "description": "dispute for smoke-20261024T205314Z"
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e04f1c2fa3758cb1fbf7cd8f1fbf036380b0bf6cb4f2aac2289477f6b7",
+      "target": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010709304948f55376ea52eb1a3dbfd787bdf20cb142234898414b28eb84b",
+      "opened_by": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b03e7345404e3b0c0b795ac2d545f5eea7c1d3831261f386a225aafb0a",
+      "opened_at": "2026-10-24T19:35:35Z",
+      "stale_after": "2026-11-23T19:35:35Z",
+      "deposit": 5000000,
+      "verdict": "upheld",
+      "name": "palmares-smoke-20261024T192629Z-dispute",
+      "description": "dispute for smoke-20261024T192629Z"
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e01a026d3f300a144b2513c3b2989155b812e226a884dac78480b9ff72",
+      "target": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010707cfa7e4aba15edf44209fbd61d4fcd09128665bb03eb252d0030474f",
+      "opened_by": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0132c592ca23fb2334e0a0a1132306d50c174002626a523a522a88649",
+      "opened_at": "2026-10-24T18:01:34Z",
+      "stale_after": "2026-11-23T18:01:34Z",
+      "deposit": 5000000,
+      "verdict": "upheld",
+      "name": "palmares-smoke-20261024T175134Z-dispute",
+      "description": "dispute for smoke-20261024T175134Z"
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e0f19eed926d13ac48fbc9da693b041bf96d570fd71d7274c9e74e994d",
+      "target": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.0000107014bea12cce2cea6371bc05f68943d44473fdf2ff70a663b4cdf8fbe1",
+      "opened_by": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0ec46f39a0b71260adb17ba380beba56820bf8d5d8ef176c22aa84618",
+      "opened_at": "2026-10-24T17:10:23Z",
+      "stale_after": "2026-11-23T17:10:23Z",
+      "deposit": 5000000,
+      "verdict": "upheld",
+      "name": "palmares-smoke-20261024T170127Z-dispute",
+      "description": "dispute for smoke-20261024T170127Z"
+    },
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e043695b1d8df106b42eda0b7bff1fff2ed2b17e516bde0ee6918cd05b",
+      "target": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010701cec17070d82d79cfb93664dbe6d3cf4b8191d47bea1bc5f009d814a",
+      "opened_by": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0a53448cfa801d630b3f25c300d0211b22c7585efceab9838993082bf",
+      "opened_at": "2026-10-24T16:40:49Z",
+      "stale_after": "2026-11-23T16:40:49Z",
+      "deposit": 5000000,
+      "verdict": "upheld",
+      "name": "palmares-smoke-20261024T163239Z-dispute",
+      "description": "dispute for smoke-20261024T163239Z"
+    }
+  ],
+  "total": 5,
+  "limit": 5,
+  "offset": 0
 }
 """

@@ -22,6 +22,9 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getWithdrawals
   , getDelegations
   , getActivity
+  , getProfiles
+  , getAttestations
+  , getDisputes
   ) where
 
 import Prelude
@@ -41,6 +44,9 @@ import Capabilities.Query.Gov.Types
   , WithdrawalPage
   , DelegationPage
   , ActivityPage
+  , ProfilePage
+  , AttestationPage
+  , DisputePage
   , VotePage
   )
 import Control.Monad.Trans.Class (lift)
@@ -51,6 +57,7 @@ import Route.GovQueries
   , DRepFilters
   , DelegationFilters
   , GovActionFilters
+  , RegistryFilters
   , SpoFilters
   , VoteFilters
   , WithdrawalFilters
@@ -112,6 +119,15 @@ class Monad m <= MonadQueryGov m where
   -- | `ActivityPage`.
   getActivity :: ActivityFilters -> m (Either ApiError ActivityPage)
 
+  -- | `GET /profiles` — registrul de profiluri. Un profil e un TOKEN: cine îl deține, îl deține.
+  getProfiles :: RegistryFilters -> m (Either ApiError ProfilePage)
+
+  -- | `GET /attestations` — cine ce a afirmat despre cine, și dacă subiectul a recunoscut.
+  getAttestations :: RegistryFilters -> m (Either ApiError AttestationPage)
+
+  -- | `GET /disputes` — contestațiile deschise împotriva atestărilor, cu depozitul pus la bătaie.
+  getDisputes :: RegistryFilters -> m (Either ApiError DisputePage)
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
@@ -129,3 +145,6 @@ instance monadQueryGovHalogenM ::
   getWithdrawals = lift <<< getWithdrawals
   getDelegations = lift <<< getDelegations
   getActivity = lift <<< getActivity
+  getProfiles = lift <<< getProfiles
+  getAttestations = lift <<< getAttestations
+  getDisputes = lift <<< getDisputes

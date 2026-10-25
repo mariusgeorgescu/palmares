@@ -12,6 +12,7 @@ import Route.GovQueries
   , MethodologyFilters
   , ActivityFilters
   , DelegationFilters
+  , RegistryFilters
   , SpoFilters
   , WithdrawalFilters
   , VoteFilters
@@ -40,6 +41,9 @@ data Route
   | TreasuryList WithdrawalFilters
   | DelegationList DelegationFilters
   | Activity ActivityFilters
+  | ProfileList RegistryFilters
+  | AttestationList RegistryFilters
+  | DisputeList RegistryFilters
   | Methodology MethodologyFilters
   | NotFound
 
@@ -65,5 +69,8 @@ instance Show Route where
     TreasuryList _ -> "TreasuryList"
     DelegationList f -> "DelegationList " <> fromMaybe "" f.drep_id
     Activity f -> "Activity " <> fromMaybe "" f.before
+    ProfileList _ -> "ProfileList"
+    AttestationList _ -> "AttestationList"
+    DisputeList _ -> "DisputeList"
     Methodology f -> "Methodology " <> fromMaybe "" f.focus
     NotFound -> "NotFound"

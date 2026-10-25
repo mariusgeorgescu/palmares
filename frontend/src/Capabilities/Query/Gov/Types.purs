@@ -56,6 +56,12 @@ module Capabilities.Query.Gov.Types
   , DelegationPage(..)
   , ActivityEvent(..)
   , ActivityPage(..)
+  , ProfileRow(..)
+  , ProfilePage(..)
+  , AttestationRow(..)
+  , AttestationPage(..)
+  , DisputeRow(..)
+  , DisputePage(..)
   ) where
 
 import Prelude
@@ -1530,3 +1536,174 @@ instance DecodeJson ActivityPage where
     limit <- o .: "limit"
     nextCursor <- o .:? "next_cursor"
     pure (ActivityPage { items, limit, nextCursor })
+
+-- | Un profil din registrul de atestări: `GET /profiles`.
+-- |
+-- | `id` e o CLASĂ DE ACTIV (`policy.assetName`), nu un hash: profilul e un token, iar asta e tot
+-- | modelul — cine deține tokenul deține profilul.
+-- |
+-- | `credential` leagă profilul de o identitate de guvernanță (un DRep, un membru de comitet) și
+-- | lipsește la 6 din 12 profiluri măsurate: un profil poate exista fără să pretindă vreo
+-- | identitate pe lanț. `claimantCount` lipsește împreună cu el, din același motiv.
+newtype ProfileRow = ProfileRow
+  { id :: String
+  , name :: String
+  , description :: String
+  , imageUri :: String
+  , kind :: String
+  , credential :: Maybe String
+  , credentialIsScript :: Maybe Boolean
+  , claimantCount :: Maybe Int
+  }
+
+derive instance Eq ProfileRow
+
+instance DecodeJson ProfileRow where
+  decodeJson json = do
+    o <- decodeJson json
+    id <- o .: "id"
+    name <- o .: "name"
+    description <- o .: "description"
+    imageUri <- o .: "image_uri"
+    kind <- o .: "kind"
+    credential <- o .:? "credential"
+    credentialIsScript <- o .:? "credential_is_script"
+    claimantCount <- o .:? "claimant_count"
+    pure (ProfileRow { id, name, description, imageUri, kind, credential, credentialIsScript, claimantCount })
+
+newtype ProfilePage = ProfilePage
+  { items :: Array ProfileRow
+  , total :: Int
+  , limit :: Int
+  , offset :: Int
+  }
+
+derive instance Eq ProfilePage
+
+instance DecodeJson ProfilePage where
+  decodeJson json = do
+    o <- decodeJson json
+    items <- o .: "items"
+    total <- o .: "total"
+    limit <- o .: "limit"
+    offset <- o .: "offset"
+    pure (ProfilePage { items, total, limit, offset })
+
+-- | O atestare: cineva (`issuer`) afirmă ceva despre altcineva (`subject`).
+-- |
+-- | `accepted` e al SUBIECTULUI: o atestare neacceptată e afirmată dar nerecunoscută, ceea ce nu e
+-- | același lucru cu una contestată. De-aia cele trei numere de dispute sunt separate.
+newtype AttestationRow = AttestationRow
+  { id :: String
+  , subject :: String
+  , issuer :: String
+  , kind :: String
+  , date :: String
+  , accepted :: Boolean
+  , name :: String
+  , description :: String
+  , disputeCount :: Int
+  , openDisputeCount :: Int
+  , upheldDisputeCount :: Int
+  }
+
+derive instance Eq AttestationRow
+
+instance DecodeJson AttestationRow where
+  decodeJson json = do
+    o <- decodeJson json
+    id <- o .: "id"
+    subject <- o .: "subject"
+    issuer <- o .: "issuer"
+    kind <- o .: "kind"
+    date <- o .: "date"
+    accepted <- o .: "accepted"
+    name <- o .: "name"
+    description <- o .: "description"
+    disputeCount <- o .: "dispute_count"
+    openDisputeCount <- o .: "open_dispute_count"
+    upheldDisputeCount <- o .: "upheld_dispute_count"
+    pure
+      ( AttestationRow
+          { id
+          , subject
+          , issuer
+          , kind
+          , date
+          , accepted
+          , name
+          , description
+          , disputeCount
+          , openDisputeCount
+          , upheldDisputeCount
+          }
+      )
+
+newtype AttestationPage = AttestationPage
+  { items :: Array AttestationRow
+  , total :: Int
+  , limit :: Int
+  , offset :: Int
+  }
+
+derive instance Eq AttestationPage
+
+instance DecodeJson AttestationPage where
+  decodeJson json = do
+    o <- decodeJson json
+    items <- o .: "items"
+    total <- o .: "total"
+    limit <- o .: "limit"
+    offset <- o .: "offset"
+    pure (AttestationPage { items, total, limit, offset })
+
+-- | O dispută deschisă împotriva unei atestări.
+-- |
+-- | `verdict` lipsește cât timp disputa e deschisă — e tocmai ce se așteaptă — iar `staleAfter` e
+-- | momentul după care disputa nedecisă poate fi închisă de oricine. Depozitul e miza: cine
+-- | deschide o dispută pune bani, și îi pierde dacă disputa cade.
+newtype DisputeRow = DisputeRow
+  { id :: String
+  , target :: String
+  , openedBy :: String
+  , openedAt :: String
+  , staleAfter :: String
+  , deposit :: Lovelace
+  , verdict :: Maybe String
+  , name :: String
+  , description :: String
+  }
+
+derive instance Eq DisputeRow
+
+instance DecodeJson DisputeRow where
+  decodeJson json = do
+    o <- decodeJson json
+    id <- o .: "id"
+    target <- o .: "target"
+    openedBy <- o .: "opened_by"
+    openedAt <- o .: "opened_at"
+    staleAfter <- o .: "stale_after"
+    deposit <- o .: "deposit"
+    verdict <- o .:? "verdict"
+    name <- o .: "name"
+    description <- o .: "description"
+    pure (DisputeRow { id, target, openedBy, openedAt, staleAfter, deposit, verdict, name, description })
+
+newtype DisputePage = DisputePage
+  { items :: Array DisputeRow
+  , total :: Int
+  , limit :: Int
+  , offset :: Int
+  }
+
+derive instance Eq DisputePage
+
+instance DecodeJson DisputePage where
+  decodeJson json = do
+    o <- decodeJson json
+    items <- o .: "items"
+    total <- o .: "total"
+    limit <- o .: "limit"
+    offset <- o .: "offset"
+    pure (DisputePage { items, total, limit, offset })

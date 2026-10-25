@@ -12,6 +12,8 @@ import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Components.Explorer.Committee as Committee
 import Components.Explorer.Activity as Activity
+import Components.Explorer.AttestationList as AttestationList
+import Components.Explorer.DisputeList as DisputeList
 import Components.Explorer.Dashboard as Dashboard
 import Components.Explorer.DelegationList as DelegationList
 import Components.Explorer.ActionDetail as ActionDetail
@@ -19,6 +21,7 @@ import Components.Explorer.ActionList as ActionList
 import Components.Explorer.DRepDetail as DRepDetail
 import Components.Explorer.DRepList as DRepList
 import Components.Explorer.Methodology as Methodology
+import Components.Explorer.ProfileList as ProfileList
 import Components.Explorer.SpoList as SpoList
 import Components.Explorer.TreasuryList as TreasuryList
 import Components.Explorer.VoteList as VoteList
@@ -67,6 +70,9 @@ type Slots =
   , treasuryList :: TreasuryList.Slot
   , delegationList :: DelegationList.Slot
   , activity :: Activity.Slot
+  , profileList :: ProfileList.Slot
+  , attestationList :: AttestationList.Slot
+  , disputeList :: DisputeList.Slot
   , voteList :: VoteList.Slot
   , methodology :: Methodology.Slot
   )
@@ -153,6 +159,9 @@ component =
     TreasuryList filters -> HH.slot_ TreasuryList._treasuryList unit TreasuryList.component filters
     DelegationList filters -> HH.slot_ DelegationList._delegationList unit DelegationList.component filters
     Activity filters -> HH.slot_ Activity._activity unit Activity.component filters
+    ProfileList filters -> HH.slot_ ProfileList._profileList unit ProfileList.component filters
+    AttestationList filters -> HH.slot_ AttestationList._attestationList unit AttestationList.component filters
+    DisputeList filters -> HH.slot_ DisputeList._disputeList unit DisputeList.component filters
     Methodology filters -> HH.slot_ Methodology._methodology unit Methodology.component filters
     NotFound -> renderNotFound
 
@@ -182,5 +191,8 @@ documentTitle = case _ of
   TreasuryList _ -> "Treasury withdrawals — Palmares"
   DelegationList _ -> "Delegations — Palmares"
   Activity _ -> "Activity — Palmares"
+  ProfileList _ -> "Profiles — Palmares"
+  AttestationList _ -> "Attestations — Palmares"
+  DisputeList _ -> "Disputes — Palmares"
   Methodology _ -> "Methodology — Palmares"
   NotFound -> "Not found — Palmares"

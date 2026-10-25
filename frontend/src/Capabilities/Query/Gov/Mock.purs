@@ -20,6 +20,9 @@ module Capabilities.Query.Gov.Mock
   , getWithdrawalsMock
   , getDelegationsMock
   , getActivityMock
+  , getProfilesMock
+  , getAttestationsMock
+  , getDisputesMock
   , decodeFixture
   ) where
 
@@ -40,6 +43,9 @@ import Capabilities.Query.Gov.Fixtures
   , withdrawalListFixture
   , delegationListFixture
   , activityFixture
+  , profileListFixture
+  , attestationListFixture
+  , disputeListFixture
   )
 import Capabilities.Query.Gov.Http (ApiError(..), classifyResponse)
 import Capabilities.Query.Gov.Types
@@ -57,6 +63,9 @@ import Capabilities.Query.Gov.Types
   , WithdrawalPage
   , DelegationPage
   , ActivityPage
+  , ProfilePage
+  , AttestationPage
+  , DisputePage
   )
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
 import Data.Bifunctor (lmap)
@@ -66,6 +75,7 @@ import Route.GovQueries
   , DRepFilters
   , DelegationFilters
   , GovActionFilters
+  , RegistryFilters
   , SpoFilters
   , VoteFilters
   , WithdrawalFilters
@@ -123,3 +133,12 @@ getDelegationsMock _ = pure (decodeFixture delegationListFixture)
 
 getActivityMock :: forall m. Applicative m => ActivityFilters -> m (Either ApiError ActivityPage)
 getActivityMock _ = pure (decodeFixture activityFixture)
+
+getProfilesMock :: forall m. Applicative m => RegistryFilters -> m (Either ApiError ProfilePage)
+getProfilesMock _ = pure (decodeFixture profileListFixture)
+
+getAttestationsMock :: forall m. Applicative m => RegistryFilters -> m (Either ApiError AttestationPage)
+getAttestationsMock _ = pure (decodeFixture attestationListFixture)
+
+getDisputesMock :: forall m. Applicative m => RegistryFilters -> m (Either ApiError DisputePage)
+getDisputesMock _ = pure (decodeFixture disputeListFixture)

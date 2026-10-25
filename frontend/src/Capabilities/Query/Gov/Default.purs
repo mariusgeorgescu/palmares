@@ -17,6 +17,9 @@ module Capabilities.Query.Gov.Default
   , getWithdrawalsDefault
   , getDelegationsDefault
   , getActivityDefault
+  , getProfilesDefault
+  , getAttestationsDefault
+  , getDisputesDefault
   ) where
 
 import Prelude
@@ -38,6 +41,9 @@ import Capabilities.Query.Gov.Types
   , WithdrawalPage
   , DelegationPage
   , ActivityPage
+  , ProfilePage
+  , AttestationPage
+  , DisputePage
   )
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
@@ -48,6 +54,7 @@ import Route.GovQueries
   , GovActionFilters
   , ActivityFilters
   , DelegationFilters
+  , RegistryFilters
   , SpoFilters
   , VoteFilters
   , WithdrawalFilters
@@ -55,6 +62,9 @@ import Route.GovQueries
   , withdrawalListHrefFor
   , delegationListHrefFor
   , activityHrefFor
+  , profileListHrefFor
+  , attestationListHrefFor
+  , disputeListHrefFor
   , encodePathSegment
   , renderDRepFilters
   , renderGovActionFilters
@@ -187,3 +197,27 @@ getActivityDefault
   -> m (Either ApiError ActivityPage)
 getActivityDefault env filters =
   getJson (env.queryBaseUrl <> "/activity" <> queryOf (activityHrefFor filters))
+
+getProfilesDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> RegistryFilters
+  -> m (Either ApiError ProfilePage)
+getProfilesDefault env f = getJson (env.queryBaseUrl <> "/profiles" <> queryOf (profileListHrefFor f))
+
+getAttestationsDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> RegistryFilters
+  -> m (Either ApiError AttestationPage)
+getAttestationsDefault env f = getJson (env.queryBaseUrl <> "/attestations" <> queryOf (attestationListHrefFor f))
+
+getDisputesDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> RegistryFilters
+  -> m (Either ApiError DisputePage)
+getDisputesDefault env f = getJson (env.queryBaseUrl <> "/disputes" <> queryOf (disputeListHrefFor f))
