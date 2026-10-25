@@ -67,6 +67,21 @@ jobs:
       # ar construi `MainDemo` și ar trece verde cu AppM rupt.
       - run: npm run build:prod
 
+      # e2e pe bundle-ul DEMO: fixturi, deci determinist, fără backend și fără rețea. Un decodor
+      # corect și un ecran alb trec amândouă testele unitare — asta le separă.
+      #
+      # `--only-shell` ia doar headless shell-ul (~100 MB) în loc de tot Chrome: suita nu deschide
+      # nicio fereastră.
+      - run: npx playwright install --only-shell chromium
+      - run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-trace
+          path: frontend/test-results/
+          retention-days: 7
+
   image:
     needs: check
     if: github.event_name != 'pull_request'

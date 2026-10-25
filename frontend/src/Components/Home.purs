@@ -83,9 +83,13 @@ component =
       -- linia asta, orice URL deschis direct — un link dat mai departe, un refresh, un bookmark —
       -- randa pagina de pornire. Template-ul avea același defect; nu se vedea, pentru că avea o
       -- singură rută cu conținut.
+      -- `Nothing` înseamnă „calea nu se parsează", nu „nu știu încă": `current` e o parsare pură a
+      -- adresei curente, iar „/" se parsează ca `Home`. Deci un URL necunoscut e `NotFound`, și
+      -- fără linia asta ar fi randat dashboard-ul — ceea ce e mai rău decât o pagină de eroare,
+      -- pentru că arată ca un succes.
       current >>= case _ of
         Just r -> H.modify_ _ { route = r }
-        Nothing -> pure unit
+        Nothing -> H.modify_ _ { route = NotFound }
       emitter <- emitMatched
       _ <- H.subscribe (RouteChanged <$> emitter)
       pure unit

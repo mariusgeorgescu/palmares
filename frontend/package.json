@@ -23,6 +23,7 @@
     "vite-plugin-wasm": "^3.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.1.10",
     "autoprefixer": "^10.4.21",
     "daisyui": "^5.5.5",
@@ -45,7 +46,9 @@
     "bff": "npm run build && node bff/server.js",
     "bff:dev": "node --watch bff/server.js",
     "deploy-dev": "docker buildx build --platform linux/amd64,linux/arm64 --provenance=false -t ghcr.io/mariusgeorgescu/palmares-frontend:dev -f Dockerfile . --push",
-    "deploy-prod": "docker buildx build --platform linux/amd64,linux/arm64 --provenance=false -t ghcr.io/mariusgeorgescu/palmares-frontend:prod -f Dockerfile . --push"
+    "deploy-prod": "docker buildx build --platform linux/amd64,linux/arm64 --provenance=false -t ghcr.io/mariusgeorgescu/palmares-frontend:prod -f Dockerfile . --push",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:only": "playwright test"
   },
   "browser": {
     "child_process": false
