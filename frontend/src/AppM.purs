@@ -14,8 +14,8 @@ import AppEnv (Env)
 import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.LogMessages (class LogMessages)
-import Capabilities.Query.Api.Default (getItemsPageDefault)
-import Capabilities.Query.Api.MonadQueryApi (class MonadQueryApi)
+import Capabilities.Query.Gov.Default (getStatusDefault)
+import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Transaction.MonadInteraction (class MonadInteraction)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Control.Monad.Error.Class (class MonadThrow)
@@ -83,5 +83,5 @@ instance MonadDelay AppM where
 instance MonadDomEvent AppM where
   preventDefaultEvent = liftEffect <<< preventDefault
 
-instance MonadQueryApi AppM where
-  getItemsPage q = ask >>= \env -> getItemsPageDefault env q
+instance MonadQueryGov AppM where
+  getStatus = ask >>= getStatusDefault

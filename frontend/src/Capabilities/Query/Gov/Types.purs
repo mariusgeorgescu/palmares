@@ -7,9 +7,9 @@
 -- | singur modificator global ar rupe exact jumătate; și o cheie scrisă literal aici e vizibilă la
 -- | citire, deci o nepotrivire se vede în diff.
 module Capabilities.Query.Gov.Types
-  ( GovSync
-  , AttestSync
-  , GovStatus
+  ( GovSync(..)
+  , AttestSync(..)
+  , GovStatus(..)
   , ChipState(..)
   , chipState
   , chipStateFor

@@ -7,6 +7,7 @@ import Prelude
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Test.Capabilities.HttpSpec as HttpSpec
+import Test.Capabilities.StatusSpec as StatusSpec
 import Test.Query.PageSpec as PageSpec
 import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner (runSpec)
@@ -14,4 +15,5 @@ import Test.Spec.Runner (runSpec)
 main :: Effect Unit
 main = launchAff_ $ runSpec [ consoleReporter ] do
   HttpSpec.spec
+  StatusSpec.spec
   PageSpec.spec

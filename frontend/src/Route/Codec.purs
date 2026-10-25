@@ -15,7 +15,6 @@ import Routing.Duplex.Generic (noArgs, sum)
 routeCodec :: RouteDuplex' Route
 routeCodec = root $ sum
   { "Home": noArgs
-  , "Items": path "items" noArgs
   , "NotFound": path "__not_found__" noArgs
   }
 

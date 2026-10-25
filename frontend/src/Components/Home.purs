@@ -8,10 +8,10 @@ import Prelude
 
 import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent)
-import Capabilities.Query.Api.MonadQueryApi (class MonadQueryApi)
+import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
-import Components.Explorer.Items as Items
 import Components.Layout.NavBar as NavBar
+import Components.Shared.StatusChip as StatusChip
 import Data.Const (Const)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
@@ -39,7 +39,7 @@ data Action
 
 type Slots =
   ( navbar :: NavBar.Slot
-  , items :: Items.Slot
+  , statusChip :: StatusChip.Slot
   )
 
 component
@@ -50,7 +50,7 @@ component
   => MonadDelay m
   => MonadRouter Route m
   => MonadStore Store.Action Store.Store m
-  => MonadQueryApi m
+  => MonadQueryGov m
   => H.Component Query Input Output m
 component =
   H.mkComponent
@@ -73,30 +73,30 @@ component =
   render st =
     HH.div [ HP.class_ (HH.ClassName "min-h-screen bg-base-100") ]
       [ HH.slot NavBar._navbar unit NavBar.component unit HandleNavBar
+      -- Chip-ul stă în afara slotului de rută, nu în fiecare pagină: prospețimea e o proprietate a
+      -- datelor, nu a ecranului, și un singur apel o acoperă pe toate.
+      , HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 pt-4") ]
+          [ HH.slot_ StatusChip._statusChip unit StatusChip.component unit ]
       , HH.main [ HP.class_ (HH.ClassName "min-h-[80vh]") ]
           [ renderRoute st.route ]
       ]
 
   renderRoute = case _ of
     Home -> renderHomePage
-    Items -> HH.slot_ Items._items unit Items.component unit
     NotFound -> renderNotFound
 
   renderHomePage =
     HH.div [ HP.class_ (HH.ClassName "container mx-auto p-6") ]
       [ HH.div [ HP.class_ (HH.ClassName "hero bg-base-200 rounded-box") ]
           [ HH.div [ HP.class_ (HH.ClassName "hero-content text-center") ]
-              [ HH.div [ HP.class_ (HH.ClassName "max-w-md") ]
+              [ HH.div [ HP.class_ (HH.ClassName "max-w-2xl") ]
                   [ HH.h1 [ HP.class_ (HH.ClassName "text-5xl font-bold") ]
-                      [ HH.text "Welcome" ]
+                      [ HH.text "Palmares" ]
                   , HH.p [ HP.class_ (HH.ClassName "py-6") ]
-                      [ HH.text "Your Cardano dApp scaffold. Connect a wallet in the navbar, then browse "
-                      , HH.a
-                          [ HP.href (printRoute Items)
-                          , HP.class_ (HH.ClassName "link link-primary")
-                          ]
-                          [ HH.text "Items" ]
-                      , HH.text " to see the page-shaped capability pattern in action."
+                      [ HH.text
+                          "A verifiable track record for Cardano governance. Every figure here is \
+                          \derived independently from the chain, and every metric resolves to a \
+                          \published formula."
                       ]
                   ]
               ]

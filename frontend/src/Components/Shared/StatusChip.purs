@@ -1,0 +1,113 @@
+-- | Chip-ul global de prospețime: pe fiecare ecran, un singur apel, fără al doilea.
+-- |
+-- | Trei lucruri pe care le face **intenționat** altfel decât ar fi comod:
+-- |
+-- |   * nu arată niciodată verde când nu știe. `Unknown` e o a patra stare, nu o degradare la
+-- |     „probabil e bine" — un produs al cărui diferențiator e aritmetica verificabilă nu are voie
+-- |     să mintă despre cât de veche e aritmetica;
+-- |   * ia pragurile din răspuns (`amber_lag_seconds`, `ready_max_lag_seconds`), nu din cod, ca să
+-- |     nu se dezacordeze de la probe-ul care decide dacă `/ready` e verde;
+-- |   * etichetează cifrele de putere cu `drep_distr_epoch`, nu cu epoca curentă, pentru că ledgerul
+-- |     scrie distribuția de stake cu o epocă în urmă față de tip.
+module Components.Shared.StatusChip
+  ( Slot
+  , Output
+  , _statusChip
+  , component
+  ) where
+
+import Prelude
+
+import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getStatus)
+import Capabilities.Query.Gov.Types (AttestSync(..), ChipState(..), GovStatus(..), GovSync(..), chipStateFor)
+import Data.Const (Const)
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
+import Halogen as H
+import Halogen.HTML as HH
+import Halogen.HTML.Properties as HP
+import Network.RemoteData (RemoteData(..))
+import Type.Proxy (Proxy(..))
+
+type Slot = H.Slot (Const Void) Output Unit
+
+type Output = Void
+
+_statusChip :: Proxy "statusChip"
+_statusChip = Proxy
+
+type State = { status :: RemoteData ApiError GovStatus }
+
+data Action = Initialize
+
+component
+  :: forall q i m
+   . MonadQueryGov m
+  => H.Component q i Output m
+component =
+  H.mkComponent
+    { initialState: const { status: NotAsked }
+    , render
+    , eval: H.mkEval H.defaultEval
+        { handleAction = handleAction
+        , initialize = Just Initialize
+        }
+    }
+  where
+  handleAction = case _ of
+    Initialize -> do
+      H.modify_ _ { status = Loading }
+      res <- getStatus
+      H.modify_ _
+        { status = case res of
+            Left e -> Failure e
+            Right s -> Success s
+        }
+
+  render st = case st.status of
+    NotAsked -> badge Unknown "status unknown"
+    Loading -> badge Unknown "checking data freshness…"
+    Failure e -> badge Unknown ("freshness unknown — " <> renderApiError e)
+    Success s -> renderStatus s
+
+  renderStatus s@(GovStatus st) =
+    let
+      GovSync gov = st.governance
+    in
+      HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-center gap-2 text-sm") ]
+        [ HH.span [ HP.class_ (HH.ClassName "badge badge-outline") ] [ HH.text st.network ]
+        , badge (chipStateFor s) (freshnessLabel gov.lagSeconds)
+        , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
+            [ HH.text ("epoch " <> show gov.epoch) ]
+        , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
+            [ HH.text ("metrics as of epoch " <> show st.metricsAsOfEpoch) ]
+        , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
+            [ HH.text ("stake distribution: epoch " <> show st.drepDistrEpoch) ]
+        , renderAttestation st.attestation
+        ]
+
+  -- Absent nu e „zero" și nu e o eroare: un deploy doar-guvernanță nu are proiector de atestări, și
+  -- asta e o configurație validă pe care ecranul trebuie să o numească.
+  renderAttestation = case _ of
+    Nothing ->
+      HH.span [ HP.class_ (HH.ClassName "opacity-50") ]
+        [ HH.text "attestations: not deployed" ]
+    Just (AttestSync a) ->
+      HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
+        [ HH.text ("attestations: " <> a.state <> " (" <> show a.lagSeconds <> "s behind)") ]
+
+  freshnessLabel lag
+    | lag <= 0 = "live"
+    | otherwise = show lag <> "s behind"
+
+  badge state label =
+    HH.span
+      [ HP.class_ (HH.ClassName ("badge " <> badgeClass state)) ]
+      [ HH.text label ]
+
+  badgeClass = case _ of
+    Green -> "badge-success"
+    Amber -> "badge-warning"
+    Red -> "badge-error"
+    Unknown -> "badge-ghost"

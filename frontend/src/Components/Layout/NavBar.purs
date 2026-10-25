@@ -84,7 +84,6 @@ component =
       , HH.div [ HP.class_ (HH.ClassName "flex-none gap-2") ]
           [ HH.ul [ HP.class_ (HH.ClassName "menu menu-horizontal px-1") ]
               [ navLink Home "Home"
-              , navLink Items "Items"
               ]
           , HH.slot WC._walletConnect unit WC.component walletConnectInput HandleWalletConnect
           ]
