@@ -1,0 +1,69 @@
+---
+description: Halogen component design — when to use components, pure render functions, performance
+globs: "**/*.purs"
+alwaysApply: false
+---
+
+# Halogen Component Design
+
+Based on [Real World Halogen — Using Halogen Components](https://thomashoneyman.com/guides/real-world-halogen/using-halogen-components/).
+
+## Reach for Components Last
+
+- Components are for managing **statefulness** and **communication** with the rest of the app, not just rendering HTML
+- If you only need to render HTML or it's simple to pass in state and events, use a **pure render function** instead
+- Promote pure functions to components only when you actually need internal state or effects
+
+```purescript
+-- Pure render function — no component overhead
+renderHeader :: forall p i. Profile -> HTML p i
+
+-- Component — needed when state or effects are involved
+myComponent :: forall m. MonadAff m => Component Query Input Output m
+```
+
+## Keep Components Pure When Possible
+
+- A component with no constraints on `m` is pure — its behavior is fully deterministic until Halogen runs it
+- Add capability constraints only when the component actually needs them
+- **Prefer intent-level capabilities** (e.g. `MonadDelay`, `MonadDomFocus`, `MonadDomEvent`) over `MonadAff`/`MonadEffect` so effect surfaces stay narrow (see project rule `effect-capability-narrowing`)
+- Keep rendering and most logic in pure helper functions; the component just wires them together
+
+```purescript
+-- Pure component: testable as a state machine
+myComponent :: forall m. Component HTML Query Input Output m
+
+-- Effectful component: intent capabilities first, broad monads only when needed
+myComponent :: forall m. MonadDelay m => MonadDomFocus m => Component HTML Query Input Output m
+myComponent :: forall m. LogMessages m => LocalStorage m => Component HTML Query Input Output m
+```
+
+## Typical Component Hierarchy
+
+- **Page-level components** for main views in the application — these are relatively monolithic compared to React-style micro-components
+- **Highly stateful widgets** (typeaheads, date pickers, charts) as standalone components
+- **Everything else** as pure render functions called within page components
+
+## Renderless & Higher-Order Components for Reuse
+
+- **Renderless components** have no render function of their own; a parent provides the renderer
+  - Good for sharing behavior and state management (e.g., selection, keyboard navigation) across visually different components
+- **Higher-order components** take a component as input, augment it with new behavior/state, and return the augmented component
+- Use these patterns when multiple components share complex interactive logic (e.g., dropdown and typeahead sharing selection/search behavior)
+
+## Performance Guidelines
+
+### Minimize State Updates
+- Halogen re-renders on **every** state update via `modify` / `put`, even if nothing visible changed
+- Batch related state changes into a single `modify` call
+- Avoid redundant updates (e.g., setting state to its current value)
+
+### Cache Expensive Computations in State
+- Don't recompute expensive values in `render` — they'll run on every state change
+- Pre-compute and store results in state; update only when the underlying input changes
+- Example: a date picker should compute the month's dates when the selected date changes, not on every mouse hover
+
+### Be Careful with `receiver` (Input Handling)
+- `receiver` runs every time the parent re-renders, regardless of whether input actually changed
+- If `receiver` writes to state, every parent re-render triggers a child re-render
+- Guard state writes in `receiver` behind an equality check or only update when input meaningfully differs

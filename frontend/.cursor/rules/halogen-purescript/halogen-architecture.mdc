@@ -1,0 +1,75 @@
+---
+description: Halogen application architecture — ReaderT pattern, three-layer design, capability type classes
+globs: "**/*.purs"
+alwaysApply: false
+---
+
+# Halogen Application Architecture
+
+Based on [Real World Halogen](https://thomashoneyman.com/guides/real-world-halogen/) by Thomas Honeyman.
+
+## Functional Core, Imperative Shell
+
+- Separate effects and data as much as possible
+- The vast majority of code should be side-effect-free functions and data
+- Effects belong only at the boundaries — API requests, DOM rendering, local storage, etc.
+- Even in apps that feel "mostly boundaries," a substantial functional core is achievable
+
+## The Three-Layer Pattern
+
+### Layer 3 — Pure Business Logic (largest layer)
+- Practically effect-free: pure functions and simple data types
+- Classic functional programming principles apply
+- No `Aff` or `Effect` in type signatures
+
+### Layer 2 — Capabilities (medium layer)
+- Type classes representing what the app can do, not how it does it
+- Pure functions that can be run by Layer 1 to perform effects
+- Defer to Layer 3 functions where possible
+
+### Layer 1 — ReaderT / Effectful Shell (thinnest layer)
+- `AppM` monad implemented via `ReaderT Env Aff`
+- Interprets capabilities into real effects
+- Provides type class instances for Layer 2
+- Purely operational: config, request execution, concurrency
+
+## The ReaderT Design Pattern
+
+- Write effectful functions in terms of pure type class capabilities
+- Use `ReaderT` with a read-only environment for global config (log levels, API base URLs, credentials)
+- Use mutable `Ref` for global mutable state — **never** `StateT` (each Halogen component runs in its own thread; `StateT` won't provide shared state)
+- Avoid monad transformers beyond `ReaderT` except in small, localized subsets
+
+```purescript
+newtype AppM a = AppM (ReaderT Env Aff a)
+
+runAppM :: Env -> AppM ~> Aff
+runAppM e (AppM m) = runReaderT m e
+```
+
+## Capability Type Classes
+
+- Represent **what** the app can do, not **how** — e.g., "read/write user credentials," not "access local storage"
+- Keep capabilities abstract so implementations can be swapped (REST → GraphQL, console → external logger, production → test mock)
+- Separate read-only vs. read-write capabilities into distinct classes
+- Provide `HalogenM` instances that lift capabilities so components can use them directly without manual `lift`
+
+```purescript
+class Monad m <= LogMessages m where
+  log :: LogType -> String -> m Unit
+
+instance LogMessages m => LogMessages (HalogenM st act slots out m) where
+  log l s = lift (log l s)
+```
+
+## Testing with Capabilities
+
+- Write a separate test monad (`TestM`) with pure instances of capability classes
+- Test core logic without hitting real services — use `Writer` to record outputs, `Reader` for fixed inputs
+- The functional core (Layer 3) is testable with no special monad at all
+
+## Application Environment
+
+- Store read-only config in the `Env` record: log level, base URL, feature flags
+- Store mutable shared state (e.g., current user) in a `Ref` within `Env`
+- Components access `Env` via `MonadAsk`

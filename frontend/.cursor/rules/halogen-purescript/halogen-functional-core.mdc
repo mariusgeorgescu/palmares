@@ -1,0 +1,36 @@
+---
+description: Functional core and capability architecture for Halogen
+alwaysApply: false
+---
+
+# Halogen Functional Core
+
+## Push effects to the edges
+
+- Keep most logic pure; isolate `Aff` / `Effect` in a thin interpreter layer.
+- Avoid embedding effectful concerns directly into business-domain types.
+
+## Define capabilities by intent, not mechanism
+
+- Model what the app can do (`Authentication`, `GetProfile`, `ManageArticle`), not how (`HTTP`, `localStorage`).
+- **Do not limit capability design by available APIs or backend data types.** When a better design calls for it, define new capability methods, domain types, and stub implementations; adapt or map from backend types at the boundary.
+- Keep capability interfaces implementation-agnostic so infrastructure can change without rewriting core logic.
+- Split read-only and mutating capabilities when possible to clarify behavior and permissions.
+
+## ReaderT application shell
+
+- Prefer an application monad with `ReaderT Env Aff` for shared config and dependencies.
+- Use `Ref` for global mutable state when needed; avoid `StateT` for app-wide mutable state.
+- Keep instances thin: read env, call pure functions, perform minimal side effects.
+
+## Keep logic testable
+
+- Put decision and formatting rules in pure functions.
+- Pass effectful dependencies as parameters (time, writers, request runners) so they can be mocked.
+- Validate behavior in pure test contexts before wiring production effects.
+
+## Components as boundary layer
+
+- Reach for components when state, lifecycle, or browser interaction is required.
+- Prefer pure render functions for reusable presentational fragments.
+- Minimize unnecessary state updates to avoid excess rerenders.

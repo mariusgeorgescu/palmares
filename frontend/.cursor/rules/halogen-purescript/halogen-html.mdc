@@ -1,0 +1,65 @@
+---
+description: Halogen HTML DSL patterns and conventions
+globs: "**/*.purs"
+alwaysApply: false
+---
+
+# Halogen HTML DSL
+
+## Import Conventions
+
+```purescript
+import Halogen.HTML as HH
+import Halogen.HTML.Properties as HP
+import Halogen.HTML.Events as HE
+```
+
+## Element Construction
+
+Elements take properties array and children array:
+
+```purescript
+HH.div [ HP.id "root", HP.classes [ HH.ClassName "container" ] ]
+  [ HH.h1_ [ HH.text "Title" ]
+  , HH.button [ HE.onClick \_ -> Increment ] [ HH.text "Click" ]
+  ]
+```
+
+Use underscore variants when no properties needed: `HH.div_`, `HH.span_`, `HH.p_`
+
+## Event Handlers
+
+Handlers return an action directly (not `Maybe action`):
+
+```purescript
+HE.onClick \_ -> DoAction
+HE.onValueInput \str -> SetValue str
+HE.onChecked \bool -> Toggle bool
+```
+
+For preventing defaults, capture the event:
+
+```purescript
+HE.onSubmit \ev -> HandleSubmit ev
+-- then in handleAction: liftEffect $ Event.preventDefault ev
+```
+
+## Child Components
+
+```purescript
+HH.slot  _label slotId component input HandleOutput  -- with output handler
+HH.slot_ _label slotId component input               -- ignore output
+```
+
+## Performance
+
+- `HH.lazy fn arg` for referential equality memoization
+- `HH.lazy2`, `HH.lazy3` for multiple arguments
+- `memoized eq renderFn` for custom equality predicates
+- Use keyed elements (`Halogen.HTML.Elements.Keyed`) for efficient list rendering
+
+## Types
+
+- `HTML w i` — base HTML type
+- `ComponentHTML action slots m` — component render output
+- `PlainHTML` — HTML with no components or events (use `fromPlainHTML` to embed)

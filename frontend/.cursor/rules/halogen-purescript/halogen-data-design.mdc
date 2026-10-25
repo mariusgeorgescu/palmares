@@ -1,0 +1,107 @@
+---
+description: Type-driven data design principles for Halogen/PureScript applications
+alwaysApply: false
+---
+
+# Data Design Principles
+
+Based on [Real World Halogen — Design Data & Pure Functions](https://thomashoneyman.com/guides/real-world-halogen/design-data-pure-functions/).
+
+## Three Kinds of Data
+
+### Values
+- Data without identity — `Email`, `Username`, `Slug`
+- Two values are the same if their contents are the same
+- Changing a value produces a new value
+
+### Entities
+- Data with persistent identity — `User`, `Article`, `Comment`
+- Two entities are the same only if they share an identity, even if other fields differ
+- Often aggregates of values
+
+### Lifecycles
+- Data representing states a value or entity can be in over time
+- Use sum types to model transitions (e.g., `RemoteData`)
+
+## Core Principles
+
+### Give Data an Informative Type
+- Prefer domain types over primitives: `Route` instead of `String`, `Username` instead of `String`
+- Meaningful types make signatures self-documenting and prevent misuse
+
+```purescript
+-- Bad: any string accepted, no hint of purpose
+navigate :: String -> Effect Unit
+
+-- Good: only valid routes accepted, intent is clear
+data Route = Home | Settings
+navigate :: Route -> Effect Unit
+```
+
+### Use Newtypes for Identification
+- Wrap primitives in newtypes to prevent mixing up semantically different values
+- Prevents accidental arithmetic on IDs, swapped arguments, wrong-type comparisons
+
+```purescript
+newtype CustomerId = CustomerId Natural
+newtype OrderId = OrderId Natural
+```
+
+### Make Illegal States Unrepresentable
+- Design types so invalid combinations cannot be constructed
+- Restrict the domain of types rather than expanding the range of every consuming function with error handling
+- Prefer `NonEmptyArray` over `Array` when emptiness is invalid; prefer custom sum types over `Tuple (Maybe a) (Maybe b)` when at-least-one is required
+
+```purescript
+-- Too permissive: allows no contact info at all
+type ContactInfo = Tuple (Maybe Email) (Maybe Postal)
+
+-- Correct: exactly the valid states
+data ContactInfo
+  = EmailOnly Email
+  | PostalOnly Postal
+  | Both Email Postal
+```
+
+### Smart Constructors
+- Hide data constructors from module exports; expose only a validated constructor function
+- Consumers get a compile-time guarantee that any value of the type is valid
+- Downstream functions don't need to handle invalid cases
+
+```purescript
+module MyModule (Username, mkUsername) where
+
+newtype Username = Username String
+
+mkUsername :: String -> Maybe Username
+mkUsername "" = Nothing
+mkUsername s = Just (Username s)
+```
+
+### Use `RemoteData` for Server-Loaded State
+- Represent async data with `RemoteData err res` (`NotAsked | Loading | Failure err | Success res`)
+- Keeps underlying domain types pure and stateless — lifecycle state is external
+- Prevents inconsistent states like "has data but not yet fetched" or "has both data and errors"
+
+```purescript
+type ComponentState = { stuff :: RemoteData Error (Array Stuff) }
+```
+
+## Row Polymorphism for Shared Fields
+
+- Use open records (`{ field :: Type | r }`) when multiple types share a common set of fields
+- Recover closed records by applying `()` to the row variable
+
+```purescript
+type UserProfileFields r =
+  { username :: Username, bio :: Maybe String, image :: Maybe Avatar | r }
+
+type UserProfile = UserProfileFields ()
+type AuthUser = UserProfileFields (email :: Email)
+```
+
+## Pick Your Battles
+
+- Not every value needs a perfect custom type — weigh the cost of deep type modeling against actual use
+- If data is module-internal, used trivially, or the domain doesn't justify it, a simpler type is fine
+- When in doubt, err on the side of a custom type

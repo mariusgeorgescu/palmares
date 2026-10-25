@@ -1,0 +1,30 @@
+bower_components/
+node_modules/
+dist/
+.pulp-cache/
+output/
+output-es/
+generated-docs/
+.psc-package/
+.psc*
+.purs*
+.psa*
+.spago
+
+.DS_Store
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# MCP
+.mcp.json
+
+# Environment variables (secrets)
+.env
+.env.*
+!.env.example
+
+# Claude Code (local worktrees, permissions with absolute paths)
+.claude/

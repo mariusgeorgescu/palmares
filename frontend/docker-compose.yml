@@ -1,0 +1,55 @@
+# -----------------------------------------------------------------------------
+# Two-tag pattern:
+#   - UPSTREAM_TAG  : tag for external services pulled from Docker Hub
+#                     (your backend services). Bump when you want a new
+#                     backend release.
+#   - DOWNSTREAM_TAG: tag for images built from THIS repo (the frontend).
+#                     Output of scripts/build-image.sh.
+# -----------------------------------------------------------------------------
+
+services:
+  # ---------------------------------------------------------------------------
+  # Product tier — built from this repo.
+  # ---------------------------------------------------------------------------
+  frontend:
+    image: your-org/cardano-dapp-frontend:${DOWNSTREAM_TAG:-latest}
+    container_name: cardano-dapp-frontend
+    ports:
+      - "8080:80"      # Fastify serves frontend + BFF on container :80
+    environment:
+      - NODE_ENV=production
+      - PORT=80
+      - BFF_HOST=0.0.0.0
+      - API_URL=${API_URL:-http://api:8083}
+      - API_USER=${API_USER:-cardano}
+      - API_PASS=${API_PASS:-lovelace}
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    # Uncomment when your backend services are running in this compose:
+    # depends_on:
+    #   api:
+    #     condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Protocol tier — pulled from Docker Hub, pinned by ${UPSTREAM_TAG}.
+  # Uncomment and adapt for your backend services.
+  # ---------------------------------------------------------------------------
+  # api:
+  #   image: your-org/your-backend:${UPSTREAM_TAG:-latest}
+  #   container_name: cardano-dapp-api
+  #   environment:
+  #     - PORT=8083
+  #   ports:
+  #     - "8083:8083"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -fsS http://localhost:8083/health || exit 1"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 10
+  #     start_period: 10s
+  #   restart: unless-stopped

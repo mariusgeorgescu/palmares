@@ -1,0 +1,93 @@
+---
+description: Project-specific naming and structural conventions for the Cardano dApp frontend template
+globs: "**/*.purs"
+alwaysApply: false
+---
+
+# Project Conventions
+
+## Module layout
+
+- **Top-level app modules**: no prefix — `AppM`, `DemoM`, `Store`, `Main`, `MainDemo`, `AppEnv`.
+- **Components**: under `Components.*` — e.g. `Components.Home`, `Components.Layout.NavBar`, `Components.Explorer.Items`.
+- **Capabilities**: under `Capabilities.*` — e.g. `Capabilities.LogMessages`, `Capabilities.Delay`, `Capabilities.DomEvent`, `Capabilities.Query.Api.MonadQueryApi`, `Capabilities.Query.Api.Types`, `Capabilities.Query.Api.Default`, `Capabilities.Query.Api.Mock`, `Capabilities.Query.Api.Env`. Add an interaction capability (e.g. `MonadInteractionApi`) and its stub in a corresponding module when you start writing on-chain.
+- **App utilities**: `App.Utils` at `src/App/Utils.purs` (add when you have project-specific helpers). Do not use top-level `Utils` for project code (reserved by dependencies).
+- **Validation**: under `Validation.*` — pure business logic (Layer 3). No `m` constraints. Validators receive effectful values (current time, etc.) as parameters.
+
+## Slot and proxy labels
+
+- Use underscore prefix for slot/label proxies: `_navbar`, `_home`, `_items`, `_walletConnect`.
+- Define once per component (e.g. `_items = Proxy`) and use in `HH.slot` / `HH.slot_`.
+
+## Domain types
+
+- Prefer domain types over raw primitives:
+  - **Username** for user identity (in `Store`).
+  - **NetworkId** (or a project newtype) for allowed network (in `AppEnv`).
+  - **EntityId** newtypes for IDs (e.g. `newtype ItemId = ItemId String`).
+- Use `DecodeJson`/`EncodeJson` for API types in `Types.purs`.
+
+## Env vs Store
+
+- **Env** (`AppEnv`): read-only config only — e.g. `apiBaseUrl`, `allowedNetworkId`. No mutable state.
+- **Store** (`Store`): global mutable state — `walletApi`, `user`; actions `Connect`, `Disconnect`, `SetUser`, `ClearUser`; single pure reducer `reduce`.
+- Wallet connection and user identity live in Store; config (network, API base) lives in Env.
+
+## App monad and capabilities
+
+- **AppM** = `RouterT Route (ReaderT Env (StoreT Store.Action Store.Store Aff))`. Run with `runAppM env initialStore rootComponent`.
+- **Capability pattern**:
+  - Type class in `Capabilities.*` (e.g. `MonadQueryApi`, `LogMessages`).
+  - Default implementation in `Capabilities.*.Default`, taking env/config.
+  - `AppM` instance: get env via `ask`, then call default.
+  - `HalogenM` instance: `lift` so components use the capability directly.
+- **Intent-level capabilities**: Prefer narrow capabilities over `MonadAff`/`MonadEffect` in components. Ships with: `MonadDelay`, `MonadDomEvent`. Add `MonadDomFocus`, `MonadGetTime`, `MonadPlaySound`, `CopyToClipboard`, `ScrollToTop`, etc. as your features need them; implement in AppM/DemoM; see rule `effect-capability-narrowing`.
+- **LogMessages**: `logMessage LogLevel String`; implement in AppM; use in components via class constraint.
+- **MonadQueryApi**: example data-fetching capability; types in `Capabilities.Query.Api.Types`; results as `Either String a`. Production: AppM delegates to `Default`. Demo/test: Mock in `Capabilities.Query.Api.Mock`; DemoM uses Mock (default build uses MainDemo; `npm run dev`).
+
+## Query env
+
+- `HasApiEnv r = ( apiBaseUrl :: String | r )` in `Capabilities.Query.Api.Env`.
+- `AppEnv.Env` satisfies it; Default functions take `env` and use `env.apiBaseUrl`.
+
+## Components
+
+- Root: `Main` runs `runAppM defaultEnv initialStore Home.component`. Stub/dev: `MainDemo` runs `runDemoM` with mock data; default bundle is MainDemo (`npm run build` / `npm run dev`).
+- Slots: typed row with named slots; use `Proxy` and `HH.slot` / `HH.slot_`.
+- Shared state only via Store or Env; local state in component state type.
+
+### Component reuse and sourcing
+
+- **Prefer upstream when available**: Before implementing a new reusable UI component, check whether it already exists in **purescript-halogen-daisyui** (https://github.com/mariusgeorgescu/purescript-halogen-daisyui). If it does, use it from `Halogen.DaisyUI.*`. If it does not, implement the new component in a **dedicated module** in this project (e.g. under `Components.*` or a shared UI module), structured so it can later be contributed to or extracted for that upstream repo.
+- **DaisyUI-first, custom only when needed**: When building UI, first use **DaisyUI primitives** (card, button, input, badge, modal, etc.) and expose them in PureScript via Halogen HTML and the existing `Halogen.DaisyUI.*` helpers or local render helpers that apply DaisyUI classes. Implement **custom components** (custom markup/CSS or complex behavior not covered by DaisyUI) only when no suitable DaisyUI primitive exists for the use case.
+
+## Async data
+
+- Use **RemoteData per capability result**: each object returned by a capability function is modeled as `RemoteData String a` (one RemoteData per result object, not per field of an aggregate).
+- For **aggregate pages**, prefer one composite capability and one `RemoteData` for the whole page (e.g. `RemoteData String DashboardPage`); avoid many separate capability calls and many RemoteData fields on the same page.
+- Config such as `apiBaseUrl` stays a plain type, not RemoteData.
+- Handle `NotAsked` / `Loading` / `Failure` / `Success` in render per section.
+
+## Dependent repositories
+
+These repos are pulled via `spago.yaml` workspace `extraPackages`.
+
+### purescript-halogen-daisyui
+
+- **Modules**: `Halogen.DaisyUI.*`. Barrel modules `Halogen.DaisyUI.Utils` and `Halogen.DaisyUI.Components`.
+- Component helpers are `render*` (e.g. `renderToasts`, `renderButton`). Utility modules under `Halogen.DaisyUI.Utils.*`.
+
+### halogen-cardano-wallet-connect-component
+
+- **Module**: `Components.WalletConnectComponent`; exports `Slot`, `_walletConnect`, `Query`, `Output`, `Input`, `component`.
+- Uses `handleQuery` for parent-driven updates; raises `Output` for wallet events.
+- Requires `MonadCIP30` and `MonadAff`.
+
+### purescript-cardano-capabilities
+
+- **Modules**: `Cardano.Capabilities.*`. Marker type class with standalone functions (e.g. `enableWallet`, `getNetworkName`).
+- Consumer declares empty instance (`instance MonadCIP30 AppM`) and uses the functions.
+
+### purescript-cip30 / cardano-serialization-lib
+
+- Low-level bindings; treat as upstream FFI/capability backends.

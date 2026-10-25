@@ -1,0 +1,26 @@
+---
+description: BFF (Backend For Frontend) — Fastify proxy and static server
+globs: "bff/**/*.js"
+alwaysApply: false
+---
+
+# BFF Conventions
+
+## Role
+
+- Serves static frontend from `../dist`; proxies `/api/{service-name}/*` to backend services; injects auth (Basic or API Key). Frontend never receives or sends credentials.
+
+## Config
+
+- Services defined in `config.js` via exported `services` object. Each entry: `target` (backend URL) and either `username`/`password` (Basic Auth) or `apiKey`. All values from environment variables.
+- Use `getEnv` / `requireEnv` for env access; mask secrets in logs (e.g. `maskValue`).
+
+## Server setup
+
+- Register proxy routes for each service **before** registering `@fastify/static`, so `/api/*` is handled by proxy.
+- Proxy options: `prefix: "/api/${serviceName}"`, `rewritePrefix: '/'`; inject auth in `rewriteRequestHeaders`. Strip `WWW-Authenticate` in `onSend` for proxy responses.
+- SPA fallback: 404 handler serves `dist/index.html` for non-API routes; return 404 JSON for `/api/*` misses.
+
+## Frontend contract
+
+- Frontend uses base URL `/api/api` (template default — see `AppEnv.defaultEnv`). Paths appended in code are sent as-is to the backend after prefix rewrite. Adding a new service: add it to `config.js` and, if needed, a new base URL in frontend Env/capability. Consumers typically rename `api` to something more descriptive (e.g. `query`, `tx`, `ipfs`).

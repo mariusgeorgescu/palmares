@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en" data-framework="purescript" data-theme="dim" class="scroll-smooth">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+	<title>Cardano dApp</title>
+	<meta name="description" content="A Cardano dApp built with PureScript + Halogen.">
+
+	<meta name="theme-color" content="#2A303C">
+
+	<link href="/output.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+	<script>
+		// Tiny scroll-reveal utility: any element with `.scroll-reveal`
+		// gets `.in-view` added when it enters the viewport. Use to fade
+		// in sections without pulling in an animation library.
+		(function () {
+			var io = new IntersectionObserver(function (entries) {
+				entries.forEach(function (e) {
+					if (e.isIntersecting) e.target.classList.add('in-view');
+				});
+			}, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+
+			var seen = new WeakSet();
+			var timer;
+			function scan() {
+				document.querySelectorAll('.scroll-reveal:not(.in-view)').forEach(function (el) {
+					if (!seen.has(el)) { seen.add(el); io.observe(el); }
+				});
+			}
+
+			new MutationObserver(function () {
+				clearTimeout(timer);
+				timer = setTimeout(scan, 80);
+			}).observe(document.documentElement, { childList: true, subtree: true });
+		})();
+	</script>
+
+	<script type="module">
+		import { main } from "./public/index.js";
+		main();
+	</script>
+</body>
+
+</html>

@@ -1,0 +1,64 @@
+---
+description: Prefer intent-level capabilities over MonadAff/MonadEffect in components; keep broad effects at interpreter boundaries
+globs: "**/*.purs"
+alwaysApply: false
+---
+
+# Effect-Capability Narrowing
+
+## Default policy
+
+- **Prefer intent-level capabilities** over `MonadAff` or `MonadEffect` in component and page signatures.
+- **Keep broad effects at interpreter boundaries** — `AppM` and `DemoM` implement capabilities via `liftAff` / `liftEffect`; components should not require `MonadAff` or `MonadEffect` unless justified by an explicit exception.
+
+## Constraint-selection ladder
+
+When a component needs an effect:
+
+1. **Pure** — no constraint if the operation can be pure (e.g. derived state, formatting).
+2. **Intent capability** — use a focused type class from `Capabilities.*` that describes the intent (e.g. `MonadDelay`, `MonadDomEvent`).
+3. **Broad monad** — use `MonadAff` or `MonadEffect` only when no suitable intent capability exists or the rule explicitly allows an exception.
+
+## Intent capabilities (shipped)
+
+| Capability | Module | Use for |
+| ---------- | ------ | ------- |
+| **MonadDelay** | Capabilities.Delay | Delays, debounce, timeouts (`delayMs`) |
+| **MonadDomEvent** | Capabilities.DomEvent | DOM event prevention (`preventDefaultEvent`) |
+
+Implementations live in **AppM** and **DemoM**; components get them via `HalogenM` lifting.
+
+## Patterns to add as you need them
+
+When a recurring effect shows up, define a focused capability rather than spreading `MonadAff`/`MonadEffect`. Examples used in similar Halogen apps:
+
+| Capability (suggested) | Use for |
+| ---------------------- | ------- |
+| `MonadDomFocus` | Focusing inputs/modals (`focusElement`) |
+| `MonadGetTime` | Current date/time (e.g. `getTodayISO`, `getNowISO`) |
+| `MonadPlaySound` | UI sound effects |
+| `CopyToClipboard` | Clipboard copy |
+| `ScrollToTop` | Scrolling page to top |
+
+## Explicit exceptions (when broad constraints are allowed)
+
+- **MonadAff** is acceptable when:
+  - The component must run arbitrary `Aff` (e.g. multiple unrelated async operations, or a third-party component that requires `MonadAff` and cannot be wrapped).
+  - A child component's slot requires `MonadAff` and the parent must provide it (document why in a comment if non-obvious). The `Components.WalletConnectComponent` slot is one such case.
+- **MonadEffect** is acceptable when:
+  - No intent capability exists for the effect and adding one is out of scope (e.g. one-off FFI).
+  - The effect is at an interpreter or FFI boundary, not in a generic UI component.
+
+## Migration checklist (when refactoring)
+
+1. Identify direct `H.liftAff` / `H.liftEffect` usage in the component.
+2. Map each to an intent (delay, focus, preventDefault, etc.).
+3. If an existing capability fits, add the constraint and replace the lift with the capability call.
+4. If no capability exists and the pattern recurs, add a new capability in `Capabilities.*` and implement it in AppM/DemoM.
+5. Remove `MonadAff`/`MonadEffect` from the component signature if no longer needed.
+6. Ensure any parent that slots this component has the same capability constraints (or broader) so the slot type checks.
+
+## Verification
+
+- Migrated components should **not** reintroduce direct `H.liftAff` / `H.liftEffect` for operations covered by an intent capability unless justified as an exception.
+- Run full build after changes. Update your project's capability documentation when adding new capabilities or changing component constraints.

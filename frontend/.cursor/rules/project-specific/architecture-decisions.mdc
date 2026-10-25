@@ -1,0 +1,53 @@
+---
+description: Project-specific architecture decisions for the Cardano dApp frontend template
+globs: "**/*.purs"
+alwaysApply: false
+---
+
+# Project-Specific Architecture
+
+This project follows the general Halogen rules in `.cursor/rules/halogen-purescript/` with the following intentional differences.
+
+## StoreT for global state
+
+- The app uses **halogen-store** (`StoreT Store.Action Store.Store Aff`) for global mutable state instead of a raw `Ref`.
+- Accepted shape: `AppM = RouterT Route (ReaderT Env (StoreT Store.Action Store.Store Aff))`.
+- The general rule "use Ref, avoid monad transformers beyond ReaderT" is relaxed here in favour of a structured store and reducer.
+
+## Build system
+
+- The project uses **spago.yaml** (workspace/registry), not `spago.dhall` / `packages.dhall`.
+- Custom/extra packages are pulled from git in `spago.yaml` workspace `extraPackages`.
+
+## Routing
+
+- **Path-based (History API)** — URLs are pathnames (`/`, `/items`, `/items/:id`). No hash-based routing as the canonical mode.
+- **Boundary modules**: `Route` (ADT), `Route.Codec` (routing-duplex: `routeCodec`, `parseRoute`, `printRoute`). History API integration via **halogen-router** (`MonadRouter`, `MonadNavigate`). AppM/DemoM use `RouterT Route`; browser effects stay in halogen-router; components use the route ADT and `MonadRouter` / `MonadNavigate`.
+- **Unknown paths** — Render the dedicated `NotFound` route/page (message + link to `/`). Do not redirect unknown paths to home. Parse failures map to `NotFound`; `printRoute NotFound` returns `/`.
+- **Backward compatibility** — On first load, if `location.hash` parses as a known route, call `replacePath(printRoute route)` once so old `#/...` links work; path is then canonical.
+- **Production runtime** — Canonical production server is the BFF (`npm start`). BFF serves `index.html` for non-API routes (SPA fallback), which is required for path routing on direct load/refresh.
+
+## BFF
+
+- See `@bff-conventions` rule for Fastify BFF proxy and static server details.
+- The frontend uses relative URLs (`/api/<service>`); credentials live only in BFF config.
+
+## Effect-capability narrowing
+
+- Components and pages should use **intent-level capabilities** (e.g. `MonadDelay`, `MonadDomEvent`) instead of broad `MonadAff`/`MonadEffect` where a suitable capability exists.
+- Broad effects belong at **interpreter boundaries** (AppM, DemoM, default/mock implementations). See rule `effect-capability-narrowing`.
+
+## Capability layer (example)
+
+The template ships one **page-shaped query capability** as a worked example:
+
+- `MonadQueryApi` (in `Capabilities.Query.Api.MonadQueryApi`) — single seam for data fetching.
+- Types in `Capabilities.Query.Api.Types` (e.g. `ItemsQuery`, `ItemsPage`).
+- `Default` implementation calls HTTP via `affjax-web`; `Mock` returns coherent stub data.
+- AppM delegates to Default; DemoM uses Mock.
+
+Rename `MonadQueryApi` / `Items*` to match your domain (e.g. `MonadQueryGov` / `Proposal*`). Add a **domain-specific interaction capability** (e.g. `MonadInteractionApi` with `submitX`, `buildTx`, `signTx`, `submitTx`) when you start writing on-chain.
+
+## Forms
+
+The template does **not** pull in `halogen-formless`. When the dApp needs typed forms with validation, add it and follow the project conventions (each form a standalone child component, pure validators in `Validation.*`, FormHelpers for DaisyUI-styled fields). See [purescript-halogen-formless](https://github.com/thomashoneyman/purescript-halogen-formless).

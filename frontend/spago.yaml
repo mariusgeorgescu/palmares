@@ -1,0 +1,92 @@
+package:
+  name: palmares-frontend
+  dependencies:
+    - aff
+    - affjax: ">=13.0.0 <14.0.0"
+    - affjax-web: ">=1.0.0 <2.0.0"
+    - argonaut-aeson-generic: ">=0.4.1 <0.5.0"
+    - argonaut-codecs
+    # `Data.Argonaut.Parser` (jsonParser) trăiește în argonaut-core, nu într-un pachet
+    # `argonaut-parser` — acela nu există în package set-ul 68.9.0.
+    - argonaut-core
+    - arrays
+    - bifunctors
+    - integers
+    - strings
+    - cardano-capabilities: "*"
+    - console: ">=6.1.0 <7.0.0"
+    - effect: ">=4.0.0 <5.0.0"
+    - either
+    - halogen: ">=7.0.0 <8.0.0"
+    - halogen-cardano-wallet-connect-component: "*"
+    - halogen-daisyui: "*"
+    - halogen-router: "*"
+    - halogen-store: ">=0.5.4 <0.6.0"
+    - maybe
+    - prelude: ">=6.0.2 <7.0.0"
+    - remotedata: ">=5.0.1 <6.0.0"
+    - routing: ">=11.0.0 <12.0.0"
+    - routing-duplex: ">=0.7.0 <0.8.0"
+    - transformers
+    - web-html: ">=4.1.1 <5.0.0"
+
+  test:
+    main: Test.Palmares
+    dependencies:
+      - spec
+
+  bundle:
+    extraArgs:
+      - "--external:@emurgo/cardano-serialization-lib-browser"
+      - "--external:@utxos/sdk"
+      - "--external:@meshsdk/core"
+
+workspace:
+  packageSet:
+    registry: 68.9.0
+  extraPackages:
+    halogen-daisyui:
+      git: https://github.com/mariusgeorgescu/purescript-halogen-daisyui.git
+      ref: c3f25f5
+
+    cardano-capabilities:
+      git: https://github.com/mariusgeorgescu/purescript-cardano-capabilities.git
+      ref: f0a6772
+
+    cardano-serialization-lib:
+      git: https://github.com/mariusgeorgescu/purescript-cardano-serialization-lib.git
+      ref: 7d6c664b125ce8c3cc441912fb8daf72294c17e7
+
+    cip30-typesafe:
+      git: https://github.com/mariusgeorgescu/purescript-cip30-typesafe.git
+      ref: a8cf31f14663b2737387ed26090516362c69d0f3
+
+    cip30:
+      git: https://github.com/mariusgeorgescu/purescript-cip30.git
+      ref: fb4b90fcca1f57edaacd6405965bf245d3504583
+
+    halogen-cardano-wallet-connect-component:
+      git: https://github.com/mariusgeorgescu/halogen-cardano-wallet-connect-component.git
+      ref: fbbb9e2
+
+    halogen-router:
+      # SHA, nu `main`: F1 check 16 cere un deploy reproductibil, iar o ramură mobilă face
+      # build-ul de azi diferit de cel de mâine fără ca nimic din repo să se schimbe.
+      git: https://github.com/katsujukou/purescript-halogen-router.git
+      ref: e25e7bbb7a32011c3f8c48c04612d5909455b035
+      dependencies:
+        - aff
+        - effect
+        - either
+        - foreign
+        - halogen
+        - halogen-hooks
+        - halogen-store
+        - halogen-subscriptions
+        - maybe
+        - prelude
+        - routing
+        - routing-duplex
+        - safe-coerce
+        - transformers
+        - tuples

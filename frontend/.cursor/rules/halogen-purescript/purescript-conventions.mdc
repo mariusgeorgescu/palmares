@@ -1,0 +1,46 @@
+---
+description: PureScript coding conventions for the Halogen project
+globs: "**/*.purs"
+alwaysApply: false
+---
+
+# PureScript Conventions
+
+## Naming
+
+- Types and data constructors: `PascalCase` (`Component`, `HalogenM`)
+- Functions and values: `camelCase` (`mkComponent`, `handleAction`)
+- Type variables: short lowercase, semantic when possible (`state`, `action`, `query`, `m`, `a`, `i`, `o`)
+- Proxy labels: underscore prefix (`_button`, `_modal`)
+- Modules: `PascalCase` dot-separated hierarchy (`Halogen.HTML.Elements`)
+
+## Type Signatures
+
+- Always provide explicit type signatures for top-level definitions
+- Order type variables consistently: `state`, `query`, `action`, `slots`, `input`, `output`, `m`
+- Use `forall` explicitly (not Unicode `∀`)
+
+## Module Organization
+
+- One primary type or concern per module
+- Use re-export modules for public API (e.g., `Halogen.purs` re-exports submodules)
+- Keep internal details in deeper submodules (e.g., `Halogen.Query.HalogenM`)
+
+## Documentation
+
+- Use `-- |` doc comments for all public types, classes, and functions
+- Document type variables in complex type signatures
+- Include usage examples in doc comments for key APIs
+
+## Formatting
+
+- 2-space indentation
+- Use `purs-tidy` for formatting (`npm run format`)
+- Trim trailing whitespace
+- End files with a newline
+
+## Imports
+
+- Group imports: PureScript core, then library, then project modules
+- Prefer qualified imports for namespacing (`import Halogen as H`, `import Halogen.HTML as HH`)
+- Use explicit import lists for unqualified imports

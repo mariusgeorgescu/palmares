@@ -1,0 +1,90 @@
+---
+description: Halogen parent-child component communication patterns
+alwaysApply: false
+---
+
+# Parent-Child Communication
+
+## Data Flow
+
+- **Input** (parent → child): declarative, re-sent on each parent render
+- **Output** (child → parent): event-based via `H.raise`
+- **Query** (parent → child): imperative, use sparingly
+
+## Rendering Children
+
+```purescript
+type Slots = ( child :: H.Slot ChildQuery ChildOutput Int )
+_child = Proxy :: Proxy "child"
+
+render state =
+  HH.div_
+    [ HH.slot _child 0 childComponent state.childInput HandleChildOutput ]
+```
+
+## Handling Child Output
+
+```purescript
+data Action = HandleChildOutput ChildOutput
+
+handleAction = case _ of
+  HandleChildOutput output -> case output of
+    ChildClicked -> H.modify_ _ { count = state.count + 1 }
+```
+
+## Input Pattern
+
+In the child, receive input updates:
+
+```purescript
+eval: H.mkEval $ H.defaultEval
+  { receive = Just <<< Receive
+  , handleAction = handleAction
+  }
+
+handleAction = case _ of
+  Receive input -> H.modify_ _ { value = input }
+```
+
+## Query Pattern
+
+Define query algebra in child:
+
+```purescript
+data Query a
+  = SetValue String a           -- tell-style
+  | GetValue (String -> a)      -- request-style
+```
+
+Handle in child:
+
+```purescript
+handleQuery = case _ of
+  SetValue v next -> H.modify_ _ { value = v } $> Just next
+  GetValue reply -> H.gets _.value <#> (Just <<< reply)
+```
+
+Use from parent:
+
+```purescript
+H.tell _child 0 (SetValue "hello")
+result <- H.request _child 0 GetValue
+```
+
+## Multiple Child Types
+
+Use a row type with multiple labels:
+
+```purescript
+type Slots =
+  ( button :: H.Slot Button.Query Button.Output Int
+  , modal :: H.Slot Modal.Query Void Unit
+  )
+```
+
+## Best Practices
+
+- Prefer input over queries for passing data down
+- Use output messages for events flowing up
+- Use queries only for imperative operations (focus, scroll, etc.)
+- Always provide `Ord` instance for slot IDs

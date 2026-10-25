@@ -1,0 +1,86 @@
+---
+description: Halogen state management and effect patterns
+globs: "**/*.purs"
+alwaysApply: false
+---
+
+# Halogen State & Effects
+
+## State Management
+
+State operations are available in `HalogenM`:
+
+```purescript
+H.get        :: HalogenM state ... state
+H.gets       :: (state -> a) -> HalogenM state ... a
+H.put        :: state -> HalogenM state ... Unit
+H.modify     :: (state -> state) -> HalogenM state ... state
+H.modify_    :: (state -> state) -> HalogenM state ... Unit
+```
+
+- `initialState :: input -> state` must be pure (no effects)
+- State changes trigger re-render automatically
+- Prefer `modify_` when you don't need the new state
+
+## Effects
+
+Use monad constraints on `m`, not concrete types. **Prefer intent-level capabilities** over broad `MonadAff`/`MonadEffect` (see project rule `effect-capability-narrowing`):
+
+```purescript
+-- Prefer: narrow capability
+handleAction :: forall o m. MonadDelay m => MonadDomFocus m => Action -> H.HalogenM State Action Slots o m Unit
+
+-- Use MonadAff/MonadEffect only when no intent capability fits or an exception applies
+handleAction :: forall o m. MonadAff m => Action -> H.HalogenM State Action Slots o m Unit
+```
+
+- This project ships `Capabilities.Delay` (`delayMs`) and `Capabilities.DomEvent` (`preventDefaultEvent`). Add others (e.g. `Capabilities.DomFocus`, `Capabilities.GetTime`) as patterns recur — see rule `effect-capability-narrowing`.
+- `liftEffect` — lift `Effect` into `HalogenM` (prefer at interpreter boundary; use intent capability in components when one exists).
+- `liftAff` — lift `Aff` into `HalogenM` (same preference).
+- For **debouncing**, wrap the delay in `H.fork` so subsequent input events don't queue up behind a blocking `delayMs`; use a generation counter in state to drop stale results.
+
+## Subscriptions
+
+```purescript
+sid <- H.subscribe emitter           -- subscribe, auto-cleanup on finalize
+H.subscribe' \sid -> ...             -- subscribe with access to own SubscriptionId
+H.unsubscribe sid                    -- manual unsubscribe
+```
+
+Use `Halogen.Query.Event.eventListener` for DOM event subscriptions:
+
+```purescript
+eventListener eventType target (map toAction <<< fromEvent)
+```
+
+## Forks
+
+```purescript
+fid <- H.fork myProcess              -- start concurrent process
+H.kill fid                            -- cancel it
+H.join fid                            -- wait for completion
+```
+
+Forks are automatically killed when the component finalizes.
+
+## Lifecycle
+
+- `initialize`: runs once on mount, use for setup/subscriptions
+- `receive`: runs when parent re-renders with new input
+- `finalize`: runs on unmount, use for cleanup
+- Subscriptions and forks are auto-cleaned on finalize
+
+## Output
+
+```purescript
+H.raise output                       -- emit output message to parent
+```
+
+## Querying Children
+
+```purescript
+H.tell _slot slotId query             -- tell (fire-and-forget)
+H.request _slot slotId query          -- request (returns Maybe a)
+H.tellAll _slot query                  -- tell all instances
+H.requestAll _slot query               -- request all instances
+```

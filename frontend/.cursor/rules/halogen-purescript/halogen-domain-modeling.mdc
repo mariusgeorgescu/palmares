@@ -1,0 +1,34 @@
+---
+description: Type-driven domain modeling for Halogen applications
+alwaysApply: false
+---
+
+# Halogen Domain Modeling
+
+## Design from use cases first
+
+- Start with user-facing use cases, then model data and transformations to support them.
+- Keep domain modules mostly pure; let components orchestrate, not own business rules.
+
+## Encode domain meaning in types
+
+- Prefer domain types over primitives (`Username`, `Slug`, `Email`, `Tag`).
+- Use `newtype` for identifiers, even when backed by `String` or numeric types.
+- Use smart constructors for validated inputs; avoid exporting unsafe constructors.
+
+## Make illegal states unrepresentable
+
+- Use ADTs to model valid states explicitly instead of boolean flags.
+- Replace sentinel empty values with richer lifecycle types.
+- Prefer `NonEmptyArray` / `NonEmptyString` where emptiness is invalid.
+
+## Separate entities, values, and lifecycles
+
+- Entities: persistent identity (`User`, `Article`, `Comment`).
+- Values: identity-free data (`Email`, `Tag`, `Route`).
+- Lifecycles: temporal state (`NotAsked | Loading | Failure e | Success a`).
+
+## Keep sensitive auth data opaque
+
+- Model authenticated identity separately from public profile projections.
+- Hide tokens and credentials behind opaque types and capability functions.

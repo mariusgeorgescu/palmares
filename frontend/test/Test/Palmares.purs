@@ -1,0 +1,17 @@
+-- | Punctul de intrare al suitei. Fiecare task din plan își adaugă aici spec-ul; agregatorul nu
+-- | conține aserțiuni proprii.
+module Test.Palmares where
+
+import Prelude
+
+import Effect (Effect)
+import Effect.Aff (launchAff_)
+import Test.Capabilities.HttpSpec as HttpSpec
+import Test.Query.PageSpec as PageSpec
+import Test.Spec.Reporter (consoleReporter)
+import Test.Spec.Runner (runSpec)
+
+main :: Effect Unit
+main = launchAff_ $ runSpec [ consoleReporter ] do
+  HttpSpec.spec
+  PageSpec.spec

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterTabFileEdit": [
+      {
+        "command": ".cursor/hooks/purs-format-typecheck.sh",
+        "timeout": 60
+      }
+    ]
+  }
+}

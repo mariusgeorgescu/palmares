@@ -1,0 +1,42 @@
+---
+description: Halogen project build tooling and workflow
+alwaysApply: true
+---
+
+# Project Tooling
+
+## Build System
+
+- **Spago** for package management and builds (`spago.yaml`)
+- Build: `npm run build` (full pipeline: spago bundle, CSS, vite build) or `npm run build:spago` (JS only). Default entry is `MainDemo` (stub/mock data).
+- Dev: `npm run dev` (build:spago + CSS + vite dev)
+- BFF: `npm run bff` (build + serve via Fastify); `npm run bff:dev` (watch mode)
+
+## Code Formatting
+
+- **purs-tidy** for formatting: `npm run format` (format in place), `npm run check-formatting` (CI check)
+- 2-space indentation, no trailing whitespace, final newline
+
+## PureScript Language
+
+- This project uses PureScript (not Haskell or TypeScript)
+- File extension: `.purs`
+- Module names must match file paths (e.g., `Components.Dashboard` → `src/Components/Dashboard.purs`)
+
+## Key Dependencies
+
+- `halogen` — UI framework
+- `halogen-store` — global state management (StoreT)
+- `halogen-daisyui` — DaisyUI component library
+- `halogen-cardano-wallet-connect-component` — wallet connection
+- `cardano-capabilities` — Cardano wallet capabilities
+- `halogen-router` — path-based routing
+- `remotedata` — async data modeling
+- `aff` — async effect monad
+- Extra packages pulled from git in `spago.yaml` workspace `extraPackages`
+- Add `halogen-formless` when the dApp needs typed forms with validation
+
+## Testing
+
+- Tests in `test/` directory
+- Test main: `Test.Main`

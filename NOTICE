@@ -8,5 +8,12 @@ from that work and are redistributed here under the Apache License, Version 2.0 
 copyright holder. The original MIT license text is retained in
 licenses/LICENSE.decentralized-belt-system.MIT.
 
+This product includes software derived from cardano-dapp-frontend-template, Copyright (c) 2026
+Marius Georgescu, itself derived from the Decentralized Belt System frontend. Portions of
+frontend/ — the ReaderT/StoreT/RouterT application skeleton, the Fastify BFF, the Vite and
+Docker configuration — come from that template and are redistributed here under the Apache
+License, Version 2.0 by the copyright holder.
+
 This product includes third-party software under its own licenses; see the dependency
-pins in cabal.project and the generated license report.
+pins in cabal.project, frontend/spago.yaml, frontend/package.json and the generated license
+report.

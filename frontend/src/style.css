@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+@source "../index.html";
+@source "./**/*.purs";
+@source "./**/*.js";
+@source "../.spago/**/*.purs";
+
+@plugin "daisyui" {
+  themes: dim --default;
+}
+
+@layer components {
+  /* Project-wide component styles go here. */
+}
