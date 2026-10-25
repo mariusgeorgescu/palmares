@@ -4,10 +4,12 @@ module Route
   ) where
 
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (fromMaybe)
 import Prelude
 import Route.GovQueries
   ( DRepFilters
   , GovActionFilters
+  , MethodologyFilters
   , VoteFilters
   , renderDRepFilters
   , renderGovActionFilters
@@ -28,6 +30,7 @@ data Route
   | ActionDetail String
   | ActionList GovActionFilters
   | VoteList VoteFilters
+  | Methodology MethodologyFilters
   | NotFound
 
 derive instance eqRoute :: Eq Route
@@ -47,4 +50,5 @@ instance Show Route where
     ActionDetail i -> "ActionDetail " <> i
     ActionList f -> "ActionList " <> renderGovActionFilters f
     VoteList f -> "VoteList " <> renderVoteFilters f
+    Methodology f -> "Methodology " <> fromMaybe "" f.focus
     NotFound -> "NotFound"

@@ -13,6 +13,8 @@ module Capabilities.Query.Gov.Fixtures
   , govActionListFixture
   , govActionDetailFixture
   , votesListFixture
+  , searchFixture
+  , formulasFixture
   ) where
 
 -- | `GET /status` pe preprod, 2026-10-24. `epoch_params` e omis: niciun decodor nu-l citește încă,
@@ -1114,4 +1116,85 @@ votesListFixture =
     "limit": 4,
     "offset": 0
   }
+  """
+
+-- | `GET /search?q=logical&limit_per_group=3` pe preprod, 2026-10-25. Trei DRep-i, restul
+-- | grupurilor goale — exact forma pe care ecranul trebuie să randeze fără să arate șase secțiuni
+-- | vide.
+searchFixture :: String
+searchFixture =
+  """
+  {"query":"logical","total":3,"dreps":{"total":3,"items":[{"id":"drep1yvv7culkq0nqlgs6gtmkryuwp3lq49k5rhu6c7y2n2psu8g08rvmk","title":"Logical Mechanism dRep","subtitle":"19ec73f603e60fa21a42f761938e0c7e0a96d41df9ac788a9a830e1d","badges":["script"],"status":"retired","target":{"kind":"drep","id":"drep1yvv7culkq0nqlgs6gtmkryuwp3lq49k5rhu6c7y2n2psu8g08rvmk"}},{"id":"drep1yvmeer7fcwng5ea3v7cw2g2uq352sm58xtmaphp5vqvcxycrzszhz","title":"Logical Mechanism dRep","subtitle":"379c8fc9c3a68a67b167b0e5215c0468a86e8732f7d0dc3460198313","badges":["script"],"status":"unknown","target":{"kind":"drep","id":"drep1yvmeer7fcwng5ea3v7cw2g2uq352sm58xtmaphp5vqvcxycrzszhz"}},{"id":"drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z","title":"Logical Mechanism dRep","subtitle":"763ef75661f0cd8c8fa159a79d79bfe8f9a76878bdaaff700598ee0e","badges":["script"],"status":"inactive","target":{"kind":"drep","id":"drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z"}}]},"gov_actions":{"total":0,"items":[]},"spos":{"total":0,"items":[]},"committee_members":{"total":0,"items":[]},"profiles":{"total":0,"items":[]},"attestations":{"total":0,"items":[]}}  """
+
+-- | Primele două din cele opt formule publicate de `GET /metrics/formulas`, cu SQL-ul __întreg__.
+-- |
+-- | Nu e tăiat, și ăsta e punctul: pagina de metodologie arată interogarea exact cum rulează, iar o
+-- | fixtură cu SQL ciuntit ar demonstra contrariul în bundle-ul demo. Răspunsul e un array nud, nu
+-- | un plic cu `items`.
+formulasFixture :: String
+formulasFixture =
+  """
+  [
+    {
+      "formula_id": "participation_rate_v1",
+      "name": "Participation rate",
+      "field": "participation_rate",
+      "expression": "|actions_voted| / |actions_eligible|",
+      "denominator": "distinct governance actions whose voting window closed before as_of_epoch, of a type the role may vote on in the action's protocol-version phase, overlapping a registered interval of the actor",
+      "null_when": "eligible_actions = 0",
+      "inputs": [
+        "gov_action_proposal",
+        "voting_procedure",
+        "drep_registration",
+        "epoch_param.protocol_major"
+      ],
+      "edge_cases": [
+        "Conway bootstrap phase: a DRep could only vote on InfoAction, and the test is over the whole voting window rather than the proposing block",
+        "re-votes collapsed to distinct actions; verdict = last vote, latency = first vote",
+        "still-open actions excluded from the denominator and reported as open_actions_unvoted",
+        "votes voided by DRep retirement still count as cast",
+        "a registered DRep with zero delegated stake is still eligible: drep_distr membership is not part of the denominator"
+      ],
+      "sql_file": "participation_rate_v1.sql",
+      "sql_object": null,
+      "params": [
+        "drep_hash_id",
+        "as_of_epoch"
+      ],
+      "spec": "docs/spec/metrics.md#participation_rate_v1",
+      "version": 1,
+      "sql": "-- participation_rate_v1 — of the actions this DRep could have voted on, how many did it vote on.\n--\n-- Parameters are bound ONCE in the leading CTE, in the order resources/metric-formulas.json's\n-- `params` array names them: drep_hash_id, as_of_epoch. Every statement in this directory follows\n-- that shape, so a positional placeholder never has to be repeated and the names stay visible in\n-- the SQL.\n--\n-- A question mark may not appear ANYWHERE else in these files, comments included:\n-- postgresql-simple counts placeholders lexically over the whole statement, so a question mark in\n-- prose is read as a parameter and the query fails with \"N single chars, but M parameters\".\n-- UnitTests.MetricCatalog asserts the count per file so that lands as a clear failure.\n--\n-- The denominator is palmares.eligible_actions, not a re-derivation: registration overlap, the\n-- Conway bootstrap test and \"settled by as_of_epoch\" all live in that one function (D-15).\n-- `open_actions_unvoted` is reported separately because a still-open action is not a missed vote.\nWITH p AS (\n  SELECT ?::bigint AS drep_hash_id, ?::int AS as_of_epoch\n),\nelig AS (\n  SELECT e.gov_action_id, e.action_type\n  FROM p, palmares.eligible_actions(p.drep_hash_id, p.as_of_epoch) e\n),\nvoted AS (\n  SELECT DISTINCT v.gov_action_id\n  FROM palmares.vote v\n  JOIN elig e ON e.gov_action_id = v.gov_action_id\n  WHERE v.drep_voter_id = (SELECT drep_hash_id FROM p)\n),\nopen_unvoted AS (\n  -- The registration interval is required here, the same overlap test `elig` above applies through\n  -- palmares.eligible_actions. Without it every credential in the table reported every open action\n  -- as outstanding — including the 523 retired ones, which cannot legally vote on any of them, and\n  -- which were therefore served `eligible_actions: 0` beside `open_actions_unvoted: 11`.\n  SELECT a.gov_action_id\n  FROM palmares.action_window a\n  WHERE a.last_votable_epoch >= (SELECT as_of_epoch FROM p)\n    AND a.drep_votable\n    AND EXISTS (\n      SELECT 1 FROM palmares.drep_interval i\n      WHERE i.drep_hash_id = (SELECT drep_hash_id FROM p)\n        AND i.from_epoch <= a.last_votable_epoch\n        AND (i.to_epoch IS NULL OR i.to_epoch >= a.proposed_epoch)\n    )\n    AND NOT EXISTS (\n      SELECT 1 FROM palmares.vote v\n      WHERE v.drep_voter_id = (SELECT drep_hash_id FROM p)\n        AND v.gov_action_id = a.gov_action_id\n    )\n)\nSELECT\n  (SELECT count(*) FROM elig) AS eligible_actions,\n  (SELECT count(*) FROM voted) AS votes_cast,\n  -- NULL, not 0: a DRep with nothing it could have voted on has no participation rate. \"n/a\" and\n  -- \"0%\" are different statements about a person.\n  CASE WHEN (SELECT count(*) FROM elig) = 0 THEN NULL\n       ELSE (SELECT count(*) FROM voted)::float8 / (SELECT count(*) FROM elig) END AS participation_rate,\n  (SELECT count(*) FROM open_unvoted) AS open_actions_unvoted;\n"
+    },
+    {
+      "formula_id": "rationale_rate_v1",
+      "name": "Rationale rate",
+      "field": "rationale_rate",
+      "expression": "(rationale_verified + rationale_inline) / (rationale_verified + rationale_inline + rationale_absent)",
+      "denominator": "the final votes on actions in the eligible set whose rationale we could actually assess: verified, inline, or demonstrably absent. Unverified and pending votes are excluded from both sides.",
+      "null_when": "rationale_verified + rationale_inline + rationale_absent = 0, i.e. none of this actor's rationales could be assessed",
+      "inputs": [
+        "voting_procedure.voting_anchor_id",
+        "voting_anchor",
+        "off_chain_vote_data",
+        "off_chain_vote_fetch_error"
+      ],
+      "edge_cases": [
+        "five grades, not four: verified | inline | unverified | pending | absent",
+        "inline is a data: URI, where the rationale IS the URL and hash verification is vacuous; counting it as missing would accuse an author who did publish one",
+        "pending means db-sync has not attempted the fetch yet, which is not the author's failure",
+        "unverified and pending are excluded from the DENOMINATOR, not counted as failures: measured on preprod, zero anchors on DRep votes are valid and 140 of the 237 unreachable ones are ipfs:// URIs our gateway list cannot fetch, so dividing by votes_cast would report our infrastructure's failure as 36 authors' negligence",
+        "all five counters are published, so a consumer wanting another basis — an attachment rate, say — can compute it",
+        "the five counters sum to votes_cast by construction, because the sample is the eligible set"
+      ],
+      "sql_file": "rationale_rate_v1.sql",
+      "sql_object": null,
+      "params": [
+        "drep_hash_id",
+        "as_of_epoch"
+      ],
+      "spec": "docs/spec/metrics.md#rationale_rate_v1",
+      "version": 1,
+      "sql": "-- rationale_rate_v1 — of the votes this DRep cast, how many carried a published rationale.\n--\n-- Params: drep_hash_id, as_of_epoch.\n--\n-- FIVE grades, not four (D-3), and the fifth is the one that matters for fairness:\n--   verified    the anchor was fetched and its hash matched\n--   inline      a `data:` URI: the rationale IS the URL, so there is nothing to fetch and hash\n--               verification is vacuous. preprod has real ones. Counting these as missing would\n--               accuse an author who did publish a rationale.\n--   unverified  a fetch was attempted and failed\n--   pending     an anchor is attached and db-sync has not tried yet\n--   absent      no anchor at all\n-- THE DENOMINATOR EXCLUDES WHAT WE COULD NOT ASSESS. The rate is\n--   (verified + inline) / (verified + inline + absent)\n-- so `unverified` and `pending` are out of BOTH sides. Rationale, and it is measured, not\n-- theoretical: across all 648 final DRep votes on preprod today there are ZERO `valid` anchors.\n-- 23 are unreachable, and network-wide 140 of the 237 unreachable anchors are `ipfs://` URIs that\n-- our db-sync's gateway list cannot fetch. Dividing by votes_cast would therefore publish\n-- \"essentially nobody on preprod writes rationales\" when the truth is \"our indexer cannot fetch\n-- IPFS\" — a statement about our infrastructure, printed as a judgement about 36 people.\n--\n-- An unreachable or not-yet-fetched anchor is evidence the author DID attach something and no\n-- evidence about its contents. Counting it as a failure is the same error the `inline` and\n-- `pending` grades exist to avoid; excluding it says \"we cannot tell\", which is true. When nothing\n-- can be assessed the rate is NULL — \"n/a\", not 0%.\n--\n-- All five counters are published regardless, so a consumer who wants a different basis (an\n-- attachment rate, say: (votes_cast - absent) / votes_cast) can compute it without us.\n--\n-- The five counters sum to votes_cast BY CONSTRUCTION, because `final` joins eligible_actions —\n-- the same denominator participation_rate uses. Taking every action the DRep ever voted on instead\n-- would let a vote on a still-open action into this sample while participation_rate excluded it,\n-- and the two rates would stop being comparable.\nWITH p AS (\n  SELECT ?::bigint AS drep_hash_id, ?::int AS as_of_epoch\n),\nelig AS (\n  SELECT e.gov_action_id\n  FROM p, palmares.eligible_actions(p.drep_hash_id, p.as_of_epoch) e\n),\nfinal AS (\n  SELECT v.gov_action_id, v.voting_anchor_id\n  FROM palmares.vote v\n  JOIN elig e ON e.gov_action_id = v.gov_action_id\n  WHERE v.drep_voter_id = (SELECT drep_hash_id FROM p)\n    AND v.seq_last = 1\n),\ngraded AS (\n  SELECT\n    f.gov_action_id,\n    CASE\n      WHEN f.voting_anchor_id IS NULL THEN 'absent'\n      WHEN a.verdict = 'inline' THEN 'inline'\n      WHEN a.verdict = 'valid' THEN 'verified'\n      WHEN a.verdict = 'not_fetched' THEN 'pending'\n      ELSE 'unverified'\n    END AS grade,\n    a.cip100_valid\n  FROM final f\n  LEFT JOIN palmares.anchor a ON a.voting_anchor_id = f.voting_anchor_id\n)\nSELECT\n  count(*) FILTER (WHERE grade = 'verified') AS rationale_verified,\n  count(*) FILTER (WHERE grade = 'inline') AS rationale_inline,\n  count(*) FILTER (WHERE grade = 'unverified') AS rationale_unverified,\n  count(*) FILTER (WHERE grade = 'pending') AS rationale_pending,\n  count(*) FILTER (WHERE grade = 'absent') AS rationale_absent,\n  count(*) FILTER (WHERE cip100_valid IS TRUE) AS rationale_cip100_valid,\n  CASE WHEN count(*) FILTER (WHERE grade IN ('verified', 'inline', 'absent')) = 0 THEN NULL\n       ELSE count(*) FILTER (WHERE grade IN ('verified', 'inline'))::float8\n            / count(*) FILTER (WHERE grade IN ('verified', 'inline', 'absent')) END AS rationale_rate\nFROM graded;\n"
+    }
+  ]
   """

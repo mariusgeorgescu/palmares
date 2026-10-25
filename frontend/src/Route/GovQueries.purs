@@ -37,6 +37,12 @@ module Route.GovQueries
   , votesForDRepHref
   , votesForActionHref
   , encodePathSegment
+  , encodeQueryValue
+  , MethodologyFilters
+  , emptyMethodologyFilters
+  , methodologyCodec
+  , methodologyPath
+  , methodologyHrefFor
   , toggleIn
   ) where
 
@@ -166,6 +172,11 @@ drepListHrefFor f = drepListPath <> renderDRepFilters f
 -- | netratat ar tăia cererea la fragment și ar cere altceva decât s-a cerut.
 encodePathSegment :: String -> String
 encodePathSegment s = fromMaybe s (encodeURIComponent s)
+
+-- | O valoare de parametru, codată procentual. Aceeași funcție care codează și căile: `#`, `&` și
+-- | spațiile dintr-o interogare scrisă de om trebuie să supraviețuiască drumului.
+encodeQueryValue :: String -> String
+encodeQueryValue s = fromMaybe s (encodeURIComponent s)
 
 drepDetailHrefFor :: String -> String
 drepDetailHrefFor drepId = drepListPath <> "/" <> encodePathSegment drepId
@@ -336,3 +347,20 @@ votesForDRepHref drepId = voteListHrefFor (emptyVoteFilters { voter_id = Just dr
 
 votesForActionHref :: String -> String
 votesForActionHref actionId = voteListHrefFor (emptyVoteFilters { gov_action_id = Just actionId })
+
+-- | Pagina de metodologie, cu formula spre care s-a dat clic. Nu e un fragment `#`: interceptorul
+-- | de linkuri face `pushState`, iar `pushState` nu derulează la ancoră — deci evidențierea
+-- | trebuie să fie o stare a paginii, nu o treabă a browserului.
+type MethodologyFilters = { focus :: Maybe String }
+
+emptyMethodologyFilters :: MethodologyFilters
+emptyMethodologyFilters = { focus: Nothing }
+
+methodologyCodec :: RouteDuplex' MethodologyFilters
+methodologyCodec = record # prop (Proxy :: Proxy "focus") (optional (param "focus"))
+
+methodologyPath :: String
+methodologyPath = "/methodology"
+
+methodologyHrefFor :: String -> String
+methodologyHrefFor formulaId = methodologyPath <> "?focus=" <> encodeQueryValue formulaId

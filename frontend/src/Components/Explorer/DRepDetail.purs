@@ -36,6 +36,7 @@ import Capabilities.Query.Gov.Types
 import Components.Chart.Series as Series
 import Components.Shared.Anchor as Anchor
 import Components.Shared.DRepIdentity as DRepIdentity
+import Components.Shared.MetricInfo as MetricInfo
 import Data.Array (last, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
@@ -212,9 +213,15 @@ component =
   metricsCard metrics@(DRepMetrics m) =
     card "Voting record"
       [ HH.div [ HP.class_ (HH.ClassName "space-y-1 text-sm") ]
-          [ line "Participation" (formatPercent m.participationRate)
-          , line "Rationale rate" (formatPercent m.rationaleRate)
-          , line "Median time to vote" (latencyLabel m.voteLatencyMedianHours m.voteLatencySample)
+          -- ID-urile de formulă sunt scrise aici, nu derivate: serverul publică `field` pentru
+          -- fiecare formulă, dar asta ar fi un al doilea apel pe ecranul ăsta doar ca să afle ce
+          -- scrie deja în `formula_ids` din același răspuns. O nepotrivire se vede în lista de
+          -- formule de la baza paginii.
+          [ lineWithFormula "Participation" (formatPercent m.participationRate) "participation_rate_v1"
+          , lineWithFormula "Rationale rate" (formatPercent m.rationaleRate) "rationale_rate_v1"
+          , lineWithFormula "Median time to vote"
+              (latencyLabel m.voteLatencyMedianHours m.voteLatencySample)
+              "vote_latency_median_hours_v1"
           , line "Slowest 10%" (latencyLabel m.voteLatencyP90Hours m.voteLatencySample)
           , line "Metrics as of epoch" (show m.asOfEpoch)
           ]
@@ -233,7 +240,8 @@ component =
           , line "Stayed" (formatInt s.delegatorsRetained)
           , line "Joined" (formatInt s.delegatorsJoined)
           , line "Left" (formatInt s.delegatorsLeft)
-          , line "Retention" (formatPercent s.delegatorRetentionRate)
+          , lineWithFormula "Retention" (formatPercent s.delegatorRetentionRate)
+              "delegator_retention_rate_v1"
           ]
       ]
 
@@ -279,7 +287,9 @@ component =
 
   votesByTypeCard (DRepMetrics m) =
     card "By kind of action"
-      [ HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
+      [ HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+          [ MetricInfo.renderLabelled "How this is counted" "votes_by_type_v1" ]
+      , HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
           [ HH.table [ HP.class_ (HH.ClassName "table table-sm") ]
               [ HH.thead_
                   [ HH.tr_
@@ -417,6 +427,13 @@ component =
   line label value =
     HH.div [ HP.class_ (HH.ClassName "flex items-baseline justify-between gap-4") ]
       [ HH.span [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text label ]
+      , HH.span [ HP.class_ (HH.ClassName "font-mono") ] [ HH.text value ]
+      ]
+
+  lineWithFormula label value formulaId =
+    HH.div [ HP.class_ (HH.ClassName "flex items-baseline justify-between gap-4") ]
+      [ HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
+          [ MetricInfo.renderLabelled label formulaId ]
       , HH.span [ HP.class_ (HH.ClassName "font-mono") ] [ HH.text value ]
       ]
 

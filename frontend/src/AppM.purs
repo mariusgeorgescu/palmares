@@ -20,8 +20,10 @@ import Capabilities.Query.Gov.Default
   , getDashboardDefault
   , getGovActionDetailDefault
   , getGovActionsDefault
+  , getFormulasDefault
   , getStatusDefault
   , getVotesDefault
+  , searchAllDefault
   )
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Transaction.MonadInteraction (class MonadInteraction)
@@ -99,3 +101,5 @@ instance MonadQueryGov AppM where
   getGovActions filters = ask >>= \env -> getGovActionsDefault env filters
   getGovActionDetail actionId = ask >>= \env -> getGovActionDetailDefault env actionId
   getVotes filters = ask >>= \env -> getVotesDefault env filters
+  searchAll q = ask >>= \env -> searchAllDefault env q
+  getFormulas = ask >>= getFormulasDefault

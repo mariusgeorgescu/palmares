@@ -15,6 +15,8 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getGovActions
   , getGovActionDetail
   , getVotes
+  , searchAll
+  , getFormulas
   ) where
 
 import Prelude
@@ -26,7 +28,9 @@ import Capabilities.Query.Gov.Types
   , DashboardPage
   , GovActionDetail
   , GovActionPage
+  , Formula
   , GovStatus
+  , SearchResults
   , VotePage
   )
 import Control.Monad.Trans.Class (lift)
@@ -64,6 +68,12 @@ class Monad m <= MonadQueryGov m where
   -- | `GET /votes` — un rând per vot, cu acțiunea și votantul denormalizate în el.
   getVotes :: VoteFilters -> m (Either ApiError VotePage)
 
+  -- | `GET /search` — șase grupuri într-un apel. Interogarea se trimite așa cum a scris-o omul.
+  searchAll :: String -> m (Either ApiError SearchResults)
+
+  -- | `GET /metrics/formulas` — un array nud cu toate formulele publicate, SQL inclus.
+  getFormulas :: m (Either ApiError (Array Formula))
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
@@ -74,3 +84,5 @@ instance monadQueryGovHalogenM ::
   getGovActions = lift <<< getGovActions
   getGovActionDetail = lift <<< getGovActionDetail
   getVotes = lift <<< getVotes
+  searchAll = lift <<< searchAll
+  getFormulas = lift getFormulas

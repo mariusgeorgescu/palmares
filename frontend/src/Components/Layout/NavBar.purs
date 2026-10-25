@@ -13,8 +13,11 @@ module Components.Layout.NavBar
 
 import Prelude
 
+import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent, preventDefaultEvent)
+import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
+import Components.Layout.SearchBox as SearchBox
 import Components.WalletConnectComponent as WC
 import Components.WalletConnectComponent (FiatOnrampBehavior(..), RenderMode(..))
 import Data.Const (Const)
@@ -28,7 +31,12 @@ import Halogen.Router.Class (class MonadRouter, navigate)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Route (Route(..))
 import Route.Codec (printRoute)
-import Route.GovQueries (defaultVoteFilters, emptyDRepFilters, emptyGovActionFilters)
+import Route.GovQueries
+  ( defaultVoteFilters
+  , emptyDRepFilters
+  , emptyGovActionFilters
+  , emptyMethodologyFilters
+  )
 import Store as Store
 import Type.Proxy (Proxy(..))
 import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
@@ -47,7 +55,10 @@ data Output
   = WalletConnected
   | WalletDisconnected
 
-type Slots = (walletConnectComponent :: WC.Slot)
+type Slots =
+  ( walletConnectComponent :: WC.Slot
+  , searchBox :: SearchBox.Slot
+  )
 
 type State = Unit
 
@@ -60,6 +71,8 @@ component
    . MonadAff m
   => MonadCIP30 m
   => MonadDomEvent m
+  => MonadDelay m
+  => MonadQueryGov m
   => MonadRouter Route m
   => MonadStore Store.Action Store.Store m
   => H.Component Query Input Output m
@@ -88,7 +101,9 @@ component =
               , navLink (DRepList emptyDRepFilters) "DReps"
               , navLink (ActionList emptyGovActionFilters) "Actions"
               , navLink (VoteList defaultVoteFilters) "Votes"
+              , navLink (Methodology emptyMethodologyFilters) "Methodology"
               ]
+          , HH.slot_ SearchBox._searchBox unit SearchBox.component unit
           , HH.slot WC._walletConnect unit WC.component walletConnectInput HandleWalletConnect
           ]
       ]

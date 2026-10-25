@@ -44,6 +44,7 @@ import Route.GovQueries
   , drepListHrefFor
   , emptyDRepFilters
   , emptyGovActionFilters
+  , methodologyPath
   , voteListHrefFor
   )
 import Halogen as H
@@ -351,7 +352,7 @@ hubEntries =
     , label: "Votes"
     , description: "Individual votes, with the rationale when one was published."
     }
-  , { href: "/methodology"
+  , { href: methodologyPath
     , label: "Methodology"
     , description: "The formula behind every metric on this site."
     }

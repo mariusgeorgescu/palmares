@@ -10,6 +10,8 @@ module Capabilities.Query.Gov.Default
   , getGovActionsDefault
   , getGovActionDetailDefault
   , getVotesDefault
+  , searchAllDefault
+  , getFormulasDefault
   ) where
 
 import Prelude
@@ -22,7 +24,9 @@ import Capabilities.Query.Gov.Types
   , DashboardPage
   , GovActionDetail
   , GovActionPage
+  , Formula
   , GovStatus
+  , SearchResults
   , VotePage
   )
 import Data.Either (Either)
@@ -34,6 +38,7 @@ import Route.GovQueries
   , encodePathSegment
   , renderDRepFilters
   , renderGovActionFilters
+  , encodeQueryValue
   , renderVoteFilters
   )
 
@@ -94,3 +99,19 @@ getVotesDefault
   -> VoteFilters
   -> m (Either ApiError VotePage)
 getVotesDefault env filters = getJson (env.queryBaseUrl <> "/votes" <> renderVoteFilters filters)
+
+-- | Interogarea se codează procentual: e text scris de om și poate conține orice.
+searchAllDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> String
+  -> m (Either ApiError SearchResults)
+searchAllDefault env q = getJson (env.queryBaseUrl <> "/search?q=" <> encodeQueryValue q)
+
+getFormulasDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> m (Either ApiError (Array Formula))
+getFormulasDefault env = getJson (env.queryBaseUrl <> "/metrics/formulas")

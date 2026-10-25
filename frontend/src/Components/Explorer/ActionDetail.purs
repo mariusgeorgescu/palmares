@@ -30,6 +30,7 @@ import Capabilities.Query.Gov.Types
   )
 import Components.Explorer.ActionList (stateClass)
 import Components.Shared.Anchor as Anchor
+import Components.Shared.MetricInfo as MetricInfo
 import Data.Array (catMaybes, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
@@ -201,7 +202,9 @@ component =
                 Nothing -> HH.text ""
                 Just fid ->
                   HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
-                    [ HH.text ("Outcome decided by formula " <> fid <> ".") ]
+                    [ HH.text ("Outcome decided by formula " <> fid <> ".")
+                    , MetricInfo.render fid
+                    ]
             , case proposer of
                 Nothing -> HH.text ""
                 Just (Proposer p) ->
@@ -257,7 +260,12 @@ component =
                   ]
               ]
           ]
-      , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (tallyVerdict tally) ]
+      , HH.p [ HP.class_ (HH.ClassName "text-sm") ]
+          [ HH.text (tallyVerdict tally)
+          , case t.formulaId of
+              Nothing -> HH.text ""
+              Just fid -> MetricInfo.render fid
+          ]
       , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
           [ HH.text
               ( "Threshold parameter: " <> fromMaybe "not recorded" t.thresholdParam

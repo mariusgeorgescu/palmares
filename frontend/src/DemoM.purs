@@ -19,8 +19,10 @@ import Capabilities.Query.Gov.Mock
   , getDashboardMock
   , getGovActionDetailMock
   , getGovActionsMock
+  , getFormulasMock
   , getStatusMock
   , getVotesMock
+  , searchAllMock
   )
 import Cardano.Capabilities.Transaction.MonadInteraction (class MonadInteraction)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
@@ -94,3 +96,5 @@ instance MonadQueryGov DemoM where
   getGovActions = getGovActionsMock
   getGovActionDetail = getGovActionDetailMock
   getVotes = getVotesMock
+  searchAll = searchAllMock
+  getFormulas = getFormulasMock

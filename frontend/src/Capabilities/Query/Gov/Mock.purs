@@ -13,6 +13,8 @@ module Capabilities.Query.Gov.Mock
   , getGovActionsMock
   , getGovActionDetailMock
   , getVotesMock
+  , searchAllMock
+  , getFormulasMock
   , decodeFixture
   ) where
 
@@ -24,6 +26,8 @@ import Capabilities.Query.Gov.Fixtures
   , drepExplorerFixture
   , govActionDetailFixture
   , govActionListFixture
+  , formulasFixture
+  , searchFixture
   , statusFixture
   , votesListFixture
   )
@@ -34,7 +38,9 @@ import Capabilities.Query.Gov.Types
   , DashboardPage
   , GovActionDetail
   , GovActionPage
+  , Formula
   , GovStatus
+  , SearchResults
   , VotePage
   )
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
@@ -73,3 +79,9 @@ getGovActionDetailMock _ = pure (decodeFixture govActionDetailFixture)
 
 getVotesMock :: forall m. Applicative m => VoteFilters -> m (Either ApiError VotePage)
 getVotesMock _ = pure (decodeFixture votesListFixture)
+
+searchAllMock :: forall m. Applicative m => String -> m (Either ApiError SearchResults)
+searchAllMock _ = pure (decodeFixture searchFixture)
+
+getFormulasMock :: forall m. Applicative m => m (Either ApiError (Array Formula))
+getFormulasMock = pure (decodeFixture formulasFixture)

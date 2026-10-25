@@ -42,6 +42,10 @@ module Capabilities.Query.Gov.Types
   , VoteAnchor(..)
   , VoteRow(..)
   , VotePage(..)
+  , SearchHit(..)
+  , SearchGroup(..)
+  , SearchResults(..)
+  , Formula(..)
   ) where
 
 import Prelude
@@ -1085,6 +1089,118 @@ instance DecodeJson VotePage where
     limit <- o .: "limit"
     offset <- o .: "offset"
     pure (VotePage { items, total, limit, offset })
+
+-- | Un rezultat de căutare, în forma uniformă pe care o întoarce serverul pentru toate cele șase
+-- | feluri de obiecte. `target` spune unde duce linkul, deci ecranul nu ghicește din formă.
+newtype SearchHit = SearchHit
+  { id :: String
+  , title :: Maybe String
+  , subtitle :: Maybe String
+  , badges :: Array String
+  , status :: Maybe String
+  , targetKind :: String
+  , targetId :: String
+  }
+
+derive instance Eq SearchHit
+
+instance DecodeJson SearchHit where
+  decodeJson json = do
+    o <- decodeJson json
+    id <- o .: "id"
+    title <- o .:? "title"
+    subtitle <- o .:? "subtitle"
+    badges <- fromMaybe [] <$> o .:? "badges"
+    status <- o .:? "status"
+    target <- o .: "target"
+    targetKind <- target .: "kind"
+    targetId <- target .: "id"
+    pure (SearchHit { id, title, subtitle, badges, status, targetKind, targetId })
+
+newtype SearchGroup = SearchGroup
+  { total :: Int
+  , items :: Array SearchHit
+  }
+
+derive instance Eq SearchGroup
+
+instance DecodeJson SearchGroup where
+  decodeJson json = do
+    o <- decodeJson json
+    total <- o .: "total"
+    items <- fromMaybe [] <$> o .:? "items"
+    pure (SearchGroup { total, items })
+
+-- | `GET /search` — șase grupuri, fiecare cu propriul total. `total` de sus nu e suma lor când un
+-- | grup e tăiat de `limit_per_group`, deci numărul de lângă un grup vine din grup.
+newtype SearchResults = SearchResults
+  { query :: String
+  , total :: Int
+  , dreps :: SearchGroup
+  , govActions :: SearchGroup
+  , spos :: SearchGroup
+  , committeeMembers :: SearchGroup
+  , profiles :: SearchGroup
+  , attestations :: SearchGroup
+  }
+
+derive instance Eq SearchResults
+
+instance DecodeJson SearchResults where
+  decodeJson json = do
+    o <- decodeJson json
+    query <- o .: "query"
+    total <- o .: "total"
+    dreps <- o .: "dreps"
+    govActions <- o .: "gov_actions"
+    spos <- o .: "spos"
+    committeeMembers <- o .: "committee_members"
+    profiles <- o .: "profiles"
+    attestations <- o .: "attestations"
+    pure (SearchResults { query, total, dreps, govActions, spos, committeeMembers, profiles, attestations })
+
+-- | O formulă publicată. `/metrics/formulas` întoarce un __array nud__, nu un plic cu `items`, deci
+-- | se decodează ca `Array Formula`.
+-- |
+-- | `null_when` e condiția în care metrica e `null` — e partea care face diferența între „n/a" și
+-- | „0%", scrisă de cel care a scris SQL-ul. `sql` e interogarea întreagă: ăsta e produsul, nu un
+-- | detaliu de implementare.
+newtype Formula = Formula
+  { formulaId :: String
+  , name :: String
+  , field :: Maybe String
+  , expression :: Maybe String
+  , denominator :: Maybe String
+  , nullWhen :: Maybe String
+  , inputs :: Array String
+  , edgeCases :: Array String
+  , params :: Array String
+  , spec :: Maybe String
+  , version :: Maybe Int
+  , sql :: Maybe String
+  }
+
+derive instance Eq Formula
+
+instance DecodeJson Formula where
+  decodeJson json = do
+    o <- decodeJson json
+    formulaId <- o .: "formula_id"
+    name <- o .: "name"
+    field <- o .:? "field"
+    expression <- o .:? "expression"
+    denominator <- o .:? "denominator"
+    nullWhen <- o .:? "null_when"
+    inputs <- fromMaybe [] <$> o .:? "inputs"
+    edgeCases <- fromMaybe [] <$> o .:? "edge_cases"
+    params <- fromMaybe [] <$> o .:? "params"
+    spec <- o .:? "spec"
+    version <- o .:? "version"
+    sql <- o .:? "sql"
+    pure
+      ( Formula
+          { formulaId, name, field, expression, denominator, nullWhen, inputs, edgeCases, params, spec, version, sql }
+      )
 
 -- | Culoarea chip-ului de prospețime. `Unknown` nu e decor: înseamnă „n-am putut citi starea", care
 -- | e un fapt diferit de „datele sunt proaspete" și de „datele sunt vechi". Un chip care arată verde
