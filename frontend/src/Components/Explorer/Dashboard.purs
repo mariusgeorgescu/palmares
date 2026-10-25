@@ -278,24 +278,65 @@ component =
   -- încărcat, nu un zero: zero ar fi o afirmație despre registru.
   registryFigures st =
     HH.div [ HP.class_ (HH.ClassName "grid gap-3 sm:grid-cols-3") ]
-      [ figureCard "Profiles" (countOf st _.profiles) "Identities anyone can look up." profileListPath
-      , figureCard "Attestations" (countOf st _.attestations) "Claims made about them." attestationListPath
-      , figureCard "Disputes" (countOf st _.disputes) "Claims someone put money against." disputeListPath
+      [ figureCard "Profiles" (countOf st _.profiles) "Identities anyone can look up."
+          profileListPath
+          "from-success to-info"
+          "0"
+      , figureCard "Attestations" (countOf st _.attestations) "Claims made about them."
+          attestationListPath
+          "from-info to-accent"
+          "80"
+      , figureCard "Disputes" (countOf st _.disputes) "Claims someone put money against."
+          disputeListPath
+          "from-accent to-warning"
+          "160"
       ]
 
   countOf st f = case st.registry of
     Nothing -> "—"
     Just r -> formatInt (f r)
 
-  figureCard label value body href =
+  -- După `renderHeroStatCard` din `bjj-frontend/src/Components/Shared/StatGrid.purs`: valoarea în
+  -- gradient, o lumină care apare la hover peste tot cardul, colțuri mari și o intrare decalată.
+  -- Cifrele registrului sunt primul lucru care se vede sub erou, deci merită tratamentul.
+  --
+  -- Gradientul diferă per card, iar ordinea nu e decorativă: profiluri → atestări → dispute merge
+  -- de la verde spre portocaliu, adică de la „cine există" spre „ce e contestat".
+  figureCard label value body href gradient delay =
     HH.a
       [ HP.href href
-      , HP.class_ (HH.ClassName "card bg-base-200 hover:bg-base-300 transition-colors")
+      , HP.class_
+          ( HH.ClassName
+              "group relative overflow-hidden rounded-2xl bg-base-200 shadow-md hover:shadow-lg \
+              \transition-all duration-300 animate-fade-in-up block"
+          )
+      , HP.style ("animation-delay: " <> delay <> "ms")
       ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body p-4 gap-1") ]
-          [ HH.span [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text label ]
-          , HH.span [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text value ]
-          , HH.span [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text body ]
+      [ HH.div
+          [ HP.class_
+              ( HH.ClassName
+                  ( "absolute inset-0 bg-gradient-to-br " <> gradient
+                      <> " opacity-0 group-hover:opacity-10 transition-opacity duration-500"
+                  )
+              )
+          ]
+          []
+      , HH.div [ HP.class_ (HH.ClassName "relative p-4 flex flex-col gap-1") ]
+          [ HH.span
+              [ HP.class_
+                  (HH.ClassName "text-xs opacity-60 font-medium uppercase tracking-wider")
+              ]
+              [ HH.text label ]
+          , HH.span
+              [ HP.class_
+                  ( HH.ClassName
+                      ( "text-3xl sm:text-4xl font-black bg-gradient-to-r " <> gradient
+                          <> " bg-clip-text text-transparent"
+                      )
+                  )
+              ]
+              [ HH.text value ]
+          , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-60") ] [ HH.text body ]
           ]
       ]
 

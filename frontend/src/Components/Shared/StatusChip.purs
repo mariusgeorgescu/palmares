@@ -112,8 +112,16 @@ component =
       HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
         [ HH.text "attestations: not deployed" ]
     Just (AttestSync a) ->
-      HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
-        [ HH.text ("attestations: " <> a.state <> " (" <> show a.lagSeconds <> "s behind)") ]
+      HH.span [ HP.class_ (HH.ClassName "opacity-70 inline-flex items-center gap-1.5") ]
+        -- Punctul pulsând, din `bjj-frontend`, dar DOAR cînd proiectorul chiar ține pasul. Un
+        -- indicator „live" care pulsează peste un proiector rămas în urmă ar fi exact minciuna pe
+        -- care banda asta există s-o prevină — de aceea e legat de stare și de decalaj, nu pus
+        -- necondiționat.
+        [ if a.state == "following" && a.lagSeconds <= 60 then
+            HH.span [ HP.class_ (HH.ClassName "feed-live-dot") ] []
+          else HH.text ""
+        , HH.text ("attestations: " <> a.state <> " (" <> show a.lagSeconds <> "s behind)")
+        ]
 
   -- Banda spune ce e NOU: o epocă egală cu cea a lanțului e același număr scris a doua oară, iar
   -- una care lipsește n-are ce să spună.
