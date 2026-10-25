@@ -83,10 +83,14 @@ test.describe('what M2-1 assumes, checked without submitting anything', () => {
 
   // Formele corpurilor pentru pașii 2 și 3, verificate pe serverul adevărat.
   //
-  // Diferența pe care o prinde: un corp cu un câmp redenumit întoarce `invalid_parameter` (400), iar
-  // unul corect întoarce refuzul de AFACERE — `ProfileNotFound`, fiindcă portofelul ăsta nu deține
-  // niciun profil. Al doilea e singurul răspuns pe care pasul 2 îl poate da înainte de pasul 1, și
-  // e dovada că ruta e cablată și corpul e bun.
+  // Diferența pe care o prinde: un corp cu un câmp redenumit întoarce `invalid_parameter` (400),
+  // iar unul corect ajunge la logica de afacere și e refuzat de ACEEA. Doar prima e un defect.
+  //
+  // Afirmația e pe INVARIANT, nu pe un cod anume, și asta e o corectare: prima variantă cerea
+  // `ProfileNotFound`, adevărat cât timp portofelul nu deținea niciun profil. După ce M2-1 a
+  // mintuit două, același corp a început să întoarcă `ScriptRefused` — validatorul refuză o
+  // atestare auto-emisă (`Mr`) — și testul a căzut pe o schimbare a lumii, nu a codului. Un test
+  // care fixează o stare trecătoare se strică singur.
   //
   // Măsurat cât scriam testul: un prim `POST` fără `other_metadata` a întors chiar
   // `invalid_parameter`. Serverul îl cere în `required` chiar gol, iar clientul îl trimite — deci
@@ -126,7 +130,9 @@ test.describe('what M2-1 assumes, checked without submitting anything', () => {
       issueBody.code,
       `issue-attestation rejected the body shape: ${JSON.stringify(issueBody)}`
     ).not.toBe('invalid_parameter');
-    expect(issueBody.code).toBe('ProfileNotFound');
+    // Refuzurile de afacere care pot apărea aici, după starea lanțului: niciun profil deținut, sau
+    // unul deținut și atestarea auto-emisă. Ambele spun „corpul a ajuns la logică".
+    expect(['ProfileNotFound', 'ScriptRefused']).toContain(issueBody.code);
 
     await page.goto('/attestations');
     const acceptLink = page.locator('a[href*="flow=accept-attestation"]').first();
@@ -142,7 +148,9 @@ test.describe('what M2-1 assumes, checked without submitting anything', () => {
       acceptBody.code,
       `accept-attestation rejected the body shape: ${JSON.stringify(acceptBody)}`
     ).not.toBe('invalid_parameter');
-    expect(acceptBody.code).toBe('ProfileNotFound');
+    expect(['ProfileNotFound', 'ScriptRefused', 'AttestationAlreadyAccepted']).toContain(
+      acceptBody.code
+    );
   });
 
   // Etichetele în care M2-1 scrie. Un `getByLabel` care nu găsește nimic eșuează cu „element not
