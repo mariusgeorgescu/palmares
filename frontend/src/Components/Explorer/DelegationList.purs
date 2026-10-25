@@ -172,7 +172,7 @@ component =
         [ HH.text (if on then "Current delegations only" else "Show current only") ]
 
   loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading delegations…" ]
@@ -203,7 +203,7 @@ component =
       ]
 
   emptyState st =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
           [ HH.p_
               [ HH.text
@@ -224,7 +224,7 @@ component =
   hasAnyFilter f = f.drep_id /= Nothing || f.is_current /= Nothing
 
   table st (DelegationPage p) =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-0") ]
           [ HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
               [ HH.table [ HP.class_ (HH.ClassName "table table-sm") ]

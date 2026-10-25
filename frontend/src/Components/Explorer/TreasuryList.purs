@@ -115,7 +115,7 @@ component =
       ]
 
   loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading withdrawals…" ]
@@ -150,7 +150,7 @@ component =
   -- care nu-l face nimeni, iar a-l prezenta ca total al rețelei fără să-l fi cerut ar fi o
   -- afirmație inventată.
   summary items =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-1") ]
           [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline gap-x-8 gap-y-2") ]
               [ figure "Requested on this page" (formatAda (sumAmounts items))
@@ -174,13 +174,13 @@ component =
       ]
 
   emptyState =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.p_ [ HH.text "No withdrawals have been recorded yet." ] ]
       ]
 
   table st (WithdrawalPage p) =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-0") ]
           [ HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
               [ HH.table [ HP.class_ (HH.ClassName "table table-sm") ]

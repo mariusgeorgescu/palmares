@@ -174,7 +174,7 @@ component =
         [ HH.text (humanize kind) ]
 
   loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading activity…" ]
@@ -208,7 +208,7 @@ component =
       ]
 
   emptyState st =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
           [ HH.p_
               [ HH.text

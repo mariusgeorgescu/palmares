@@ -153,7 +153,7 @@ component =
       ]
 
   loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading this DRep…" ]
@@ -205,7 +205,7 @@ component =
   -- `details`/`summary` și nu un buton cu stare: e închis la intrare, deschis de cine-l caută, și
   -- nu adaugă un al doilea loc în care starea ecranului se poate desincroniza.
   embedCard origin' (DRepSummary s) =
-    HH.details [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.details [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.summary [ HP.class_ (HH.ClassName "card-body py-3 cursor-pointer text-sm font-medium") ]
           [ HH.text "Embed this record on your own site" ]
       , HH.div [ HP.class_ (HH.ClassName "card-body pt-0 gap-2") ]
@@ -230,7 +230,7 @@ component =
       [ HH.text "See every vote this DRep cast →" ]
 
   identityCard (DRepSummary s) =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
           -- `h1`, nu `div`: numele DRep-ului E titlul paginii. Fără el, lista de titluri începea cu
           -- „Voting record", deci cine navighează cu un cititor de ecran nu afla pe CINE se uită.
@@ -547,7 +547,7 @@ component =
       [ HH.text fid ]
 
   card title children =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
           ([ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text title ] ] <> children)
       ]

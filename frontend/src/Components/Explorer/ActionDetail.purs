@@ -143,7 +143,7 @@ component =
       ]
 
   loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading this proposal…" ]
@@ -188,7 +188,7 @@ component =
       ChainPoint at = a.proposedAt
       Lifecycle lc = a.lifecycle
     in
-      HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
         [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
             [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ]
                 [ HH.text (fromMaybe "Untitled proposal" a.title) ]
@@ -364,7 +364,7 @@ component =
       ]
 
   card title children =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
           ([ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text title ] ] <> children)
       ]

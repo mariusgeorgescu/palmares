@@ -185,7 +185,7 @@ component =
   -- Un graf fără centru nu e un graf gol, e o întrebare incompletă — deci se spune ce lipsește și
   -- se dă drumul exact spre locul de unde se alege.
   noRoot =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
           [ HH.p_ [ HH.text "Pick a representative first — the graph is drawn around one." ]
           , HH.a [ HP.href drepListPath, HP.class_ (HH.ClassName "btn btn-sm btn-primary") ]
@@ -216,7 +216,7 @@ component =
       -- primul desen să n-aibă unde să se facă.
       , HH.div
           [ HP.ref canvasRef
-          , HP.class_ (HH.ClassName "card bg-base-200 w-full h-[32rem]")
+          , HP.class_ (HH.ClassName "card bg-base-200 w-full h-[32rem] graph-dots")
           ]
           []
       , HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
@@ -224,7 +224,7 @@ component =
       ]
 
   noDelegators =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.p_ [ HH.text "This representative has no delegations in force." ] ]
       ]

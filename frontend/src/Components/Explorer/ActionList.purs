@@ -192,7 +192,7 @@ component =
       ]
 
   loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading proposals…" ]
@@ -248,7 +248,7 @@ component =
       ]
 
   emptyState st =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
           [ HH.p_ [ HH.text (if hasAnyFilter st.filters then "No proposals match these filters." else "No proposals have been recorded yet.") ]
           , if hasAnyFilter st.filters then
@@ -270,7 +270,7 @@ component =
       ]
 
   filterBlock st title key values =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-3 gap-1") ]
           [ HH.h3 [ HP.class_ (HH.ClassName "font-medium text-sm") ] [ HH.text title ]
           , HH.div [ HP.class_ (HH.ClassName "space-y-0.5") ] (map (filterRow st key) values)

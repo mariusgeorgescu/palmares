@@ -156,15 +156,26 @@ component =
               (HH.ClassName "sr-only focus:not-sr-only focus:absolute focus:z-50 focus:m-2 btn btn-sm btn-primary")
           ]
           [ HH.text "Skip to content" ]
+      -- Cele trei straturi de fundal, fixe și pe toate paginile, exact cum le pune `bjj-frontend`:
+      -- overlay-ul dă adâncime și contrast barei de navigare, iar cele două lumini pulsează decalat
+      -- ca să nu bată în ritm. `pointer-events-none` fiindcă sunt decor, nu suprafață.
+      --
+      -- bjj are dedesubt și o FOTOGRAFIE cu efect Ken Burns (`hero-bg-image`). Aici nu e pusă încă:
+      -- a lui e o sală de arte marțiale, iar un registru de guvernanță are nevoie de propria
+      -- imagine, pe care nimeni nu a ales-o. Mecanismul e gata — o clasă și un fișier o aprind.
+      -- Luminile sunt ascunse pe telefon: pe un ecran mic ocupă jumătate din el.
+      , HH.div [ HP.class_ (HH.ClassName "fixed inset-0 pointer-events-none global-bg-overlay z-0") ] []
+      , HH.div [ HP.class_ (HH.ClassName "fixed inset-0 pointer-events-none hero-neon-glow-left z-0 hidden sm:block") ] []
+      , HH.div [ HP.class_ (HH.ClassName "fixed inset-0 pointer-events-none hero-neon-glow-right z-0 hidden sm:block") ] []
       , HH.slot NavBar._navbar unit NavBar.component st.route HandleNavBar
       -- Chip-ul stă în afara slotului de rută, nu în fiecare pagină: prospețimea e o proprietate a
       -- datelor, nu a ecranului, și un singur apel o acoperă pe toate.
       -- Înălțimea e rezervată, nu descoperită: banda crește de la o pastilă („checking…") la
       -- câteva fapte când răspunde `/status`, iar fără rezervare tot ce e sub ea — titlul,
       -- cardurile, primul tabel — sare în jos exact când utilizatorul a început să citească.
-      , HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 pt-4 min-h-14 sm:min-h-10") ]
+      , HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 pt-4 min-h-14 sm:min-h-10 relative z-10") ]
           [ HH.slot_ StatusChip._statusChip unit StatusChip.component unit ]
-      , HH.main [ HP.id "main", HP.class_ (HH.ClassName "min-h-[80vh]") ]
+      , HH.main [ HP.id "main", HP.class_ (HH.ClassName "min-h-[80vh] relative z-10") ]
           [ renderRoute st.route ]
       ]
 

@@ -220,7 +220,7 @@ component =
       ]
 
   loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading DReps…" ]
@@ -282,7 +282,7 @@ component =
   -- Zero rezultate nu e un tabel gol cu capete de coloană: e o propoziție care spune ce s-a
   -- întâmplat și un drum înapoi. „showing 1–0" nu înseamnă nimic pentru nimeni.
   emptyState st =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
           [ HH.p_ [ HH.text (if hasAnyFilter st.filters then "No DReps match these filters." else "No DReps have been recorded yet.") ]
           , if hasAnyFilter st.filters then
@@ -300,7 +300,7 @@ component =
       [ facetBlock st "Status" "status" p.statusFacets
       , facetBlock st "Metadata" "anchor_status" p.anchorFacets
       , facetBlock st "Language" "language" p.languageFacets
-      , HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      , HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
           [ HH.div [ HP.class_ (HH.ClassName "card-body p-3 gap-2") ]
               [ HH.h3 [ HP.class_ (HH.ClassName "font-medium text-sm") ] [ HH.text "Voting power (ADA)" ]
               , Histogram.render (map (bucketBar st.filters) p.powerBuckets)
@@ -315,7 +315,7 @@ component =
       ]
 
   facetBlock st title key facets =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-3 gap-1") ]
           [ HH.h3 [ HP.class_ (HH.ClassName "font-medium text-sm") ] [ HH.text title ]
           , if null facets then

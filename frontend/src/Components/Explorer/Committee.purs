@@ -95,7 +95,7 @@ component =
       ]
 
   loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading the committee…" ]
@@ -115,7 +115,7 @@ component =
 
   body (CommitteeState c) =
     HH.div [ HP.class_ (HH.ClassName "space-y-4") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      [ HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
           [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
               [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline gap-x-6 gap-y-2") ]
                   [ figure "Quorum" (show c.quorumNumerator <> " of " <> show c.quorumDenominator)
@@ -154,7 +154,7 @@ component =
       ]
 
   noMembers =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.p_ [ HH.text "No members are seated." ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
@@ -163,7 +163,7 @@ component =
       ]
 
   membersTable members =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-0") ]
           [ HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
               [ HH.table [ HP.class_ (HH.ClassName "table table-sm") ]

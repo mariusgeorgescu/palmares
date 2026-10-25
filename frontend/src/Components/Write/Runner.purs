@@ -265,7 +265,7 @@ component =
       ]
 
   pickOne =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.p_ [ HH.text "Pick what you want to do." ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
@@ -277,7 +277,7 @@ component =
   -- adevărat — și verdictul, ÎNAINTE de orice semnătură.
   walletCard st = case st.gate of
     Nothing ->
-      HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
         [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
             [ HH.p_ [ HH.text "Connect a wallet to see what it can and cannot do here." ]
             , if null st.wallets then
@@ -289,7 +289,7 @@ component =
             ]
         ]
     Just (Allowed w) ->
-      HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
         [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
             [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-center gap-2") ]
                 [ HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-success") ] [ HH.text "ready" ]
@@ -367,7 +367,7 @@ component =
       ]
 
   flowCard st spec =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-3") ]
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text spec.title ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-80") ] [ HH.text spec.summary ]
@@ -610,7 +610,7 @@ component =
       ]
 
   summaryCard st tx sum =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-3") ]
           [ HH.h3 [ HP.class_ (HH.ClassName "card-title text-base") ]
               [ HH.text "What this transaction does" ]
@@ -629,7 +629,7 @@ component =
           , HH.details_
               [ HH.summary [ HP.class_ (HH.ClassName "text-xs opacity-70 cursor-pointer") ]
                   [ HH.text "Show the raw transaction" ]
-              , HH.pre [ HP.class_ (HH.ClassName "bg-base-300 rounded p-2 overflow-x-auto text-xs mt-2") ]
+              , HH.pre [ HP.class_ (HH.ClassName "bg-base-300 rounded p-2 overflow-x-auto text-xs mt-2 cbor-fingerprint-bg") ]
                   [ HH.code_ [ HH.text tx ] ]
               ]
           -- Butonul stă SUB sumar, nu lângă „Build": semnătura se cere după ce ai citit ce

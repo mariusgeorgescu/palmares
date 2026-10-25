@@ -224,7 +224,7 @@ component =
       ]
 
   loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading votes…" ]
@@ -283,7 +283,7 @@ component =
   -- potriveste" ar fi adevarat si pe un lant fara niciun vot — iar butonul care duce inapoi la
   -- filtrele implicite ar duce exact unde esti deja.
   emptyState st =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
           [ HH.p_
               [ HH.text
@@ -310,7 +310,7 @@ component =
       ]
 
   filterBlock st title key values =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-3 gap-1") ]
           [ HH.h3 [ HP.class_ (HH.ClassName "font-medium text-sm") ] [ HH.text title ]
           , HH.div [ HP.class_ (HH.ClassName "space-y-0.5") ] (map (filterRow st key) values)
@@ -337,7 +337,7 @@ component =
   -- Comutatorul care spune ce se numără: ultimul vot al fiecărui votant, sau fiecare vot exprimat,
   -- inclusiv cele înlocuite.
   finalBlock st =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-3 gap-1") ]
           [ HH.h3 [ HP.class_ (HH.ClassName "font-medium text-sm") ] [ HH.text "What counts" ]
           , HH.a

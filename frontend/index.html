@@ -48,6 +48,48 @@
 		import { main } from "./public/index.js";
 		main();
 	</script>
+	<script>
+		// Dezvăluirea la derulare: `.scroll-reveal` pornește invizibil și primește `.in-view` cînd
+		// intră în ecran.
+		//
+		// DIFERENȚA FAȚĂ DE `bjj-frontend`, și e o plasă de siguranță, nu o preferință: acolo
+		// `.scroll-reveal` e ascuns necondiționat în CSS, deci dacă scriptul ăsta nu rulează —
+		// JavaScript blocat, o eroare mai devreme în pagină, un crawler — conținutul rămîne
+		// invizibil PE VECI. Aici clasa `js-reveal` se pune pe `<html>` ÎNAINTE de orice altceva, iar
+		// CSS-ul ascunde doar sub ea. Fără script, totul se vede normal.
+		(function () {
+			document.documentElement.classList.add('js-reveal');
+
+			if (!('IntersectionObserver' in window)) {
+				document.documentElement.classList.remove('js-reveal');
+				return;
+			}
+
+			var io = new IntersectionObserver(function (entries) {
+				entries.forEach(function (e) {
+					if (e.isIntersecting) e.target.classList.add('in-view');
+				});
+			}, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+
+			var seen = new WeakSet();
+			var timer;
+			function scan() {
+				document.querySelectorAll('.scroll-reveal:not(.in-view)').forEach(function (el) {
+					if (!seen.has(el)) { seen.add(el); io.observe(el); }
+				});
+			}
+
+			// Un scan imediat, pe lîngă cel din mutații: Halogen randează după `load`, dar o pagină
+			// servită cu conținut deja în DOM n-ar declanșa nicio mutație.
+			scan();
+
+			new MutationObserver(function () {
+				clearTimeout(timer);
+				timer = setTimeout(scan, 80);
+			}).observe(document.documentElement, { childList: true, subtree: true });
+		})();
+	</script>
+
 </body>
 
 </html>

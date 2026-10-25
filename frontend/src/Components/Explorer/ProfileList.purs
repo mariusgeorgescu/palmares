@@ -123,7 +123,7 @@ component =
       ]
 
   loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading profiles…" ]
@@ -154,7 +154,7 @@ component =
       ]
 
   emptyState =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.p_ [ HH.text "No profiles have been registered yet." ] ]
       ]
@@ -165,7 +165,7 @@ component =
     HH.div [ HP.class_ (HH.ClassName "grid gap-3 md:grid-cols-2") ] (map card items)
 
   card (ProfileRow r) =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
           [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline gap-2") ]
               [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-base") ] [ HH.text r.name ]

@@ -61,3 +61,369 @@
 .copy-btn.copied .copy-confirm {
   opacity: 1;
 }
+
+/* ===================================================================================
+   LIMBAJUL VIZUAL, portat din `bjj-frontend/src/style.css`.
+   ===================================================================================
+
+   De ce aproape verbatim: ambele aplicații sunt pe tema daisyUI `dim`, iar tot ce urmează e scris
+   în variabilele TEMEI (`var(--color-primary)`, `color-mix(in oklch, …)`) — nu pe culori fixe. Deci
+   nu e „copiat", e același sistem aplicat de două ori.
+
+   Măsurat înainte: bjj avea 530 de linii și ~40 de clase de limbaj vizual; palmares avea 63 și una
+   singură. Aceeași temă, dar unul arăta proiectat și celălalt arăta ca daisyUI din cutie. Asta era
+   toată diferența de aspect.
+
+   NU s-a portat: variabilele de culoare ale centurilor, `.promotion-card`, izolarea de print a
+   certificatului, ajustările de `timeline` și caruselul de tranzacții — toate cer un domeniu sau o
+   componentă care nu există aici. */
+
+/* Panoul unui chip de identificator e `position: absolute` într-un rând de tabel sau într-un card,
+   iar amândouă creează contexte de stivuire: fără ridicarea asta, panoul e TĂIAT de vecini.
+   E un defect pe care l-am introdus chiar eu cu chipul, iar bjj îl avea deja rezolvat — prima regulă
+   pe care merita s-o iau. `:has()` ca să nu fie nevoie de stare în Halogen. */
+.grid > *:has(.dropdown:hover),
+.grid > *:has(.dropdown:focus-within),
+tr:has(.dropdown:hover),
+tr:has(.dropdown:focus-within),
+.card:has(.dropdown:hover),
+.card:has(.dropdown:focus-within) {
+  position: relative;
+  z-index: 50;
+}
+
+/* Grilă de puncte în spatele grafului Cytoscape: orientare spațială fără linii care concurează cu
+   muchiile. */
+.graph-dots {
+  background-image: radial-gradient(circle, color-mix(in oklch, var(--color-base-content) 8%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ===== Animații ===== */
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 5px color-mix(in srgb, var(--color-primary) 30%, transparent); }
+  50% { box-shadow: 0 0 20px color-mix(in srgb, var(--color-primary) 60%, transparent); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.5s ease-out forwards;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.4s ease-out forwards;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--color-base-content) 8%, transparent),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-glow {
+  animation: glow-pulse 2s infinite;
+}
+
+/* ===== Carduri ===== */
+
+.card-hover-lift {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04),
+    0 12px 36px -12px color-mix(in oklch, var(--color-primary) 18%, transparent),
+    0 0 0 1px color-mix(in oklch, var(--color-primary) 12%, transparent);
+}
+
+/* Ridicare plus o lumină care trece diagonal la hover. Pe telefon ridicarea se oprește: un
+   `transform` pe atingere arată ca o eroare de randare, nu ca un efect. */
+.explorer-card {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.explorer-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 40%,
+    color-mix(in oklch, var(--color-primary) 6%, transparent) 100%
+  );
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+
+.explorer-card:hover::after {
+  opacity: 1;
+}
+
+.explorer-card:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow:
+    0 20px 40px -12px rgba(0, 0, 0, 0.12),
+    0 0 0 1px color-mix(in oklch, var(--color-primary) 15%, transparent);
+}
+
+@media (max-width: 767px) {
+  .explorer-card:hover {
+    transform: none;
+  }
+}
+
+.glass-card {
+  background: color-mix(in oklch, var(--color-base-200) 70%, transparent);
+  backdrop-filter: blur(10px);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
+}
+
+.skeleton-animate {
+  background: linear-gradient(
+    90deg,
+    var(--color-base-200) 25%,
+    var(--color-base-300) 50%,
+    var(--color-base-200) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ===== Text și separatoare ===== */
+
+.gradient-text {
+  background: linear-gradient(to right, var(--color-success), var(--color-info), var(--color-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+  max-width: 50%;
+  margin: 0 auto;
+  opacity: 0.55;
+}
+
+/* ===== Straturile de fundal, aplicate pe toate paginile ===== */
+
+/* Overlay-ul: întuneric sus pentru contrastul barei de navigare, fade în `base-300` jos. Funcționează
+   și FĂRĂ o fotografie dedesubt — atunci e doar un gradient, iar paginile capătă adâncime fără să
+   ceară un activ pe care nimeni nu l-a ales încă. */
+.global-bg-overlay {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.35) 35%,
+    rgba(0, 0, 0, 0.35) 60%,
+    color-mix(in oklch, var(--color-base-300) 95%, transparent) 100%
+  );
+}
+
+/* Pulsuri de lumină, decalate stânga/dreapta ca să nu bată în ritm. */
+.hero-neon-glow-left {
+  background: radial-gradient(ellipse 40% 20% at 8% 60%, var(--color-info) 0%, transparent 70%);
+  opacity: 0;
+  animation: hero-neon-pulse-left 4s ease-in-out infinite alternate;
+}
+
+.hero-neon-glow-right {
+  background: radial-gradient(ellipse 30% 15% at 92% 55%, var(--color-accent) 0%, transparent 70%);
+  opacity: 0;
+  animation: hero-neon-pulse-right 4s ease-in-out 2s infinite alternate;
+}
+
+@keyframes hero-neon-pulse-left {
+  0% { opacity: 0; }
+  100% { opacity: 0.20; }
+}
+
+@keyframes hero-neon-pulse-right {
+  0% { opacity: 0; }
+  100% { opacity: 0.25; }
+}
+
+/* ===== Secțiuni de ecran întreg și dezvăluire la derulare ===== */
+
+.section-slide {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4rem 0;
+  position: relative;
+}
+
+@media (max-width: 640px) {
+  .section-slide {
+    min-height: auto;
+    padding: 3rem 0;
+  }
+}
+
+/* Ascuns DOAR cînd scriptul din `index.html` a confirmat că poate dezvălui. Fără `js-reveal`,
+   `.scroll-reveal` nu face nimic — vezi comentariul de acolo pentru de ce contează. */
+html.js-reveal .scroll-reveal {
+  opacity: 0;
+  transform: translateY(40px);
+  transition:
+    opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.js-reveal .scroll-reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stagger-1 { transition-delay: 0.08s; }
+.stagger-2 { transition-delay: 0.16s; }
+.stagger-3 { transition-delay: 0.24s; }
+.stagger-4 { transition-delay: 0.32s; }
+.stagger-5 { transition-delay: 0.40s; }
+.stagger-6 { transition-delay: 0.48s; }
+
+@keyframes scroll-indicator {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 0.7; transform: translateY(8px); }
+}
+
+.scroll-indicator {
+  animation: scroll-indicator 2s ease-in-out infinite;
+}
+
+/* ===== Bandă rulantă ===== */
+
+.marquee-container {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee-track {
+  display: inline-flex;
+  animation: marquee 30s linear infinite;
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ===== Flux de activitate ===== */
+
+.feed-live-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-success);
+  animation: feed-pulse 2s ease-in-out infinite;
+}
+
+@keyframes feed-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 40%, transparent); }
+  50% { opacity: 0.6; box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-success) 0%, transparent); }
+}
+
+.feed-item-enter {
+  opacity: 0;
+  transform: translateX(-12px);
+  animation: feed-slide-in 0.4s ease-out forwards;
+}
+
+@keyframes feed-slide-in {
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ===== CBOR: filigran de amprentă ===== */
+
+/* Ecranul de scriere arată CBOR-ul brut al tranzacției într-un `<pre>`. Filigranul spune din privire
+   ce fel de lucru e: o amprentă, nu un text de citit. */
+.cbor-fingerprint-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.cbor-fingerprint-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/images/fingerprint.svg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+/* ===== Accesibilitate: nicio animație pentru cine a cerut asta ===== */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-neon-glow-left,
+  .hero-neon-glow-right {
+    animation: none !important;
+    opacity: 0.15;
+  }
+
+  .animate-fade-in-up,
+  .animate-slide-in-right,
+  .animate-scale-in,
+  .animate-shimmer,
+  .animate-glow,
+  .feed-item-enter,
+  .feed-live-dot,
+  .marquee-track,
+  .scroll-indicator,
+  .skeleton-animate {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  html.js-reveal .scroll-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

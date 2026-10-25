@@ -193,23 +193,85 @@ component =
   -- Deci: o frază care spune ce se vede aici în cuvinte de zi cu zi, apoi trei lucruri pe care
   -- le poți face, apoi cele trei cuvinte din jargon pe care site-ul le folosește oricum. Cifrele
   -- vin după.
+  -- EROUL, după tiparul din `bjj-frontend/src/Components/Home/ExplorerHub.purs`: o secțiune de
+  -- înălțimea ecranului, centrată, cu marca plutind într-un inel luminos, titlul în gradient, și
+  -- indicatorul de derulare jos. Intrările sînt decalate — 0s, 0,2s, 0,6s — ca pagina să se așeze,
+  -- nu să apară dintr-o dată.
+  --
+  -- Marca e logo-ul Cardano, nu unul propriu: un registru de reputație pentru guvernanța Cardano
+  -- spune din prima privire pe ce lanț trăiește. Cînd proiectul capătă semn propriu, se schimbă
+  -- un `src`.
   intro st =
-    HH.div [ HP.class_ (HH.ClassName "space-y-4") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
-          [ HH.h1 [ HP.class_ (HH.ClassName "text-4xl font-bold") ] [ HH.text "Palmares" ]
-          , HH.p [ HP.class_ (HH.ClassName "text-lg max-w-3xl") ]
-              [ HH.text "A register of who vouches for whom, on chain — and what those claims are worth." ]
-          , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
+    HH.div_
+      [ HH.section
+          [ HP.id "hero"
+          , HP.class_
+              ( HH.ClassName
+                  "w-full min-h-[82vh] relative overflow-hidden flex flex-col items-center justify-center"
+              )
+          ]
+          [ HH.div [ HP.class_ (HH.ClassName "relative max-w-3xl mx-auto text-center px-4 space-y-5 sm:space-y-8") ]
+              [ HH.div [ HP.class_ (HH.ClassName "flex justify-center mb-2 animate-scale-in hero-logo-float") ]
+                  [ HH.div [ HP.class_ (HH.ClassName "animate-glow rounded-full p-3") ]
+                      [ HH.img
+                          [ HP.src "/images/cardano-logo.svg"
+                          , HP.alt "Cardano"
+                          , HP.class_ (HH.ClassName "w-16 h-16 sm:w-24 sm:h-24 opacity-90")
+                          ]
+                      ]
+                  ]
+              , HH.h1
+                  [ HP.class_
+                      ( HH.ClassName
+                          "text-4xl sm:text-5xl lg:text-6xl font-black leading-tight animate-fade-in-up"
+                      )
+                  ]
+                  [ HH.text "Who vouches for whom, "
+                  , HH.span [ HP.class_ (HH.ClassName "gradient-text") ] [ HH.text "on chain" ]
+                  ]
+              , HH.p
+                  [ HP.class_ (HH.ClassName "text-lg sm:text-xl text-base-content/70 max-w-xl mx-auto animate-fade-in-up")
+                  , HP.style "animation-delay: 0.2s"
+                  ]
+                  [ HH.text
+                      "Anyone can state something about someone else. The subject accepts it or \
+                      \does not, and anyone who thinks it is false can put money behind the \
+                      \challenge."
+                  ]
+              , HH.div
+                  [ HP.class_ (HH.ClassName "flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-in-up")
+                  , HP.style "animation-delay: 0.6s"
+                  ]
+                  [ HH.a [ HP.href "/attestations", HP.class_ (HH.ClassName "btn btn-primary btn-md sm:btn-lg") ]
+                      [ HH.text "See who vouched for whom" ]
+                  , HH.a [ HP.href "/write", HP.class_ (HH.ClassName "btn btn-ghost btn-sm sm:btn-md") ]
+                      [ HH.text "Make a claim of your own" ]
+                  ]
+              , HH.p
+                  [ HP.class_ (HH.ClassName "text-sm text-base-content/50 animate-fade-in-up")
+                  , HP.style "animation-delay: 0.8s"
+                  ]
+                  [ HH.text "Nothing is deleted and nothing is anonymous." ]
+              ]
+          , HH.div [ HP.class_ (HH.ClassName "absolute bottom-8 left-1/2 -translate-x-1/2 scroll-indicator hidden sm:block") ]
+              [ HH.div [ HP.class_ (HH.ClassName "w-6 h-10 rounded-full border-2 border-base-content/20 flex justify-center pt-2") ]
+                  [ HH.div [ HP.class_ (HH.ClassName "w-1 h-2 bg-base-content/30 rounded-full") ] [] ]
+              ]
+          ]
+      , HH.div [ HP.class_ (HH.ClassName "section-divider") ] []
+      , HH.div [ HP.class_ (HH.ClassName "space-y-4 pt-10") ]
+          [ HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl scroll-reveal") ]
               [ HH.text
                   "Anyone can state something about someone else here: that they delivered a \
                   \milestone, passed an audit, hold a role. The claim is written on chain, the \
                   \subject can accept it, and anyone who thinks it is false can challenge it by \
-                  \putting money behind the challenge. Nothing is deleted and nothing is anonymous."
+                  \putting money behind the challenge."
               ]
+          , HH.div [ HP.class_ (HH.ClassName "scroll-reveal stagger-1") ] [ registryFigures st ]
+          , HH.div [ HP.class_ (HH.ClassName "grid gap-3 md:grid-cols-3 scroll-reveal stagger-2") ]
+              (map useCase useCases)
+          , HH.div [ HP.class_ (HH.ClassName "scroll-reveal stagger-3") ] [ glossary ]
           ]
-      , registryFigures st
-      , HH.div [ HP.class_ (HH.ClassName "grid gap-3 md:grid-cols-3") ] (map useCase useCases)
-      , glossary
       ]
 
   -- Cele trei numere ale registrului, sus, pentru că ele sunt produsul. Un „—" cît timp nu s-a
@@ -251,7 +313,7 @@ component =
   -- Trei cuvinte, o propoziție fiecare. Site-ul le folosește de sute de ori; a le explica o dată,
   -- aici, costă trei rânduri și scutește fiecare ecran de o paranteză.
   glossary =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-4 gap-2") ]
           [ HH.span [ HP.class_ (HH.ClassName "text-xs uppercase tracking-wide opacity-70") ]
               [ HH.text "Four words this site uses a lot" ]
@@ -297,7 +359,7 @@ component =
       ]
 
   skeleton label =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
           , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text label ]
@@ -378,7 +440,7 @@ component =
       ]
 
   statCard title value desc =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-4 gap-1") ]
           [ HH.span [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text title ]
           , HH.span [ HP.class_ (HH.ClassName "text-2xl font-semibold") ] [ HH.text value ]
@@ -389,7 +451,7 @@ component =
   -- Două numere, nu unul. „Cerut" e ce au scris propunerile; „adoptat" e ce a plătit trezoreria. La
   -- măsurătoare, al doilea era zero — un singur număr ar fi spus exact pe dos.
   treasury p =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text "Treasury withdrawals" ]
           , HH.div [ HP.class_ (HH.ClassName "grid gap-4 sm:grid-cols-2") ]
@@ -412,7 +474,7 @@ component =
       ]
 
   participation page@(DashboardPage p) =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ]
               [ HH.text "DRep participation by epoch" ]
@@ -440,7 +502,7 @@ component =
   -- iar fără link trebuie să meargă la Actions și să reconstruiască filtrul de mână. Exact aceleași
   -- valori sunt deja linkuri în bara laterală a listei.
   breakdown title key pairs =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text title ]
           , if null pairs then HH.p [ HP.class_ (HH.ClassName "opacity-70 text-sm") ] [ HH.text "Nothing yet." ]
@@ -469,7 +531,7 @@ component =
         ]
 
   closingSoon p =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text "Closing soon" ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
@@ -517,7 +579,7 @@ component =
     Just amount -> " · " <> formatAda amount <> " requested"
 
   topDreps p =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text "Largest DReps by voting power" ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
