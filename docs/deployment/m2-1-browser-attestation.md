@@ -1,55 +1,63 @@
 # M2-1: o atestare emisă **și contrasemnată din browser**, pe preprod
 
-Ăsta e singurul criteriu din poarta M2 care nu se poate închide fără decizia ta. **Nu din lipsă de
-cheie** — asta s-a schimbat pe 25 octombrie — ci fiindcă trimiterea rămâne manuală prin decizia ta,
-iar `POST /submit-tx` e singurul pas ireversibil din tot produsul, marcat ca atare în cod
-(`MonadInteract.purs`: „ĂSTA e pasul ireversibil").
+> **ÎNCHIS pe 2026-10-25.** Patru tranzacții, toate semnate în browser de un wallet CIP-30, toate
+> construite de `interaction-api` pe deployul `gov.cardano.vip`, toate proiectate în registru.
+>
+> | pasul | tranzacția | slot |
+> | --- | --- | --- |
+> | profil subiect (`person_d_rep`) | `773d343a9907613a6d2dc255bb1de9a03139fc01498d12f7967e3434b9c2d21c` | 137275620 |
+> | profil emitent (`auditor`) | `80f97ede58c5bcaf89874b9ceeeac83523725a3aace167a62316e4c608c403bb` | 137276653 |
+> | atestarea | `e0a360a11f8c9cb6859a3334426938f0c8f92d506fbbca09a3ca3ceca04ccf93` | — |
+> | contrasemnătura | `a2ccfdbc6028f449f5067fd068d6632cdfa60d06e3314889c2e16112db877d69` | 137278322 |
+>
+> Rezultatul: `m2-1-1792961388736-attestation`, `kind: endorsement`, **`accepted: true`**, pe
+> `https://gov.cardano.vip/attestations`. Registrul: 12→14 profiluri, 19→20 atestări, **zero**
+> intrări în `attest_dead_letter`.
+>
+> **Latența proiecției, măsurată: 45 de secunde** de la „trimis" până când rândul arată `accepted`.
+> Singurul număr care spune ceva despre lanțul de proiecții și nu doar despre tranzacții.
+>
+> **Patru tranzacții, nu trei**, și motivul e o regulă on-chain: `traceIfFalse "Mr"
+> (isCredentialKind || subject /= issuer)` — *o atestare nu poate fi auto-emisă*. Un singur profil
+> nu ajunge, deci a trebuit un al doilea ca emitent. Un portofel poate deține oricâte profiluri,
+> deci nu a trebuit un al doilea portofel: aceeași cheie a semnat emiterea (tokenul emitentului) și
+> acceptarea (tokenul subiectului).
+>
+> **Testul e reluabil**, și a trebuit să fie: `PALMARES_M2_PROFILE_ID`,
+> `PALMARES_M2_ISSUER_PROFILE_ID`, `PALMARES_M2_ATTESTATION_ID`. Fiecare pas costă o tranzacție
+> ireversibilă, iar fără reluare fiecare defect de test ar fi cerut re-mintarea a tot ce era deja pe
+> lanț.
 
-**Ce s-a schimbat: cheia nu mai lipsește.** Portofelul din `cip30-test-wallet` derivă determinist,
-iar adresa lui de pe preprod ținea **53.115 tADA în 56 de UTxO-uri** la 2026-10-25, măsurat prin
-Kupo-ul clusterului. Deci nu e nevoie de o cheie nouă, de un mnemonic în mediu, sau de un fișier
-commis cu o credențială în el.
+## Cele șase defecte, niciunul prins de un test care trecea
 
-**Și semnătura e dovedită.** `e2e-wallet/sign-not-submit.spec.js` rulează împotriva deployului:
-wallet-ul semnează cu adevărat, cu cheia lui, pe o tranzacție Conway construită de
-`interaction-api` din UTxO-uri reale, iar aplicația trimite martorul la `/submit-tx` cu exact
-tranzacția pe care a arătat-o în sumar. Singura diferență față de o rulare adevărată e că ruta aceea
-e **interceptată**: octeții nu pleacă.
+Rularea a cerut șase reparații. **Cinci erau în teste, una în produs** — iar cea din produs e
+singura pe care un om ar fi văzut-o imediat și pe care niciun test n-ar fi văzut-o vreodată.
 
-Deci ce rămâne e literal un pas: scoaterea interceptării. O variabilă o scoate.
+1. **Ecranul trimitea adrese goale.** `usedAddresses: []`, `changeAddress: ""` — serverul alege
+   intrările pe baza lor, deci nicio tranzacție nu se putea construi, pe nicio rețea. *În produs.*
+   Unitarele verificau serializarea corpului, nu de unde vin valorile; fixturile n-au portofel.
+2. **Două selectoare citeau id-ul greșit.** `/profiles` e o listă de carduri: un `div` prea larg
+   întorcea id-ul PRIMULUI profil, nu al celui nou. Pe `/attestations`, id-ul atestării nu e în rând
+   deloc — cele două valori monospațiate sînt subiectul și emitentul, trunchiate cu elipsă. Ambele
+   reparate citind id-ul din adresa linkului „Edit" / „Accept", care e și calea unui om.
+3. **O afirmație vacuă a anulat semnarea.** `getByText(/submitted/i)` prinde textul introductiv al
+   ecranului — „nothing here is submitted on your behalf" — ÎNAINTE de orice semnătură. Testul
+   trecea instantaneu, naviga, iar navigarea anula semnarea în curs: zece minute, zero tranzacții,
+   pas „verde".
+4. **Ecranele registrului nu reinterogează.** Datele se cer o dată, la montare. Un
+   `expect(...).toBeVisible()` pe o pagină încărcată înainte de proiecție așteaptă pe un DOM
+   înghețat — a așteptat 25 de minute pe un profil care era deja în API. Reparat prin reîncărcare în
+   buclă. **Și e o observație despre produs:** cine mintuiește trebuie să reîncarce ca să vadă.
+5. **O atestare auto-emisă, refuzată pe lanț** cu `Mr PT5`. Presupusesem că „subiect == emitent" e
+   validă fiindcă revendicările de credențială o folosesc — dar acelea sînt `isCredentialKind`, iar
+   scutirea aceea e chiar motivul pentru care restul nu sînt scutite. Ecranul a arătat codul de
+   trace corect; greșeala era a testului.
+6. **`page` nu era în scope** în helper-ul pe care l-am mutat în scope-ul `describe`. A picat DUPĂ
+   ce atestarea plecase deja — de unde a treia variabilă de reluare.
 
-## O comandă
-
-```bash
-cd frontend
-PALMARES_WALLET_URL=https://gov.cardano.vip PALMARES_M2_SUBMIT=1 \
-  npx playwright test --config playwright.wallet.config.js e2e-wallet/m2-1-chain.spec.js
-```
-
-`PALMARES_M2_SUBMIT=1` nu înseamnă nimic altceva decât „ai voie să trimiți", și nu se pune din
-greșeală.
-
-**Rularea e pregătită, nu doar scrisă.** Pașii 2 și 3 nu pot rula decât DUPĂ ce pasul 1 a mintuit
-deja pe lanț, deci o greșeală în pasul 2 s-ar descoperi numai după un mint ireversibil, cu un profil
-orfan rămas pe preprod. `e2e-wallet/m2-1-preflight.spec.js` verifică fără să trimită nimic tot ce se
-poate verifica, și a găsit **două greșeli care ar fi pierdut exact o rulare**:
-
-1. pe `/profiles`, care e o listă de carduri și nu un tabel, selectorul întorcea id-ul **primului**
-   profil din pagină, nu al celui nou-mintuit — deci atestarea ar fi fost despre altcineva;
-2. pe `/attestations`, cele două valori monospațiate din rând sînt subiectul și emitentul, nu
-   atestarea, și sînt **trunchiate cu elipsă**.
-
-Ambele reparate citind identificatorul din adresa linkului „Edit" / „Accept" — care e și calea unui
-om: nimeni nu copiază un hex de pe ecran. Pre-flight-ul fixează acum contractul, verifică pe serverul
-adevărat că formele corpurilor pentru pașii 2 și 3 sînt cele așteptate (refuz `ProfileNotFound`, nu
-`invalid_parameter`), și confirmă că fiecare etichetă în care testul scrie mai există în fluxul ei.
-
-Singurul lucru care NU se poate pregăti dinainte e ce face serverul când portofelul deține un
-profil — fiindcă pentru asta trebuie mintuit unul. Testul face cele trei tranzacții — profil, atestare, acceptare — și așteaptă ca rândul de
-pe `/attestations` să arate `accepted`. Cost: taxă măsurată 0,61 tADA pe una dintre ele, plus
-min-UTxO blocat în tokenurile create; sub 10 tADA în total.
-
-Dacă preferi să o faci cu mâna, pașii manuali sunt mai jos și sunt aceiași.
+Ce rămâne mai jos e istoria de dinainte de închidere, păstrată pentru ce dovedește FĂRĂ a trimite
+nimic: `build-and-summarise.spec.js`, `sign-not-submit.spec.js` și `m2-1-preflight.spec.js` rămân
+valoroase exact pentru că nu ating lanțul.
 
 ## Ce e deja dovedit, și cu ce
 

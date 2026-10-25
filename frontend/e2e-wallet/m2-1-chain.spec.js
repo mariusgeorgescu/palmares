@@ -22,10 +22,25 @@
 import { expect, test } from 'cip30-test-wallet/playwright';
 
 const SUBMIT = process.env.PALMARES_M2_SUBMIT === '1';
+// Reluare. Fiecare pas costă o tranzacție ireversibilă, deci un eșec la pasul 2 nu trebuie să
+// ceară re-mintarea profilului de la pasul 1 — prima rulare a lăsat exact așa un profil pe
+// preprod. Cu `PALMARES_M2_PROFILE_ID` pus, pasul 1 se sare și se folosește profilul numit, care
+// trebuie să fie deținut de ACELAȘI portofel.
+const EXISTING_PROFILE = process.env.PALMARES_M2_PROFILE_ID;
+const EXISTING_ISSUER = process.env.PALMARES_M2_ISSUER_PROFILE_ID;
+// A treia reluare: o atestare deja emisă, de contrasemnat. Numele ei purta un marker bazat pe
+// timp, deci o rulare nouă nu o putea regăsi — iar o atestare emisă și neacceptată e exact starea
+// pe care pasul 3 are nevoie s-o găsească.
+const EXISTING_ATTESTATION = process.env.PALMARES_M2_ATTESTATION_ID;
 const WALLET = 'palmaresM2';
 
 // Trei tranzacții plus proiecțiile lor. Nu încape în timeout-ul implicit.
-test.describe.configure({ mode: 'serial', timeout: 20 * 60 * 1000 });
+// Trei tranzacții, fiecare urmată de o așteptare a proiecției. Fereastra e largă pentru că
+// numărul real nu era cunoscut: prima rulare a dat 10 minute proiecției profilului și n-a ajuns —
+// profilul a apărut, dar mai târziu. Testul măsoară acum fiecare așteptare și o tipărește, ca
+// următoarea fereastră să fie bazată pe o cifră.
+test.describe.configure({ mode: 'serial', timeout: 60 * 60 * 1000 });
+const PROJECTION_WAIT = 25 * 60 * 1000;
 
 test.use({
   walletOptions: {
@@ -157,54 +172,157 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
 
   const marker = `m2-1-${Date.now()}`;
 
-  test('mints a profile, attests to it, accepts it, and the register shows accepted', async ({ page }) => {
-    // 1. Un profil, ca să existe un subiect și un emitent.
-    await connect(page, 'claim-profile');
-    await fill(page, 'Kind', 'person_d_rep');
-    await fill(page, 'Name', `${marker}-profile`);
-    await fill(page, 'Description', 'M2-1 end-to-end run');
-    await fill(page, 'Image URI', 'ipfs://palmares-m2-1');
-    const txProfile = await buildSignSubmit(page, 'profile');
+  // Cât durează de la „trimis" până când rândul e pe ecran. E singurul număr care spune ceva despre
+  // lanțul de proiecții și nu doar despre tranzacții, iar runbook-ul îl cere.
+  // RELOAD, în buclă. Asta e reparația care a costat două rulări: ecranele registrului își cer
+  // datele O DATĂ, la montare, și nu interoghează din nou. Deci un `expect(...).toBeVisible()` pe o
+  // pagină încărcată înainte ca proiecția să ajungă așteaptă pe un DOM înghețat — a așteptat 25 de
+  // minute pe un profil care era deja în API și pe care o simplă reîncărcare l-ar fi arătat.
+  //
+  // E și o observație despre produs, nu doar despre test: cine a mintuit ceva trebuie să
+  // reîncarce ca să-l vadă. Ecranul de scriere ar putea măcar să trimită spre registru după
+  // „trimis".
+  const awaitProjection = async (page, what, url, locatorOf) => {
+    const started = Date.now();
+    const deadline = started + PROJECTION_WAIT;
+    for (;;) {
+      await page.goto(url);
+      try {
+        await locatorOf().waitFor({ state: 'visible', timeout: 15_000 });
+        const secs = Math.round((Date.now() - started) / 1000);
+        console.log(`[m2-1] ${what} projected after ${secs}s`);
+        return secs;
+      } catch (e) {
+        if (Date.now() > deadline) {
+          throw new Error(
+            `${what} never appeared on ${url} within ${Math.round(PROJECTION_WAIT / 60000)} min ` +
+              `(reloaded throughout, so this is the projection and not a stale page)`
+          );
+        }
+      }
+    }
+  };
+
+  test('mints a profile, attests to it, accepts it, and the register shows accepted', async ({ page, request }) => {
+    // 1. Un profil, ca să existe un subiect și un emitent — sau cel dat, dacă reluăm.
+    let txProfile = EXISTING_PROFILE ? '(reused)' : null;
+    let profileName = `${marker}-profile`;
+
+    if (EXISTING_PROFILE) {
+      console.log(`[m2-1] reusing profile ${EXISTING_PROFILE}`);
+    } else {
+      await connect(page, 'claim-profile');
+      await fill(page, 'Kind', 'person_d_rep');
+      await fill(page, 'Name', profileName);
+      await fill(page, 'Description', 'M2-1 end-to-end run');
+      await fill(page, 'Image URI', 'ipfs://palmares-m2-1');
+      txProfile = await buildSignSubmit(page, 'profile');
+    }
 
     // Proiecția trebuie să prindă tranzacția. attest-sync citește Kupo și e la ZERO decalaj pe
     // deploy, deci e o chestiune de un bloc sau două. Guvernanța e în urmă cu sute de epoci, dar
     // n-are nicio legătură cu registrul: sunt două lanțuri de proiecții separate.
     await page.goto('/profiles');
-    const profileRow = page.getByText(`${marker}-profile`);
-    await expect(profileRow).toBeVisible({ timeout: 10 * 60 * 1000 });
+    let profileId;
+    if (EXISTING_PROFILE) {
+      // Reluare: profilul trebuie să existe deja pe ecran, altfel nu e al acestui registru.
+      const card = page.locator('.card', {
+        has: page.locator(`a[href*="${EXISTING_PROFILE}"]`),
+      });
+      await expect(card.first(), 'the given profile is not in the register').toBeVisible({
+        timeout: 60_000,
+      });
+      profileId = EXISTING_PROFILE;
+    } else {
+      await awaitProjection(page, 'profile', '/profiles', () => page.getByText(profileName));
+      const profileCard = page.locator('.card', { hasText: profileName }).first();
+      profileId = await idFromLink(profileCard, 'update-profile');
+    }
 
-    const profileCard = page.locator('.card', { hasText: `${marker}-profile` }).first();
-    const profileId = await idFromLink(profileCard, 'update-profile');
+    // 1b. UN AL DOILEA PROFIL, ca emitent. Prima variantă folosea același profil ca subiect și
+    // emitent, iar lanțul a refuzat-o — pe bună dreptate:
+    //
+    //   traceIfFalse "Mr" (isCredentialKind || subject /= issuer)
+    //     -- An attestation may not be self-issued (Mr)
+    //
+    // Ecranul a arătat exact asta: „A validator refused this transaction: Mr PT5". Presupunerea
+    // greșită era că „subiect == emitent" e o formă validă fiindcă revendicările de credențială o
+    // folosesc — dar acelea sînt `isCredentialKind`, iar scutirea aceea e chiar motivul pentru care
+    // restul nu sînt scutite.
+    //
+    // Un portofel poate deține oricâte profiluri, deci al doilea profil nu cere un al doilea
+    // portofel: aceeași cheie semnează și emiterea (tokenul emitentului) și acceptarea (tokenul
+    // subiectului).
+    let issuerId = EXISTING_ISSUER;
+    if (issuerId) {
+      console.log(`[m2-1] reusing issuer profile ${issuerId}`);
+    } else {
+      const issuerName = `${marker}-issuer`;
+      await connect(page, 'claim-profile');
+      await fill(page, 'Kind', 'auditor');
+      await fill(page, 'Name', issuerName);
+      await fill(page, 'Description', 'M2-1 issuer profile');
+      await fill(page, 'Image URI', 'ipfs://palmares-m2-1');
+      const txIssuer = await buildSignSubmit(page, 'issuer-profile');
+      console.log(`[m2-1] issuer profile tx ${txIssuer}`);
 
-    // 2. O atestare despre el, emisă de el — un singur portofel deține un singur profil, iar
-    // „subiect == emitent" e o formă care există deja pe preprod (revendicările de credențială).
-    await connect(page, 'issue-attestation', profileId);
-    await fill(page, 'Issuer', profileId);
-    await fill(page, 'Kind', 'endorsement');
-    await fill(page, 'Name', `${marker}-attestation`);
-    await fill(page, 'Description', 'issued and countersigned from the browser');
-    await fill(page, 'Image URI', 'ipfs://palmares-m2-1');
-    const txAttestation = await buildSignSubmit(page, 'attestation');
+      await awaitProjection(page, 'issuer profile', '/profiles', () => page.getByText(issuerName));
+      issuerId = await idFromLink(
+        page.locator('.card', { hasText: issuerName }).first(),
+        'update-profile'
+      );
+    }
+    expect(issuerId, 'the issuer must be a different profile').not.toBe(profileId);
 
-    await page.goto('/attestations');
-    const attRow = page.getByRole('row', { name: new RegExp(`${marker}-attestation`) });
-    await expect(attRow).toBeVisible({ timeout: 10 * 60 * 1000 });
-    // Înainte de contrasemnătură: afirmată, nerecunoscută.
-    await expect(attRow.getByText('not yet')).toBeVisible();
+    // 2. O atestare despre subiect, emisă de celălalt profil — sau cea dată, dacă reluăm.
+    let txAttestation = EXISTING_ATTESTATION ? '(reused)' : null;
+    let attestationId = EXISTING_ATTESTATION;
 
-    const attestationId = await idFromLink(attRow, 'accept-attestation');
+    // Numele rândului, pentru afirmația finală. La o reluare markerul e altul, deci numele se
+    // citește din API după id — altfel pasul 4 ar căuta un rând care nu există și ar rata exact
+    // criteriul pe care tocmai l-a îndeplinit.
+    let attestationName = `${marker}-attestation`;
+
+    if (attestationId) {
+      console.log(`[m2-1] reusing attestation ${attestationId}`);
+      const all = await (await request.get('/api/query/attestations?limit=200')).json();
+      const found = all.items.find((a) => a.id === attestationId);
+      expect(found, `attestation ${attestationId} is not in the register`).toBeTruthy();
+      attestationName = found.name;
+      console.log(`[m2-1] its name is ${attestationName}, accepted=${found.accepted}`);
+    } else {
+      await connect(page, 'issue-attestation', profileId);
+      await fill(page, 'Subject', profileId);
+      await fill(page, 'Issuer', issuerId);
+      await fill(page, 'Kind', 'endorsement');
+      await fill(page, 'Name', `${marker}-attestation`);
+      await fill(page, 'Description', 'issued and countersigned from the browser');
+      await fill(page, 'Image URI', 'ipfs://palmares-m2-1');
+      txAttestation = await buildSignSubmit(page, 'attestation');
+
+      await awaitProjection(page, 'attestation', '/attestations', () =>
+        page.getByRole('row', { name: new RegExp(`${marker}-attestation`) })
+      );
+      const attRow = page.getByRole('row', { name: new RegExp(`${marker}-attestation`) });
+      // Înainte de contrasemnătură: afirmată, nerecunoscută.
+      await expect(attRow.getByText('not yet')).toBeVisible();
+      attestationId = await idFromLink(attRow, 'accept-attestation');
+    }
 
     // 3. Contrasemnătura, cu portofelul SUBIECTULUI — aici același, fiindcă subiectul e profilul lui.
     await connect(page, 'accept-attestation', attestationId);
     const txAcceptance = await buildSignSubmit(page, 'acceptance');
 
     // 4. Criteriul însuși: rândul arată „accepted".
-    await page.goto('/attestations');
-    const accepted = page.getByRole('row', { name: new RegExp(`${marker}-attestation`) });
-    await expect(accepted.getByText('accepted')).toBeVisible({ timeout: 10 * 60 * 1000 });
+    await awaitProjection(page, 'acceptance', '/attestations', () =>
+      page.getByRole('row', { name: new RegExp(attestationName) }).getByText('accepted')
+    );
 
     // Cele trei id-uri, pentru jurnal: fără ele „a trecut" nu e o dovadă pe care cineva o poate
     // verifica pe lanț.
-    console.log(`[m2-1] DONE profile=${txProfile} attestation=${txAttestation} acceptance=${txAcceptance}`);
+    console.log(
+      `[m2-1] DONE subject=${profileId} issuer=${issuerId} ` +
+        `profileTx=${txProfile} attestationTx=${txAttestation} acceptanceTx=${txAcceptance}`
+    );
   });
 });
