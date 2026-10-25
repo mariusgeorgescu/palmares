@@ -21,13 +21,16 @@ module Components.Explorer.AttestationList
 import Prelude
 
 import Capabilities.Query.Gov.Http (ApiError, renderApiError)
-import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestations)
-import Capabilities.Query.Gov.Types (AttestationPage(..), AttestationRow(..))
+import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestations, getProfiles)
+import Capabilities.Query.Gov.Types (AttestationPage(..), AttestationRow(..), ProfilePage(..), ProfileRow(..))
 import Components.Shared.DRepIdentity (shortId)
 import Data.Array (length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
+import Data.Map (Map)
+import Data.Map as Map
+import Data.Maybe (Maybe(..), fromMaybe)
 import Format (formatDay, formatInt, humanize, matchLine)
 import Halogen as H
 import Halogen.HTML as HH
@@ -53,6 +56,10 @@ type State =
   { filters :: RegistryFilters
   , refreshing :: Boolean
   , page :: RemoteData ApiError AttestationPage
+  -- Numele profilurilor, după id. Tabelul ăsta e „cine a vouchuit pentru cine", iar cu două
+  -- hash-uri de şaizeci de caractere pe rînd nu răspunde la întrebarea aia: arată că s-a întîmplat
+  -- ceva, nu între cine.
+  , names :: Map String String
   }
 
 data Action
@@ -67,7 +74,7 @@ component
   => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: \filters -> { filters, page: NotAsked, refreshing: false }
+    { initialState: \filters -> { filters, page: NotAsked, refreshing: false, names: Map.empty }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -101,6 +108,15 @@ component =
           Left e -> Failure e
           Right p -> Success p
       }
+    -- Numele se cer o singură dată, și eșecul lor NU strică ecranul: fără ele se arată
+    -- identificatorii, ca înainte. Registrul are douăsprezece profiluri pe preprod, deci o cerere
+    -- de 200 le acoperă; dacă ajunge să nu le mai acopere, ce se vede e un id, nu un nume greșit.
+    when (Map.isEmpty st.names) do
+      profiles <- getProfiles { order_by: Nothing, sort_order: Nothing, limit: Just "200", offset: Nothing }
+      case profiles of
+        Left _ -> pure unit
+        Right (ProfilePage pp) ->
+          H.modify_ _ { names = Map.fromFoldable (map (\(ProfileRow r) -> Tuple r.id r.name) pp.items) }
 
   render st =
     HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-4") ]
@@ -147,7 +163,7 @@ component =
               HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-xs ml-2") ] []
             else HH.text ""
           ]
-      , if null p.items then emptyState else table p.items
+      , if null p.items then emptyState else table st p.items
       , if null p.items then HH.text "" else pager st page
       ]
 
@@ -157,7 +173,7 @@ component =
           [ HH.p_ [ HH.text "No attestations have been issued yet." ] ]
       ]
 
-  table items =
+  table st items =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-0") ]
           [ HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
@@ -173,26 +189,48 @@ component =
                           , HH.th_ [ HH.text "Act" ]
                           ]
                       ]
-                  , HH.tbody_ (map row items)
+                  , HH.tbody_ (map (row st) items)
                   ]
               ]
           ]
       ]
 
-  row (AttestationRow a) =
+  -- Numele deasupra, identificatorul dedesubt — nu unul SAU altul. Numele e ce caută omul, iar
+  -- identificatorul e ce verifică pe lanț, şi regula casei (R3) cere să fie amîndouă.
+  party st i = case Map.lookup i st.names of
+    Nothing ->
+      HH.span [ HP.class_ (HH.ClassName "font-mono text-xs"), HP.title i ] [ HH.text (shortId i) ]
+    Just n ->
+      HH.div_
+        [ HH.div [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text n ]
+        , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70"), HP.title i ]
+            [ HH.text (shortId i) ]
+        ]
+
+  row st (AttestationRow a) =
     HH.tr_
       [ HH.td_
           [ HH.div_ [ HH.text a.name ]
           , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text (humanize a.kind) ]
           ]
-      , HH.td [ HP.class_ (HH.ClassName "font-mono text-xs"), HP.title a.subject ] [ HH.text (shortId a.subject) ]
-      , HH.td [ HP.class_ (HH.ClassName "font-mono text-xs"), HP.title a.issuer ] [ HH.text (shortId a.issuer) ]
+      , HH.td_ [ party st a.subject ]
+      , HH.td_ [ party st a.issuer ]
       , HH.td [ HP.class_ (HH.ClassName "text-sm whitespace-nowrap"), HP.title a.date ] [ HH.text (formatDay a.date) ]
       -- „Afirmată, nerecunoscută" și nu „respinsă": subiectul care n-a acceptat încă nu a negat.
+      -- `whitespace-nowrap`: „not yet accepted" se rupea pe două rînduri ÎN pastilă, iar conturul
+      -- tăia textul pe la mijloc. O pastilă e o etichetă, nu un paragraf.
       , HH.td_
           [ HH.span
-              [ HP.class_ (HH.ClassName ("badge badge-sm " <> if a.accepted then "badge-success" else "badge-outline")) ]
-              [ HH.text (if a.accepted then "accepted" else "not yet accepted") ]
+              [ HP.class_
+                  ( HH.ClassName
+                      ("badge badge-sm whitespace-nowrap " <> if a.accepted then "badge-success" else "badge-outline")
+                  )
+              , HP.title
+                  ( if a.accepted then "The subject countersigned this claim."
+                    else "Stated, but the subject has not countersigned it. That is not the same as denied."
+                  )
+              ]
+              [ HH.text (if a.accepted then "accepted" else "not yet") ]
           ]
       , HH.td_ [ disputeCell a ]
       -- Linkurile duc identificatorul CU ELE. Fără asta, „contestă atestarea asta" înseamnă că

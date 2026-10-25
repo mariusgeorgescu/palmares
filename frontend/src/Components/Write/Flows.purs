@@ -87,7 +87,7 @@ flowSpecs =
     , summary: "Changes a profile's description and image. The name is immutable and is not asked for."
     , consequence: "Replaces the profile's metadata on chain. The old values stop being current."
     , fields:
-        [ txt "profile_id" "Profile" "The profile's asset class — policy.assetName."
+        [ txt "profile_id" "Profile" "Paste the profile's identifier — the long string shown under its title on the Profiles page."
         , txt "image_uri" "Image URI" "Required: the server replaces the whole metadata record."
         , optional (long "description" "Description" "Leave empty to keep the current one.")
         ]
@@ -99,8 +99,8 @@ flowSpecs =
         \it, and anyone can dispute it."
     , consequence: "Writes a pending attestation on chain, signed by you, naming the subject."
     , fields:
-        [ txt "subject_profile_id" "Subject" "The profile this is about."
-        , txt "issuer_profile_id" "Issuer" "Your profile — the one making the claim."
+        [ txt "subject_profile_id" "Subject" "The profile you are making a claim about — paste its identifier."
+        , txt "issuer_profile_id" "Issuer" "Your own profile's identifier. You must hold its token to sign this."
         , sel "kind" "Kind" "What sort of claim this is." attestationKinds
         , txt "name" "Name" "A short title for the attestation."
         , long "description" "Description" "What exactly is being attested."
@@ -111,7 +111,7 @@ flowSpecs =
     , title: "Accept an attestation"
     , summary: "Countersigns an attestation about your own profile. Only the subject can do this."
     , consequence: "Marks the attestation as accepted on chain. It cannot be un-accepted."
-    , fields: [ txt "attestation_id" "Attestation" "The attestation's asset class." ]
+    , fields: [ txt "attestation_id" "Attestation" "Paste the attestation's identifier. The Attestations page has an \"Accept\" link that fills this in for you." ]
     }
   , { id: "open-dispute"
     , title: "Open a dispute"
@@ -120,8 +120,8 @@ flowSpecs =
         \from an opinion, and you lose it if the dispute is dismissed."
     , consequence: "Locks the oracle's current deposit from your wallet until the dispute resolves."
     , fields:
-        [ txt "attestation_id" "Attestation" "The attestation being contested."
-        , txt "opened_by_profile_id" "Your profile" "The profile opening the dispute."
+        [ txt "attestation_id" "Attestation" "The claim you are challenging. The Attestations page has a \"Dispute\" link that fills this in."
+        , txt "opened_by_profile_id" "Your profile" "Your own profile's identifier. The deposit comes from your wallet."
         , txt "name" "Name" "A short title for the dispute."
         , long "description" "Description" "What is being contested, and why."
         , txt "image_uri" "Image URI" "You host the image; the protocol only stores the link."
@@ -132,7 +132,7 @@ flowSpecs =
     , summary: "Records the verdict on a dispute. Only the oracle's authority can do this."
     , consequence: "Settles the dispute and releases or forfeits the deposit accordingly."
     , fields:
-        [ txt "dispute_id" "Dispute" "The dispute's asset class."
+        [ txt "dispute_id" "Dispute" "Paste the dispute's identifier. The Disputes page has links that fill this in for you."
         , sel "verdict" "Verdict" "Upheld means the attestation falls." disputeVerdicts
         ]
     }
@@ -142,7 +142,7 @@ flowSpecs =
         "Closes a dispute that was never decided, after its stale-after moment. Anyone can do this \
         \— that is the point of a deadline."
     , consequence: "Closes the dispute as stale and returns the deposit."
-    , fields: [ txt "dispute_id" "Dispute" "The dispute's asset class." ]
+    , fields: [ txt "dispute_id" "Dispute" "Paste the dispute's identifier. The Disputes page has links that fill this in for you." ]
     }
   , { id: "claim-credential"
     , title: "Claim a governance credential"
@@ -152,7 +152,7 @@ flowSpecs =
     , consequence: "Writes a credential claim on chain, linking the profile to the credential."
     , fields:
         [ txt "profile_id" "Profile" "The profile making the claim."
-        , txt "credential" "Credential" "CIP-129 identifier: drep1…, cc_cold1… or cc_hot1…."
+        , txt "credential" "Credential" "The governance identity you are claiming: a DRep id starting drep1…, or a committee key starting cc_cold1… or cc_hot1…."
         , txt "name" "Name" "A short title for the claim."
         , long "description" "Description" "What this claim asserts."
         , txt "image_uri" "Image URI" "You host the image; the protocol only stores the link."
@@ -164,7 +164,7 @@ flowSpecs =
     , consequence: "Writes a withdrawal on chain. The earlier claim remains visible and dated."
     , fields:
         [ txt "profile_id" "Profile" "The profile withdrawing the claim."
-        , txt "credential" "Credential" "The CIP-129 identifier being withdrawn."
+        , txt "credential" "Credential" "The same governance identity you claimed before: drep1…, cc_cold1… or cc_hot1…."
         , txt "name" "Name" "A short title for the withdrawal."
         , long "description" "Description" "Why it is being withdrawn."
         , txt "image_uri" "Image URI" "You host the image; the protocol only stores the link."

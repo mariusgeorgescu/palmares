@@ -18,13 +18,16 @@ module Components.Explorer.DisputeList
 import Prelude
 
 import Capabilities.Query.Gov.Http (ApiError, renderApiError)
-import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getDisputes)
-import Capabilities.Query.Gov.Types (DisputePage(..), DisputeRow(..))
+import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestations, getDisputes)
+import Capabilities.Query.Gov.Types (AttestationPage(..), AttestationRow(..), DisputePage(..), DisputeRow(..))
 import Components.Shared.DRepIdentity (shortId)
 import Data.Array (length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Format (formatAda, formatDay, formatInt, humanize, matchLine)
 import Halogen as H
 import Halogen.HTML as HH
@@ -50,6 +53,9 @@ type State =
   { filters :: RegistryFilters
   , refreshing :: Boolean
   , page :: RemoteData ApiError DisputePage
+  -- Numele atestărilor contestate, după id. „Against: 648c6a…1f4a3f" nu spune împotriva a CE s-a
+  -- deschis disputa, ceea ce e singurul lucru pe care îl caută cineva în tabelul ăsta.
+  , names :: Map String String
   }
 
 data Action
@@ -74,7 +80,7 @@ component
   => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: \filters -> { filters, page: NotAsked, refreshing: false }
+    { initialState: \filters -> { filters, page: NotAsked, refreshing: false, names: Map.empty }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -108,6 +114,14 @@ component =
           Left e -> Failure e
           Right p -> Success p
       }
+    -- Ca la atestări: o singură cerere, iar eșecul ei lasă identificatorii pe ecran în loc să
+    -- strice tabelul.
+    when (Map.isEmpty st.names) do
+      atts <- getAttestations { order_by: Nothing, sort_order: Nothing, limit: Just "200", offset: Nothing }
+      case atts of
+        Left _ -> pure unit
+        Right (AttestationPage ap) ->
+          H.modify_ _ { names = Map.fromFoldable (map (\(AttestationRow a) -> Tuple a.id a.name) ap.items) }
 
   render st =
     HH.div [ HP.class_ (HH.ClassName "container mx-auto px-6 py-6 space-y-4") ]
@@ -153,7 +167,7 @@ component =
               HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-xs ml-2") ] []
             else HH.text ""
           ]
-      , if null p.items then emptyState else table p.items
+      , if null p.items then emptyState else table st p.items
       , if null p.items then HH.text "" else pager st page
       ]
 
@@ -166,7 +180,7 @@ component =
           ]
       ]
 
-  table items =
+  table st items =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body p-0") ]
           [ HH.div [ HP.class_ (HH.ClassName "overflow-x-auto") ]
@@ -181,19 +195,28 @@ component =
                           , HH.th_ [ HH.text "Act" ]
                           ]
                       ]
-                  , HH.tbody_ (map row items)
+                  , HH.tbody_ (map (row st) items)
                   ]
               ]
           ]
       ]
 
-  row (DisputeRow d) =
+  target st i = case Map.lookup i st.names of
+    Nothing ->
+      HH.span [ HP.class_ (HH.ClassName "font-mono text-xs"), HP.title i ] [ HH.text (shortId i) ]
+    Just n ->
+      HH.div_
+        [ HH.div [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text n ]
+        , HH.div [ HP.class_ (HH.ClassName "font-mono text-xs opacity-70"), HP.title i ] [ HH.text (shortId i) ]
+        ]
+
+  row st (DisputeRow d) =
     HH.tr_
       [ HH.td_
           [ HH.div_ [ HH.text d.name ]
           , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text d.description ]
           ]
-      , HH.td [ HP.class_ (HH.ClassName "font-mono text-xs"), HP.title d.target ] [ HH.text (shortId d.target) ]
+      , HH.td_ [ target st d.target ]
       , HH.td [ HP.class_ (HH.ClassName "text-sm whitespace-nowrap") ]
           [ HH.div [ HP.title d.openedAt ] [ HH.text (formatDay d.openedAt) ]
           , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70"), HP.title d.staleAfter ]
