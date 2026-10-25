@@ -31,6 +31,8 @@ module Capabilities.Wallet.Governance
   , supportsCip95
   , supportsCip142
   , hasExtension
+  , impliedMagic
+  , singleTestnetWallets
   ) where
 
 import Prelude
@@ -38,8 +40,9 @@ import Prelude
 import AppEnv (NetworkMagic(..), unNetworkMagic)
 import Cardano.Wallet.Cip30 (Api, Extension, WalletName)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (any)
+import Data.Array (any, find)
 import Data.Maybe (Maybe(..))
+import Data.String (toLower)
 import Halogen (HalogenM)
 
 -- | Ce am aflat despre wallet, în cele trei forme, plus magic-ul dacă s-a putut afla.
@@ -49,7 +52,11 @@ type WalletCapabilities =
   , negotiated :: Array Extension
   , cip95Present :: Boolean
   , cip142Present :: Boolean
+  -- Magic-ul CONFIRMAT prin CIP-142, cînd extensia există și a răspuns.
   , networkMagic :: Maybe NetworkMagic
+  -- `getNetworkId` din CIP-30: 0 sau 1. Nu distinge testnet-urile între ele, dar distinge un
+  -- testnet de mainnet — iar asta e jumătate din ce avem nevoie pentru calea (b) de mai jos.
+  , networkId :: Maybe Int
   }
 
 -- | Wallet-ul gata de scris: API-ul plus ce s-a constatat despre el.
@@ -92,8 +99,9 @@ blockMessage :: BlockReason -> String
 blockMessage = case _ of
   NetworkUndetermined ->
     "This wallet cannot tell us which network it is on. CIP-30 reports every testnet as the same \
-    \number, so preprod and preview are indistinguishable without the CIP-142 extension. Signing \
-    \here could spend your key on a chain you did not choose, so nothing will be built."
+    \number, so preprod and preview are indistinguishable unless the wallet supports the CIP-142 \
+    \extension, or is one that only ever connects to preprod. Signing here could spend your key \
+    \on a chain you did not choose, so nothing will be built."
   WrongNetwork expected actual ->
     "This wallet is on network " <> show (unNetworkMagic actual)
       <> ", and this deployment is on "
@@ -118,15 +126,50 @@ capabilitiesOf = case _ of
   Allowed w -> w.capabilities
   Blocked _ c -> c
 
+-- | Wallet-urile a căror IDENTITATE implică exact o rețea de test.
+-- |
+-- | Calea (b) din R6. Pentru un wallet din lista asta, `getNetworkId() == 0` nu mai e ambiguu:
+-- | dacă wallet-ul nu POATE fi pe preview, întrebarea pe care CIP-142 o rezolvă nu există.
+-- |
+-- | Lista e scurtă și explicită pentru că fiecare intrare e o afirmație despre un produs din afară
+-- | — exact genul de lucru care se învechește — iar un wallet necunoscut nu intră pe calea asta, ci
+-- | pe refuz. Yoroi-extensie e cea măsurată în design: preprod e singurul ei testnet.
+singleTestnetWallets :: Array { name :: WalletName, magic :: NetworkMagic }
+singleTestnetWallets =
+  [ { name: "yoroi", magic: NetworkMagic 1 }
+  ]
+
+-- | Rețeaua pe care o implică identitatea wallet-ului, dacă o implică.
+-- |
+-- | `Nothing` pe orice altceva: un wallet necunoscut, sau unul pe mainnet (`networkId == 1`), nu
+-- | spune nimic despre CARE testnet, iar presupunerea e exact ce R6 interzice.
+impliedMagic :: WalletName -> Maybe Int -> Maybe NetworkMagic
+impliedMagic name = case _ of
+  Just 0 -> map _.magic (find (\w -> w.name == toLower name) singleTestnetWallets)
+  _ -> Nothing
+
+-- | Verdictul porții.
+-- |
+-- | R6 se satisface pe DOUĂ căi, nu pe una — și asta nu e o slăbire. Prima versiune cerea CIP-142
+-- | și numai CIP-142, iar intersecția dintre wallet-urile care implementează CIP-142 și cele care
+-- | semnează pe `required_signers` e GOALĂ: revendicarea de credențială ar fi fost imposibilă prin
+-- | construcție. Calea (b) păstrează garanția întreagă, pentru că un wallet care nu poate fi pe
+-- | preview nu lasă loc ambiguității pe care CIP-142 o rezolvă.
 verdictOf :: WalletCapabilities -> NetworkMagic -> Maybe BlockReason
-verdictOf c expected
-  | not c.cip142Present = Just NetworkUndetermined
-  | otherwise = case c.networkMagic of
-      Nothing -> Just NetworkUndetermined
-      Just actual
-        | actual /= expected -> Just (WrongNetwork expected actual)
-        | not c.cip95Present -> Just NoGovernanceKeys
-        | otherwise -> Nothing
+verdictOf c expected = case confirmedMagic c of
+  Nothing -> Just NetworkUndetermined
+  Just actual
+    | actual /= expected -> Just (WrongNetwork expected actual)
+    | not c.cip95Present -> Just NoGovernanceKeys
+    | otherwise -> Nothing
+
+-- | Magic-ul pe care îl putem susține fără să ghicim: întîi cel confirmat prin CIP-142, apoi cel
+-- | implicat de identitatea wallet-ului. În această ordine, pentru că primul e o măsurătoare și al
+-- | doilea o deducție.
+confirmedMagic :: WalletCapabilities -> Maybe NetworkMagic
+confirmedMagic c = case c.networkMagic of
+  Just m | c.cip142Present -> Just m
+  _ -> impliedMagic c.walletName c.networkId
 
 -- | Cusătura. Componentele cer poarta, nu wallet-ul.
 class Monad m <= MonadGovWallet m where

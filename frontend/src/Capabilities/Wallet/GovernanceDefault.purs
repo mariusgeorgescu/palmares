@@ -12,7 +12,7 @@ import Prelude
 
 import AppEnv (NetworkMagic(..))
 import Capabilities.Wallet.Governance (BlockReason(..), GateVerdict(..), WalletCapabilities, verdictOf)
-import Cardano.Wallet.Cip30 (Api, Extension, WalletName, enable, getExtensions, getSupportedExtensions)
+import Cardano.Wallet.Cip30 (Api, Extension, WalletName, enable, getExtensions, getNetworkId, getSupportedExtensions)
 import Cardano.Wallet.Cip142 (cip142Extension, getNetworkMagic, hasCip142)
 import Cardano.Wallet.Cip95 (cip95Extension, hasCip95)
 import Data.Either (Either(..))
@@ -50,6 +50,7 @@ connectGovernanceDefault expected walletName = liftAff do
           , cip95Present: false
           , cip142Present: false
           , networkMagic: Nothing
+          , networkId: Nothing
           }
       )
     Right api -> judge expected walletName advertised api
@@ -71,6 +72,10 @@ judge
   -> Aff GateVerdict
 judge expected walletName advertised api = do
   negotiated <- orEmpty (getExtensions api)
+  -- `getNetworkId` se citește MEREU, nu doar cînd CIP-142 lipsește: e ce face posibilă calea (b)
+  -- din R6, iar fără el un wallet cu o singură rețea de test n-ar putea fi deosebit de unul care
+  -- pur și simplu nu spune nimic.
+  netId <- orNothing (getNetworkId api)
   cip95 <- orFalse (liftEffect (hasCip95 api))
   cip142 <- orFalse (liftEffect (hasCip142 api))
   magic <-
@@ -85,6 +90,7 @@ judge expected walletName advertised api = do
       , cip95Present: cip95
       , cip142Present: cip142
       , networkMagic: magic
+      , networkId: netId
       }
   pure case verdictOf capabilities expected of
     Just reason -> Blocked reason capabilities

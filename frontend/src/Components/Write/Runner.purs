@@ -66,8 +66,13 @@ type State =
   { filters :: WriteFilters
   , values :: Map String String
   , gate :: Maybe GateVerdict
-  -- Starea protocolului, citită o dată la intrarea pe ecran. `Nothing` cît timp n-a răspuns.
+  -- Starea protocolului, citită o dată la intrarea pe ecran.
   , oracle :: Maybe InteractionStatus
+  -- Dacă răspunsul a SOSIT. Fără flag-ul ăsta, `Nothing` înseamnă deopotrivă „încă se încarcă" și
+  -- „n-am putut afla", iar ecranul arăta avertismentul alarmant („nu putem ști dacă protocolul e
+  -- oprit") la fiecare încărcare, timp de o clipă, înainte să se liniștească. Un avertisment care
+  -- apare și dispare singur învață omul să nu citească avertismentele.
+  , oracleAsked :: Boolean
   , wallets :: Array String
   , step :: Step
   }
@@ -89,7 +94,7 @@ component
   => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: \filters -> { filters, values: seedFrom filters, gate: Nothing, oracle: Nothing, wallets: [], step: Idle }
+    { initialState: \filters -> { filters, values: seedFrom filters, gate: Nothing, oracle: Nothing, oracleAsked: false, wallets: [], step: Idle }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -116,7 +121,8 @@ component =
       H.modify_ _ { wallets = names }
       res <- interactionStatus
       H.modify_ _
-        { oracle = case res of
+        { oracleAsked = true
+        , oracle = case res of
             Left _ -> Nothing
             Right st -> Just st
         }
@@ -307,7 +313,10 @@ component =
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-3") ]
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text spec.title ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-80") ] [ HH.text spec.summary ]
-          , case protocolGate st, st.gate of
+          , if not st.oracleAsked then
+              -- Încă se întreabă. Nu se promite nimic și nu se sperie nimeni.
+              HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text "Checking the protocol…" ]
+            else case protocolGate st, st.gate of
               OracleOpen, Just (Allowed _) -> form st spec
               OracleOpen, _ -> gateNote
               g, _ -> oracleNote g

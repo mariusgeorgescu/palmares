@@ -24,5 +24,8 @@ connectGovernanceMock walletName =
         , cip95Present: true
         , cip142Present: false
         , networkMagic: Nothing
+        -- Un wallet pe testnet, dar nu unul al cărui nume implică UN testnet anume: exact cazul
+        -- în care niciuna din cele două căi din R6 nu se închide.
+        , networkId: Just 0
         }
     )

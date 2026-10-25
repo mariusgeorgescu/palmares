@@ -9,7 +9,7 @@ import Prelude
 
 import AppEnv (NetworkMagic(..), preprodMagic, previewMagic)
 import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams(..), encodeFlow, flowPath, oracleGate)
-import Capabilities.Wallet.Governance (BlockReason(..), WalletCapabilities, blockMessage, verdictOf)
+import Capabilities.Wallet.Governance (BlockReason(..), WalletCapabilities, blockMessage, impliedMagic, verdictOf)
 import Components.Write.Flows (buildRequest, flowSpecs, missingFields, specFor)
 import Data.Argonaut.Core (stringify)
 import Data.Array (length, nub)
@@ -31,6 +31,7 @@ baseCaps =
   , cip95Present: true
   , cip142Present: true
   , networkMagic: Just preprodMagic
+  , networkId: Just 0
   }
 
 spec :: Spec Unit
@@ -60,6 +61,43 @@ spec = do
 
     it "refuses a wallet without governance keys, once the network is settled" do
       verdictOf (baseCaps { cip95Present = false }) preprodMagic `shouldEqual` Just NoGovernanceKeys
+
+  describe "R6, second path: a wallet whose identity implies one testnet" do
+    -- Nu e o slabire a regulii. Prima versiune cerea CIP-142 si numai CIP-142, iar intersectia
+    -- dintre wallet-urile care implementeaza CIP-142 si cele care semneaza pe `required_signers` e
+    -- GOALA — deci revendicarea de credentiala ar fi fost imposibila prin constructie. Un wallet
+    -- care nu POATE fi pe preview nu lasa loc ambiguitatii pe care CIP-142 o rezolva.
+    it "passes a single-testnet wallet on networkId 0, without CIP-142" do
+      verdictOf
+        (baseCaps { walletName = "yoroi", cip142Present = false, networkMagic = Nothing, networkId = Just 0 })
+        preprodMagic
+        `shouldEqual` Nothing
+
+    it "still refuses an unknown wallet on networkId 0" do
+      -- „Testnet" nu spune CARE testnet, iar presupunerea e exact ce interzice regula.
+      verdictOf
+        (baseCaps { walletName = "somewallet", cip142Present = false, networkMagic = Nothing, networkId = Just 0 })
+        preprodMagic
+        `shouldEqual` Just NetworkUndetermined
+
+    it "refuses a single-testnet wallet reporting mainnet" do
+      verdictOf
+        (baseCaps { walletName = "yoroi", cip142Present = false, networkMagic = Nothing, networkId = Just 1 })
+        preprodMagic
+        `shouldEqual` Just NetworkUndetermined
+
+    it "prefers a confirmed magic over an implied one" do
+      -- Masuratoarea bate deductia: daca CIP-142 spune mainnet, un nume de wallet nu schimba asta.
+      verdictOf
+        (baseCaps { walletName = "yoroi", networkMagic = Just (NetworkMagic 764824073) })
+        preprodMagic
+        `shouldEqual` Just (WrongNetwork preprodMagic (NetworkMagic 764824073))
+
+    it "matches the wallet name case-insensitively" do
+      -- `window.cardano` scrie cheile cum vrea fiecare extensie.
+      impliedMagic "Yoroi" (Just 0) `shouldEqual` Just preprodMagic
+      impliedMagic "yoroi" (Just 0) `shouldEqual` Just preprodMagic
+      impliedMagic "yoroi" Nothing `shouldEqual` Nothing
 
     it "says what is missing and what will not work, not just 'incompatible'" do
       -- Un mesaj pe care nimeni nu-l poate actiona e acelasi lucru cu niciun mesaj.

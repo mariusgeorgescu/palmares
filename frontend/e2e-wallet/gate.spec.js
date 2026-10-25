@@ -25,8 +25,8 @@ test.describe('a real CIP-30 wallet without CIP-142', () => {
     await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
 
     await expect(page.getByText('cannot write')).toBeVisible();
-    await expect(page.getByText(/without the CIP-142 extension/)).toBeVisible();
-    await expect(page.getByText(/nothing will be built/)).toBeVisible();
+    await expect(page.getByText(/unless the wallet supports the CIP-142/)).toBeVisible();
+    await expect(page.getByText(/did not choose, so nothing will be built/)).toBeVisible();
 
     // Matricea, cu cele trei forme de detecție una lîngă alta. CIP-95 e prezent pe conexiune,
     // CIP-142 nu e nicăieri — și asta se vede pe rînduri, nu într-un mesaj.
