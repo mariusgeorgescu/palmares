@@ -147,3 +147,19 @@ REVOKE CREATE ON SCHEMA public FROM palmares_ro;
 REVOKE CREATE ON SCHEMA public FROM palmares_owner;
 REVOKE ALL ON DATABASE cexplorer FROM PUBLIC;
 GRANT CONNECT ON DATABASE cexplorer TO palmares_owner, palmares_ro;
+
+-- __And `TEMPORARY` back to the owner, which the revoke above took away.__
+--
+-- PUBLIC holds `TEMPORARY` on every database by default, so `REVOKE ALL ... FROM PUBLIC` removes it
+-- from everybody — and `REFRESH MATERIALIZED VIEW CONCURRENTLY` builds its new contents in a
+-- TEMPORARY table. Without this line the refresh loop fails every time it runs, with
+-- `permission denied to create temporary tables in database "cexplorer"`.
+--
+-- Measured on the preprod deployment, where it had been failing every five minutes since the first
+-- boot: `/status` served `metrics_as_of_epoch: null`, which reads as "the metrics have never been
+-- computed" — true, but for a reason nothing pointed at. The refresher logs the failure and carries
+-- on, which is right for a loop and is also why nobody saw it; the only place it showed was the
+-- PostgreSQL log.
+--
+-- Only the owner. `palmares_ro` reads, and a role that reads has no reason to create anything.
+GRANT TEMPORARY ON DATABASE cexplorer TO palmares_owner;

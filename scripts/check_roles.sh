@@ -66,6 +66,15 @@ chk "palmares_owner may create the palmares schema" \
   "has_database_privilege('palmares_owner','cexplorer','CREATE')"
 chk "palmares_ro may NOT create a schema" \
   "NOT has_database_privilege('palmares_ro','cexplorer','CREATE')"
+
+# `REFRESH MATERIALIZED VIEW CONCURRENTLY` builds its new contents in a TEMPORARY table, and
+# PUBLIC's default TEMPORARY is removed by `REVOKE ALL ... FROM PUBLIC`. On the preprod deployment
+# the refresh had been failing every five minutes since the first boot, visible only in the
+# PostgreSQL log: `/status` served `metrics_as_of_epoch: null`, which reads as "never computed".
+chk "palmares_owner may create temp tables, which CONCURRENTLY refresh needs" \
+  "has_database_privilege('palmares_owner','cexplorer','TEMPORARY')"
+chk "palmares_ro may NOT create temp tables" \
+  "NOT has_database_privilege('palmares_ro','cexplorer','TEMPORARY')"
 chk "palmares_attest is owned by palmares_owner" \
   "(SELECT nspowner = 'palmares_owner'::regrole FROM pg_namespace WHERE nspname='palmares_attest')"
 
