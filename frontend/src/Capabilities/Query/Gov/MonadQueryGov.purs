@@ -21,6 +21,7 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getCommittee
   , getWithdrawals
   , getDelegations
+  , getActivity
   ) where
 
 import Prelude
@@ -39,12 +40,21 @@ import Capabilities.Query.Gov.Types
   , CommitteeState
   , WithdrawalPage
   , DelegationPage
+  , ActivityPage
   , VotePage
   )
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Halogen (HalogenM)
-import Route.GovQueries (DRepFilters, DelegationFilters, GovActionFilters, SpoFilters, VoteFilters, WithdrawalFilters)
+import Route.GovQueries
+  ( ActivityFilters
+  , DRepFilters
+  , DelegationFilters
+  , GovActionFilters
+  , SpoFilters
+  , VoteFilters
+  , WithdrawalFilters
+  )
 
 class Monad m <= MonadQueryGov m where
   -- | `GET /status` — rețeaua, epoca, lag-ul, pragurile și starea proiectorului, într-un singur
@@ -98,6 +108,10 @@ class Monad m <= MonadQueryGov m where
   -- | singurul pe care un link din produs îl setează.
   getDelegations :: DelegationFilters -> m (Either ApiError DelegationPage)
 
+  -- | `GET /activity` — fluxul, paginat pe CURSOR. Nu există un total, și nu e o scăpare: vezi
+  -- | `ActivityPage`.
+  getActivity :: ActivityFilters -> m (Either ApiError ActivityPage)
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
@@ -114,3 +128,4 @@ instance monadQueryGovHalogenM ::
   getCommittee = lift getCommittee
   getWithdrawals = lift <<< getWithdrawals
   getDelegations = lift <<< getDelegations
+  getActivity = lift <<< getActivity

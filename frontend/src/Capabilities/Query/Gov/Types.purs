@@ -54,6 +54,8 @@ module Capabilities.Query.Gov.Types
   , WithdrawalPage(..)
   , DelegationRow(..)
   , DelegationPage(..)
+  , ActivityEvent(..)
+  , ActivityPage(..)
   ) where
 
 import Prelude
@@ -502,11 +504,15 @@ instance DecodeJson DRepExplorerPage where
       )
 
 -- | Un punct în lanț: slotul, epoca, ora și tranzacția. Apare peste tot unde un eveniment trebuie
--- | să poată fi verificat de cineva care nu ne crede pe cuvânt. `txHash` lipseşte TOTUŞI la
--- | evenimentele de graniţă de epocă — expirări, schimbări de stare — pe care nu le-a provocat
--- | nicio tranzacţie.
+-- | să poată fi verificat de cineva care nu ne crede pe cuvânt.
+-- |
+-- | __`slot` şi `txHash` lipsesc amândouă la evenimentele de GRANIŢĂ DE EPOCĂ__ — o acţiune care
+-- | expiră, un DRep care devine inactiv — pentru că nu le-a provocat nicio tranzacţie şi nu s-au
+-- | întâmplat într-un slot anume, ci la trecerea dintre epoci. Epoca şi ora sunt tot ce există
+-- | acolo, şi sunt de ajuns. Măsurat: 4 din 11 feluri de evenimente din `/activity` sunt aşa, iar
+-- | un decodor care cerea un număr pentru `slot` rupea tot fluxul.
 newtype ChainPoint = ChainPoint
-  { slot :: Int
+  { slot :: Maybe Int
   , epoch :: Int
   , time :: String
   , txHash :: Maybe String
@@ -517,7 +523,7 @@ derive instance Eq ChainPoint
 instance DecodeJson ChainPoint where
   decodeJson json = do
     o <- decodeJson json
-    slot <- o .: "slot"
+    slot <- o .:? "slot"
     epoch <- o .: "epoch"
     time <- o .: "time"
     txHash <- o .:? "tx_hash"
@@ -1478,3 +1484,49 @@ instance DecodeJson DelegationPage where
     limit <- o .: "limit"
     offset <- o .: "offset"
     pure (DelegationPage { items, total, limit, offset })
+
+-- | Un eveniment din fluxul de activitate: `GET /activity`.
+-- |
+-- | `actorId` și `targetId` lipsesc des și din motive diferite — 4 din 100 n-au actor (evenimente
+-- | de graniță de epocă, pe care nu le-a provocat nimeni), 51 din 100 n-au țintă (o înregistrare
+-- | de DRep nu e îndreptată spre nimic) — deci nu sunt același gol și nu se scriu la fel.
+newtype ActivityEvent = ActivityEvent
+  { cursor :: String
+  , eventType :: String
+  , source :: String
+  , at :: ChainPoint
+  , actorId :: Maybe String
+  , targetId :: Maybe String
+  }
+
+derive instance Eq ActivityEvent
+
+instance DecodeJson ActivityEvent where
+  decodeJson json = do
+    o <- decodeJson json
+    cursor <- o .: "cursor"
+    eventType <- o .: "event_type"
+    source <- o .: "source"
+    at <- o .: "at"
+    actorId <- o .:? "actor_id"
+    targetId <- o .:? "target_id"
+    pure (ActivityEvent { cursor, eventType, source, at, actorId, targetId })
+
+-- | Plicul fluxului. __`total` e `null` prin construcție__ (`D-18`): un flux care se paginează pe
+-- | cursor nu poate număra ce urmează fără să scaneze tot, iar un număr inventat ar fi mai rău
+-- | decât niciunul. `nextCursor` lipsește când nu mai e nimic după.
+newtype ActivityPage = ActivityPage
+  { items :: Array ActivityEvent
+  , limit :: Int
+  , nextCursor :: Maybe String
+  }
+
+derive instance Eq ActivityPage
+
+instance DecodeJson ActivityPage where
+  decodeJson json = do
+    o <- decodeJson json
+    items <- o .: "items"
+    limit <- o .: "limit"
+    nextCursor <- o .:? "next_cursor"
+    pure (ActivityPage { items, limit, nextCursor })

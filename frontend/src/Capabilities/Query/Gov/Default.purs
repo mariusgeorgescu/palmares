@@ -16,6 +16,7 @@ module Capabilities.Query.Gov.Default
   , getCommitteeDefault
   , getWithdrawalsDefault
   , getDelegationsDefault
+  , getActivityDefault
   ) where
 
 import Prelude
@@ -36,6 +37,7 @@ import Capabilities.Query.Gov.Types
   , CommitteeState
   , WithdrawalPage
   , DelegationPage
+  , ActivityPage
   )
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
@@ -44,6 +46,7 @@ import Effect.Aff.Class (class MonadAff)
 import Route.GovQueries
   ( DRepFilters
   , GovActionFilters
+  , ActivityFilters
   , DelegationFilters
   , SpoFilters
   , VoteFilters
@@ -51,6 +54,7 @@ import Route.GovQueries
   , renderSpoFilters
   , withdrawalListHrefFor
   , delegationListHrefFor
+  , activityHrefFor
   , encodePathSegment
   , renderDRepFilters
   , renderGovActionFilters
@@ -174,3 +178,12 @@ queryOf :: String -> String
 queryOf href = case String.indexOf (String.Pattern "?") href of
   Just i -> String.drop i href
   Nothing -> ""
+
+getActivityDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> ActivityFilters
+  -> m (Either ApiError ActivityPage)
+getActivityDefault env filters =
+  getJson (env.queryBaseUrl <> "/activity" <> queryOf (activityHrefFor filters))

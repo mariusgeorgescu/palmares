@@ -11,7 +11,8 @@ import Data.Either (Either(..))
 import Prelude hiding ((/))
 import Route (Route(..))
 import Route.GovQueries
-  ( delegationFiltersCodec
+  ( activityFiltersCodec
+  , delegationFiltersCodec
   , drepFiltersCodec
   , govActionFiltersCodec
   , methodologyCodec
@@ -36,6 +37,7 @@ routeCodec = root $ sum
   , "Committee": path "committee" noArgs
   , "TreasuryList": path "treasury" withdrawalFiltersCodec
   , "DelegationList": path "delegations" delegationFiltersCodec
+  , "Activity": path "activity" activityFiltersCodec
   , "Methodology": path "methodology" methodologyCodec
   , "NotFound": path "__not_found__" noArgs
   }

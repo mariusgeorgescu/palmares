@@ -9,7 +9,13 @@ module Test.Capabilities.SpoCommitteeSpec (spec) where
 
 import Prelude
 
-import Capabilities.Query.Gov.Fixtures (committeeFixture, delegationListFixture, spoListFixture, withdrawalListFixture)
+import Capabilities.Query.Gov.Fixtures
+  ( activityFixture
+  , committeeFixture
+  , delegationListFixture
+  , spoListFixture
+  , withdrawalListFixture
+  )
 import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.Mock (decodeFixture)
 import Capabilities.Query.Gov.Types
@@ -18,6 +24,8 @@ import Capabilities.Query.Gov.Types
   , CommitteeState(..)
   , DelegationPage(..)
   , DelegationRow(..)
+  , ActivityEvent(..)
+  , ActivityPage(..)
   , SpoPage(..)
   , SpoRow(..)
   , WithdrawalPage(..)
@@ -27,7 +35,7 @@ import Components.Explorer.DelegationList (isStandingChoice, standingLabel)
 import Data.Array (any, filter)
 import Data.Array (head, length)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), isNothing)
+import Data.Maybe (Maybe(..), isJust, isNothing)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 
@@ -101,3 +109,19 @@ spec = do
       standingLabel "drep_always_no_confidence" `shouldEqual` "always no confidence"
       -- Un identificator necunoscut se scrie așa cum e, nu se înlocuiește cu o ghicire.
       standingLabel "drep1abc" `shouldEqual` "drep1abc"
+
+  describe "ActivityPage decoding" do
+    it "survives the four events that have no slot and no transaction" do
+      case (decodeFixture activityFixture :: Either ApiError ActivityPage) of
+        Left e -> fail ("fixture did not decode: " <> show e)
+        Right (ActivityPage p) -> do
+          length p.items `shouldEqual` 11
+          -- Evenimentele de granita de epoca — o actiune care expira, una care se ratifica — n-au
+          -- nici slot nici tranzactie, pentru ca nu le-a provocat nicio tranzactie. Un decodor
+          -- care cerea un numar pentru `slot` rupea tot fluxul; s-a vazut pe ecran, nu in teste.
+          length (filter (\(ActivityEvent e) -> noSlot e.at) p.items) `shouldEqual` 4
+          length (filter (\(ActivityEvent e) -> e.actorId == Nothing) p.items) `shouldEqual` 4
+          -- `total` nu exista pe ruta asta (`D-18`) si de-aia plicul nici nu-l are.
+          isJust p.nextCursor `shouldEqual` true
+  where
+  noSlot (ChainPoint c) = c.slot == Nothing

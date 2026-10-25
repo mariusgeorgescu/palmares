@@ -19,6 +19,7 @@ module Capabilities.Query.Gov.Fixtures
   , committeeFixture
   , withdrawalListFixture
   , delegationListFixture
+  , activityFixture
   ) where
 
 -- | `GET /status` pe preprod, 2026-10-24. `epoch_params` e omis: niciun decodor nu-l citește încă,
@@ -1483,5 +1484,171 @@ delegationListFixture =
   "total": 2025,
   "limit": 5,
   "offset": 0
+}
+"""
+
+-- | `GET /activity`, măsurat 2026-10-25. __Un rînd din fiecare fel de eveniment care există pe
+-- | preprod__, cules cu `event_type=` pe rînd, nu primele unsprezece dintr-o pagină: altfel
+-- | fixtura ar avea numai delegări și înregistrări, care sînt 60 din primele 100.
+-- |
+-- | Dintre cele treisprezece feluri, două nu s-au întîmplat niciodată aici —
+-- | `treasury_withdrawal_enacted` și `committee_resigned` — și lipsesc tocmai pentru că
+-- | fixtura e măsurată, nu scrisă.
+-- |
+-- | Patru rînduri n-au tranzacție și n-au actor: sînt evenimente de GRANIȚĂ DE EPOCĂ, pe care
+-- | nu le-a provocat nimeni. Trei n-au țintă. `total` e `null` prin construcție (`D-18`).
+activityFixture :: String
+activityFixture =
+  """
+{
+  "items": [
+    {
+      "cursor": "137256846:2:4:0",
+      "event_type": "delegation_changed",
+      "source": "governance",
+      "at": {
+        "slot": 137256846,
+        "epoch": 321,
+        "time": "2026-10-25T14:54:06Z",
+        "tx_hash": "f0619b14271fc6e931e319bddf5c0010b8ba992530593cdb395fe039fcd9d629"
+      },
+      "actor_id": "stake_test1upgxfdn3vdx3fjud2sl8rhvwksm6glhmg7cty2yzsekyyrgm428xq",
+      "target_id": "always_abstain"
+    },
+    {
+      "cursor": "137244199:2:1:0",
+      "event_type": "drep_registered",
+      "source": "governance",
+      "at": {
+        "slot": 137244199,
+        "epoch": 321,
+        "time": "2026-10-25T11:23:19Z",
+        "tx_hash": "9276042f79cf12c13e4b8664d79302c01055860b3cc8e5fc3d44d9e7210cb567"
+      },
+      "actor_id": "5064b671634d14cb8d543e71dd8eb437a47efb47b0b22882866c420d",
+      "target_id": null
+    },
+    {
+      "cursor": "137243764:4:1:0",
+      "event_type": "drep_updated",
+      "source": "governance",
+      "at": {
+        "slot": 137243764,
+        "epoch": 321,
+        "time": "2026-10-25T11:16:04Z",
+        "tx_hash": "357cdeb86b3c727d4150f9f9104fe021a95d9fd3e8fdde0aec68b922f1c7feab"
+      },
+      "actor_id": "5064b671634d14cb8d543e71dd8eb437a47efb47b0b22882866c420d",
+      "target_id": null
+    },
+    {
+      "cursor": "137244309:0:1:0",
+      "event_type": "drep_retired",
+      "source": "governance",
+      "at": {
+        "slot": 137244309,
+        "epoch": 321,
+        "time": "2026-10-25T11:25:09Z",
+        "tx_hash": "491a40c060deab507023307b0626e7f932792efb291c056d2047fcbf09de5b7f"
+      },
+      "actor_id": "5064b671634d14cb8d543e71dd8eb437a47efb47b0b22882866c420d",
+      "target_id": null
+    },
+    {
+      "cursor": "137227151:3:2:3244726",
+      "event_type": "vote_cast",
+      "source": "governance",
+      "at": {
+        "slot": 137227151,
+        "epoch": 321,
+        "time": "2026-10-25T06:39:11Z",
+        "tx_hash": "cf0ff083197e6178790b3ab21438b9fe9f70b920d648840d51242fa20aca58ab"
+      },
+      "actor_id": "e77eb965c537895a4163322915846b3b57780d97f3107ff0285dc82f",
+      "target_id": "131"
+    },
+    {
+      "cursor": "136473457:6:3:0",
+      "event_type": "gov_action_proposed",
+      "source": "governance",
+      "at": {
+        "slot": 136473457,
+        "epoch": 319,
+        "time": "2026-10-16T13:17:37Z",
+        "tx_hash": "04f23439388432a22b6830425d0a8114a168ac5ead2767fe122eb956e8593f44"
+      },
+      "actor_id": "stake_test1uzrr46pd4wn2qpzvv5fpdeycndzsgjc899jn8e4rmten3ngcgm3f4",
+      "target_id": "131"
+    },
+    {
+      "cursor": "129686402:-1:7:109",
+      "event_type": "gov_action_ratified",
+      "source": "governance",
+      "at": {
+        "slot": null,
+        "epoch": 304,
+        "time": "2026-07-30T00:00:02Z",
+        "tx_hash": null
+      },
+      "actor_id": null,
+      "target_id": "109"
+    },
+    {
+      "cursor": "130118424:-1:8:109",
+      "event_type": "gov_action_enacted",
+      "source": "governance",
+      "at": {
+        "slot": null,
+        "epoch": 305,
+        "time": "2026-08-04T00:00:24Z",
+        "tx_hash": null
+      },
+      "actor_id": null,
+      "target_id": "109"
+    },
+    {
+      "cursor": "137030441:-1:9:124",
+      "event_type": "gov_action_expired",
+      "source": "governance",
+      "at": {
+        "slot": null,
+        "epoch": 321,
+        "time": "2026-10-23T00:00:41Z",
+        "tx_hash": null
+      },
+      "actor_id": null,
+      "target_id": "124"
+    },
+    {
+      "cursor": "133574403:-1:10:117",
+      "event_type": "gov_action_dropped",
+      "source": "governance",
+      "at": {
+        "slot": null,
+        "epoch": 313,
+        "time": "2026-09-13T00:00:03Z",
+        "tx_hash": null
+      },
+      "actor_id": null,
+      "target_id": "117"
+    },
+    {
+      "cursor": "96856972:6:5:0",
+      "event_type": "committee_authorized",
+      "source": "governance",
+      "at": {
+        "slot": 96856972,
+        "epoch": 228,
+        "time": "2025-07-15T00:42:52Z",
+        "tx_hash": "c7a1a3eb5c362e6ca951461b660c3ebd9cfcd6f1e7dc853d3fc9dd639b9e508c"
+      },
+      "actor_id": "70d20c66e0d63c9a638d9230310b4fba988f620ab1a41654e66f167c",
+      "target_id": "cedf596dbc94e2229ec11118ea9404f2336369c4826219253e4b6802"
+    }
+  ],
+  "total": null,
+  "limit": 11,
+  "offset": 0,
+  "next_cursor": "137243903:1:1:0"
 }
 """

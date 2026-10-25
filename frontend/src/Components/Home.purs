@@ -11,6 +11,7 @@ import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Components.Explorer.Committee as Committee
+import Components.Explorer.Activity as Activity
 import Components.Explorer.Dashboard as Dashboard
 import Components.Explorer.DelegationList as DelegationList
 import Components.Explorer.ActionDetail as ActionDetail
@@ -65,6 +66,7 @@ type Slots =
   , committee :: Committee.Slot
   , treasuryList :: TreasuryList.Slot
   , delegationList :: DelegationList.Slot
+  , activity :: Activity.Slot
   , voteList :: VoteList.Slot
   , methodology :: Methodology.Slot
   )
@@ -150,6 +152,7 @@ component =
     Committee -> HH.slot_ Committee._committee unit Committee.component unit
     TreasuryList filters -> HH.slot_ TreasuryList._treasuryList unit TreasuryList.component filters
     DelegationList filters -> HH.slot_ DelegationList._delegationList unit DelegationList.component filters
+    Activity filters -> HH.slot_ Activity._activity unit Activity.component filters
     Methodology filters -> HH.slot_ Methodology._methodology unit Methodology.component filters
     NotFound -> renderNotFound
 
@@ -178,5 +181,6 @@ documentTitle = case _ of
   Committee -> "Constitutional committee — Palmares"
   TreasuryList _ -> "Treasury withdrawals — Palmares"
   DelegationList _ -> "Delegations — Palmares"
+  Activity _ -> "Activity — Palmares"
   Methodology _ -> "Methodology — Palmares"
   NotFound -> "Not found — Palmares"

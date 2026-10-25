@@ -46,6 +46,14 @@ spec = do
     it "renders exactly a thousand ADA with separators" do
       formatAda 1000000000.0 `shouldEqual` "1,000 ADA"
 
+  describe "humanize" do
+    it "writes the two acronyms the way the ecosystem writes them" do
+      -- Maparea mecanica din snake_case da „Drep registered", care pe un site public arata ca o
+      -- greseala de scriere. Apare pe fiecare pastila de filtru din fluxul de activitate.
+      humanize "drep_registered" `shouldEqual` "DRep registered"
+      humanize "delegation_changed" `shouldEqual` "Delegation changed"
+      humanize "treasury_withdrawals" `shouldEqual` "Treasury withdrawals"
+
   describe "matchLine" do
     it "says nothing when there is nothing, because the empty card says it better" do
       -- Masurat pe deployul de preprod: linia si cardul de sub ea scriau aceeasi propozitie, una

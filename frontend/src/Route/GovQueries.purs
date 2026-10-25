@@ -56,6 +56,11 @@ module Route.GovQueries
   , delegationFiltersCodec
   , delegationListPath
   , delegationListHrefFor
+  , ActivityFilters
+  , emptyActivityFilters
+  , activityFiltersCodec
+  , activityPath
+  , activityHrefFor
   , MethodologyFilters
   , emptyMethodologyFilters
   , methodologyCodec
@@ -270,6 +275,37 @@ actionListHrefFor f = actionListPath <> renderGovActionFilters f
 -- | deci ar cere pagina listei în loc de acțiune.
 actionDetailHrefFor :: String -> String
 actionDetailHrefFor actionId = actionListPath <> "/" <> encodePathSegment actionId
+
+-- | Filtrele fluxului de activitate. Se paginează pe CURSOR, nu pe offset: `before` e cursorul
+-- | ultimului eveniment văzut, iar serverul nu publică un total (`D-18`), pentru că un flux pe
+-- | cursor nu poate număra ce urmează fără să scaneze tot.
+type ActivityFilters =
+  { before :: Maybe String
+  , event_type :: Array String
+  , limit :: Maybe String
+  }
+
+emptyActivityFilters :: ActivityFilters
+emptyActivityFilters = { before: Nothing, event_type: [], limit: Nothing }
+
+activityFiltersCodec :: RouteDuplex' ActivityFilters
+activityFiltersCodec =
+  record
+    # prop (Proxy :: Proxy "before") (optional (param "before"))
+    # prop (Proxy :: Proxy "event_type") (repeatedParam "event_type")
+    # prop (Proxy :: Proxy "limit") (optional (param "limit"))
+
+activityPath :: String
+activityPath = "/activity"
+
+activityHrefFor :: ActivityFilters -> String
+activityHrefFor f =
+  activityPath
+    <> renderQuery
+      ( optPair "before" f.before
+          <> map (Tuple "event_type") f.event_type
+          <> optPair "limit" f.limit
+      )
 
 -- | Filtrele listei de retrageri din trezorerie. Sortare și paginare; filtrele pe beneficiar, pe
 -- | acțiune și pe interval de sumă n-au control în ecran, deci nu intră în rută.

@@ -115,8 +115,18 @@ roleLabel = case _ of
 -- | ecranul le arată ca text, iar maparea e mecanică — deci nu există o listă de etichete de
 -- | întreținut care s-ar putea dezacorda de la enum.
 humanize :: String -> String
-humanize s = case String.uncons spaced of
-  Nothing -> spaced
-  Just { head, tail } -> String.toUpper (String.singleton head) <> tail
+humanize s = fixAcronyms capitalised
   where
   spaced = String.replaceAll (String.Pattern "_") (String.Replacement " ") s
+
+  capitalised = case String.uncons spaced of
+    Nothing -> spaced
+    Just { head, tail } -> String.toUpper (String.singleton head) <> tail
+
+  -- Maparea mecanică dă „Drep registered" și „Spo", care pe un site public arată ca o greșeală de
+  -- scriere, nu ca o abreviere. Cele două cuvinte se corectează DUPĂ, ca să nu existe o listă de
+  -- etichete scrise de mână care se poate dezacorda de enum-urile serverului.
+  fixAcronyms =
+    String.replaceAll (String.Pattern "Drep") (String.Replacement "DRep")
+      <<< String.replaceAll (String.Pattern "drep") (String.Replacement "DRep")
+      <<< String.replaceAll (String.Pattern "Spo ") (String.Replacement "SPO ")

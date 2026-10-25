@@ -24,6 +24,7 @@ import Capabilities.Query.Gov.Mock
   , getCommitteeMock
   , getWithdrawalsMock
   , getDelegationsMock
+  , getActivityMock
   , getStatusMock
   , getVotesMock
   , searchAllMock
@@ -106,3 +107,4 @@ instance MonadQueryGov DemoM where
   getCommittee = getCommitteeMock
   getWithdrawals = getWithdrawalsMock
   getDelegations = getDelegationsMock
+  getActivity = getActivityMock

@@ -10,6 +10,7 @@ import Route.GovQueries
   ( DRepFilters
   , GovActionFilters
   , MethodologyFilters
+  , ActivityFilters
   , DelegationFilters
   , SpoFilters
   , WithdrawalFilters
@@ -38,6 +39,7 @@ data Route
   | Committee
   | TreasuryList WithdrawalFilters
   | DelegationList DelegationFilters
+  | Activity ActivityFilters
   | Methodology MethodologyFilters
   | NotFound
 
@@ -62,5 +64,6 @@ instance Show Route where
     Committee -> "Committee"
     TreasuryList _ -> "TreasuryList"
     DelegationList f -> "DelegationList " <> fromMaybe "" f.drep_id
+    Activity f -> "Activity " <> fromMaybe "" f.before
     Methodology f -> "Methodology " <> fromMaybe "" f.focus
     NotFound -> "NotFound"

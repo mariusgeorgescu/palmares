@@ -23,6 +23,7 @@ const ROUTES = [
   ['/committee', 'Constitutional committee — Palmares'],
   ['/treasury', 'Treasury withdrawals — Palmares'],
   ['/delegations', 'Delegations — Palmares'],
+  ['/activity', 'Activity — Palmares'],
   ['/methodology', 'Methodology — Palmares'],
 ];
 
