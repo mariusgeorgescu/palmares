@@ -448,6 +448,47 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # CHECK 16: deployul reproductibil are nevoie și de frontend, nu doar de backend.
+  #
+  # Fișierul ăsta avea cele patru servicii de backend și se oprea acolo, deci „o comandă, de la
+  # zero" producea un stack fără nicio interfață — iar cine îl pornea trebuia să ghicească ce mai
+  # lipsește. Frontendul e un singur container care face DOUĂ lucruri: servește SPA-ul și
+  # proxiază `/api/query` și `/api/interaction` către cele două servicii de mai sus.
+  #
+  # De aceea nu are nevoie de `CORS_ALLOWED_ORIGINS` pe query-api: cererile pleacă din aceeași
+  # origine. Un frontend servit separat ar avea nevoie, iar allowlist-ul gol de sus ar refuza —
+  # fail-closed, prin construcție.
+  frontend:
+    # În AMÂNDOUĂ profilurile: SPA-ul și proxy-ul de citire sunt utile fără partea de scriere, iar
+    # cu `--profile write` vine și interaction-api în spatele lui.
+    profiles: [app, write]
+    image: ghcr.io/${GH_OWNER:-mariusgeorgescu}/palmares-frontend:${FRONTEND_TAG:-${TAG:-latest}}
+    environment:
+      # Numele de serviciu, nu `localhost`: BFF-ul rulează în containerul lui, iar `localhost`
+      # acolo e el însuși.
+      PALMARES_QUERY_API_URL: "http://query-api:8083"
+      PALMARES_INTERACTION_API_URL: "http://interaction-api:8082"
+      # Aceleași credențiale pe care le cere interaction-api, fiindcă BFF-ul e cel care le atașează
+      # — browserul nu le vede niciodată. Fără default, ca peste tot în fișierul ăsta.
+      PALMARES_INTERACTION_API_USER: "${BASIC_USER:?set BASIC_USER — the BFF signs interaction-api requests with it}"
+      PALMARES_INTERACTION_API_PASS: "${BASIC_PASS:?set BASIC_PASS — the BFF signs interaction-api requests with it}"
+      PORT: "80"
+    ports: ["127.0.0.1:${FRONTEND_PORT:-8080}:80"]
+    # Depinde DOAR de query-api, deși proxiază și interaction-api. `interaction-api` e în profilul
+    # `write`, iar o dependență către el ar face stack-ul de citire invalid — compose nu are
+    # dependențe condiționate de profil. Iar comportamentul e oricum cel corect: fără partea de
+    # scriere, ecranul de scriere nu poate afla starea oracolului și REFUZĂ, ceea ce e exact ce
+    # face și în cluster când interaction-api e jos.
+    depends_on:
+      query-api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
 volumes:
   node-db:
   node-ipc:

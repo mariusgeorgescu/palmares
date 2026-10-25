@@ -449,3 +449,33 @@ test('no rendered line runs away, whatever the document says', async ({ page }) 
   // lung scris de noi.
   expect(longest).toBeLessThan(4000);
 });
+
+// CHECK 16: deployul reproductibil trebuie sa includa interfata, nu doar backendul.
+//
+// `compose.yaml` avea cele patru servicii de backend si se oprea acolo, deci „o comanda, de la
+// zero" producea un stack fara nicio interfata. Testul e pe fisiere, fiindca asta e forma
+// afirmatiei: un test care ar porni stack-ul ar cere Docker si un sfert de ora.
+test('the reproducible stack includes the frontend and its build', async () => {
+  const { readFileSync } = await import('node:fs');
+
+  const compose = readFileSync('../compose.yaml', 'utf8');
+  // Serviciul exista, in amindoua profilurile, si proxiaza catre numele de serviciu — nu catre
+  // `localhost`, care in containerul lui ar fi el insusi.
+  expect(compose).toMatch(/^ {2}frontend:/m);
+  expect(compose).toMatch(/PALMARES_QUERY_API_URL: "http:\/\/query-api:8083"/);
+  expect(compose).toMatch(/PALMARES_INTERACTION_API_URL: "http:\/\/interaction-api:8082"/);
+  // Credentialele de scriere nu au default: un default intr-un fisier commis e o credentiala care
+  // se publica, iar restul fisierului respecta deja regula asta.
+  expect(compose).toMatch(/PALMARES_INTERACTION_API_USER: "\$\{BASIC_USER:\?/);
+  expect(compose).toMatch(/PALMARES_INTERACTION_API_PASS: "\$\{BASIC_PASS:\?/);
+
+  // Si imaginea se construieste de scriptul care construieste restul — altfel `up` trage o imagine
+  // care nu exista local pe un host amd64.
+  const build = readFileSync('../scripts/build-images.sh', 'utf8');
+  expect(build).toMatch(/palmares-frontend/);
+  expect(build).toMatch(/-f frontend\/Dockerfile/);
+
+  // Si comanda unica e documentata.
+  const readme = readFileSync('../README.md', 'utf8');
+  expect(readme).toMatch(/--profile app --profile write up -d/);
+});

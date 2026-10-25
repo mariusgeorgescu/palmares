@@ -84,7 +84,21 @@ for svc in "${SERVICES[@]}"; do
     .
 done
 
+# Frontendul se construiește separat, și nu e o scăpare că nu e în `SERVICES`: cele patru servicii
+# împart `Dockerfile.base` și arborele Haskell, pe când frontendul are propriul `Dockerfile`, sub
+# `frontend/`, cu un context de build diferit. Un singur loop peste amândouă ar fi cerut un `if`
+# despre context și dockerfile în interiorul lui — mai mult cod decât liniile astea.
+#
+# Fără el, „o comandă, de la zero" (check 16) producea un stack fără nicio interfață.
+echo "Building frontend"
+docker buildx build \
+  "${BUILDX_FLAGS[@]}" \
+  -f frontend/Dockerfile \
+  -t "${IMAGE_PREFIX}/palmares-frontend:${TAG}" \
+  frontend
+
 printf '\nBuilt images:\n'
 for svc in "${SERVICES[@]}"; do
   echo "  ${IMAGE_PREFIX}/palmares-${svc}:${TAG}"
 done
+echo "  ${IMAGE_PREFIX}/palmares-frontend:${TAG}"

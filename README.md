@@ -151,9 +151,41 @@ docker compose --profile app   up -d       # + the public query API on :8083, as
 BASIC_USER=you BASIC_PASS=secret docker compose --profile write up -d
 ```
 
-Every published port binds to `127.0.0.1`, including Postgres. The `write` profile brings up Kupo,
-the interaction API **and `attest-sync`**: without the last one the stack can submit an attestation
-to the chain and never read it back, which is what the audit found.
+### Everything at once, including the interface (check 16)
+
+The profiles above bring up services. **One command brings up the product**, backend plus the
+frontend that serves the interface and proxies both APIs from the same origin:
+
+```bash
+export POSTGRES_PASSWORD=… PALMARES_OWNER_PASSWORD=… PALMARES_RO_PASSWORD=…
+export BASIC_USER=you BASIC_PASS=secret
+
+docker compose --profile app --profile write up -d      # and the site is on http://127.0.0.1:8080
+```
+
+`frontend` is a single container doing two jobs: it serves the SPA and proxies `/api/query` and
+`/api/interaction` to the two services. That is why `CORS_ALLOWED_ORIGINS` stays empty — the
+browser's requests leave from the same origin, so there is no cross-origin request to allow. A
+frontend served from anywhere else would need that allowlist, and the empty one would refuse it:
+fail-closed by construction.
+
+The write credentials go to the **BFF**, not to the browser. `BASIC_USER` / `BASIC_PASS` are the
+same pair `interaction-api` demands, and the BFF attaches them server-side; nothing in the
+JavaScript that reaches a browser carries a credential.
+
+With only `--profile app`, the site comes up read-only and the write screen says so: without
+`interaction-api` it cannot learn whether the protocol is paused, and it refuses to build anything
+rather than guess — the same behaviour as a cluster whose interaction API is down.
+
+**From zero**, on a host with Docker and nothing else, that is: `scripts/build-images.sh` (or a pull
+on arm64), the five exports, and the one `up`. Everything else — the Postgres roles, the `palmares`
+schema, the matviews — is applied by the stack itself, in order, through `palmares-roles` and the
+query API's boot.
+
+Every published port binds to `127.0.0.1`, including Postgres — the frontend included, on
+`:8080`. The `write` profile brings up Kupo, the interaction API **and `attest-sync`**: without the
+last one the stack can submit an attestation to the chain and never read it back, which is what the
+audit found.
 
 The four service containers run as **`nobody`** (uid/gid 65534), set in each `Dockerfile.*` — they
 read a static binary and at most one read-only config file, and write nothing. One deployment shape
