@@ -94,6 +94,34 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
     else await f.fill(value);
   };
 
+  // Identificatorul se citește din ADRESA linkului „Edit" / „Accept", nu din textul de pe ecran, și
+  // asta e o reparație, nu o preferință. Prima variantă lua `.font-mono` din rândul găsit, și
+  // ambele căi erau greșite — verificat împotriva deployului, pe date reale, ÎNAINTE de a trimite
+  // ceva:
+  //
+  //   * pe `/profiles`, care e o listă de carduri și nu un tabel, `locator('div', { has: … })`
+  //     prinde și containerul exterior, deci `.font-mono` .first() întorcea id-ul PRIMULUI profil
+  //     din pagină, nu al celui căutat. Măsurat: pentru al treilea card întorcea
+  //     `…000643b0f4eff1d6…` în loc de `…000643b06e4117ca…`. Un profil nou nu e primul, deci rularea
+  //     ar fi atestat despre altcineva — după ce mintuise deja, ireversibil;
+  //   * pe `/attestations`, cele două `.font-mono` din rând sînt id-urile de SUBIECT și EMITENT, iar
+  //     id-ul atestării nu e în rând deloc. Și sînt trunchiate cu elipsă — `648c6a732aa55e…d1458b` —
+  //     deci inutilizabile ca identificator.
+  //
+  // Linkul le poartă întregi, și e calea pe care o folosește și un om: nimeni nu copiază un hex de
+  // pe ecran, apasă „Accept".
+  const idFromLink = async (scope, flow) => {
+    const href = await scope.locator(`a[href*="flow=${flow}"]`).first().getAttribute('href');
+    expect(href, `no ${flow} deep link to read the id from`).toBeTruthy();
+    const id = new URL(href, 'https://example.invalid').searchParams.get('subject');
+    expect(id, `${flow} link carries no subject`).toBeTruthy();
+    // Un id trunchiat ar trece mai departe și ar eșua abia la construire, cu un mesaj despre un
+    // token inexistent.
+    expect(id).not.toContain('\u2026');
+    expect(id).toMatch(/^[0-9a-f]{56}\.[0-9a-f]+$/);
+    return id;
+  };
+
   // Construiește, citește sumarul, semnează, trimite. Fiecare pas e o afirmație separată, pentru că
   // fiecare înseamnă altceva: până la „submit" nu s-a întâmplat nimic pe lanț.
   const buildSignSubmit = async (page, label) => {
@@ -134,14 +162,8 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
     const profileRow = page.getByText(`${marker}-profile`);
     await expect(profileRow).toBeVisible({ timeout: 10 * 60 * 1000 });
 
-    // Identificatorul profilului, citit de pe ecran: e singura cale prin care un om îl află, deci e
-    // calea pe care o testăm.
-    const profileId = await page
-      .locator('div', { has: profileRow })
-      .locator('.font-mono')
-      .first()
-      .innerText();
-    expect(profileId).toMatch(/^[0-9a-f]{56}\./);
+    const profileCard = page.locator('.card', { hasText: `${marker}-profile` }).first();
+    const profileId = await idFromLink(profileCard, 'update-profile');
 
     // 2. O atestare despre el, emisă de el — un singur portofel deține un singur profil, iar
     // „subiect == emitent" e o formă care există deja pe preprod (revendicările de credențială).
@@ -159,7 +181,7 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
     // Înainte de contrasemnătură: afirmată, nerecunoscută.
     await expect(attRow.getByText('not yet')).toBeVisible();
 
-    const attestationId = await attRow.locator('.font-mono').first().innerText();
+    const attestationId = await idFromLink(attRow, 'accept-attestation');
 
     // 3. Contrasemnătura, cu portofelul SUBIECTULUI — aici același, fiindcă subiectul e profilul lui.
     await connect(page, 'accept-attestation', attestationId);

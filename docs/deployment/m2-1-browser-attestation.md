@@ -27,7 +27,25 @@ PALMARES_WALLET_URL=https://gov.cardano.vip PALMARES_M2_SUBMIT=1 \
 ```
 
 `PALMARES_M2_SUBMIT=1` nu înseamnă nimic altceva decât „ai voie să trimiți", și nu se pune din
-greșeală. Testul face cele trei tranzacții — profil, atestare, acceptare — și așteaptă ca rândul de
+greșeală.
+
+**Rularea e pregătită, nu doar scrisă.** Pașii 2 și 3 nu pot rula decât DUPĂ ce pasul 1 a mintuit
+deja pe lanț, deci o greșeală în pasul 2 s-ar descoperi numai după un mint ireversibil, cu un profil
+orfan rămas pe preprod. `e2e-wallet/m2-1-preflight.spec.js` verifică fără să trimită nimic tot ce se
+poate verifica, și a găsit **două greșeli care ar fi pierdut exact o rulare**:
+
+1. pe `/profiles`, care e o listă de carduri și nu un tabel, selectorul întorcea id-ul **primului**
+   profil din pagină, nu al celui nou-mintuit — deci atestarea ar fi fost despre altcineva;
+2. pe `/attestations`, cele două valori monospațiate din rând sînt subiectul și emitentul, nu
+   atestarea, și sînt **trunchiate cu elipsă**.
+
+Ambele reparate citind identificatorul din adresa linkului „Edit" / „Accept" — care e și calea unui
+om: nimeni nu copiază un hex de pe ecran. Pre-flight-ul fixează acum contractul, verifică pe serverul
+adevărat că formele corpurilor pentru pașii 2 și 3 sînt cele așteptate (refuz `ProfileNotFound`, nu
+`invalid_parameter`), și confirmă că fiecare etichetă în care testul scrie mai există în fluxul ei.
+
+Singurul lucru care NU se poate pregăti dinainte e ce face serverul când portofelul deține un
+profil — fiindcă pentru asta trebuie mintuit unul. Testul face cele trei tranzacții — profil, atestare, acceptare — și așteaptă ca rândul de
 pe `/attestations` să arate `accepted`. Cost: taxă măsurată 0,61 tADA pe una dintre ele, plus
 min-UTxO blocat în tokenurile create; sub 10 tADA în total.
 
