@@ -336,22 +336,14 @@ test('the wallet gate refuses before the form, and says why', async ({ page }) =
   // Fara wallet: niciun cimp de formular pe ecran.
   await expect(page.getByRole('textbox')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Connect wallet' }).click();
-
-  await expect(page.getByText('cannot write')).toBeVisible();
+  // Fara niciun wallet in browser nu exista buton de conectare, ci propozitia care spune de ce.
+  // Refuzul cu matrice se testeaza in suita `e2e-wallet`, cu un wallet CIP-30 adevarat.
+  await expect(page.getByText('No Cardano wallet is installed')).toBeVisible();
+  await expect(page.getByText('Connect a wallet that can write here')).toBeVisible();
   // Propozitia, nu celula din matrice: amindoua contin „CIP-142", iar cea care conteaza e cea care
   // explica ce NU se va intimpla.
-  await expect(page.getByText(/without the CIP-142 extension/)).toBeVisible();
-  await expect(page.getByText(/nothing will be built/)).toBeVisible();
-
-  // Matricea arata toate cele trei forme de detectie, si ele se contrazic — asta e tot rostul ei.
-  await expect(page.getByRole('columnheader', { name: 'Advertised' })).toBeVisible();
-  await expect(page.getByRole('columnheader', { name: 'Negotiated' })).toBeVisible();
-  await expect(page.getByRole('columnheader', { name: 'Actually present' })).toBeVisible();
-
   // Si tot niciun formular.
   await expect(page.getByRole('textbox')).toHaveCount(0);
-  await expect(page.getByText('Connect a wallet that can write here')).toBeVisible();
 });
 
 // Cele noua fluxuri exista si sint accesibile, fiecare cu propriul URL.
@@ -378,10 +370,10 @@ test('all nine write flows are listed and deep-linkable', async ({ page }) => {
 });
 
 // Un link din produs aduce identificatorul cu el: altfel omul copiaza de mina saizeci de caractere.
-test('a flow deep-linked with a subject arrives with the field filled', async ({ page }) => {
+test('a flow deep-linked with a subject arrives without breaking the route', async ({ page }) => {
   await page.goto('/write?flow=open-dispute&subject=pol.assetname');
-  await page.getByRole('button', { name: 'Connect wallet' }).click();
-  // Ramine refuzat in demo, deci cimpul nu se vede — dar ruta il poarta, si asta se verifica in
-  // teste unitare pe `buildRequest`. Aici se verifica doar ca ruta nu cade.
+  // Ca identificatorul ajunge in cimpul potrivit se verifica unitar pe `buildRequest`; aici doar
+  // ca ruta cu doi parametri se parseaza si randeaza fluxul cerut.
   await expect(page).toHaveTitle('Act on chain — Palmares');
+  await expect(page.getByRole('heading', { name: 'Open a dispute', exact: true })).toBeVisible();
 });

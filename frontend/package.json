@@ -27,6 +27,7 @@
     "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4.1.10",
     "autoprefixer": "^10.4.21",
+    "cip30-test-wallet": "^0.9.1",
     "daisyui": "^5.5.5",
     "postcss": "^8.5.3",
     "tailwindcss": "^4.1.10",
@@ -50,7 +51,8 @@
     "deploy-prod": "docker buildx build --platform linux/amd64,linux/arm64 --provenance=false -t ghcr.io/mariusgeorgescu/palmares-frontend:prod -f Dockerfile . --push",
     "test:e2e": "npm run build && playwright test",
     "test:e2e:only": "playwright test",
-    "e2e:live": "playwright test --config playwright.live.config.js"
+    "e2e:live": "playwright test --config playwright.live.config.js",
+    "e2e:wallet": "playwright test --config playwright.wallet.config.js"
   },
   "browser": {
     "child_process": false

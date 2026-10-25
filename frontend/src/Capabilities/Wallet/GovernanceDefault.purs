@@ -11,13 +11,14 @@ module Capabilities.Wallet.GovernanceDefault
 import Prelude
 
 import AppEnv (NetworkMagic(..))
-import Capabilities.Wallet.Governance (GateVerdict(..), WalletCapabilities, verdictOf)
-import Cardano.Wallet.Cip30 (WalletName, enable, getExtensions, getSupportedExtensions)
+import Capabilities.Wallet.Governance (BlockReason(..), GateVerdict(..), WalletCapabilities, verdictOf)
+import Cardano.Wallet.Cip30 (Api, Extension, WalletName, enable, getExtensions, getSupportedExtensions)
 import Cardano.Wallet.Cip142 (cip142Extension, getNetworkMagic, hasCip142)
 import Cardano.Wallet.Cip95 (cip95Extension, hasCip95)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff, attempt)
+import Effect.Exception (message)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (liftEffect)
 
@@ -35,7 +36,40 @@ connectGovernanceDefault
   -> m GateVerdict
 connectGovernanceDefault expected walletName = liftAff do
   advertised <- orEmpty (liftEffect (getSupportedExtensions walletName))
-  api <- enable walletName [ cip95Extension, cip142Extension ]
+  -- `enable` e singurul apel care NU se poate înlocui cu o valoare implicită: fără API nu există
+  -- nimic de constatat. Iar el e și cel mai probabil să eșueze — omul apasă „Decline" — deci o
+  -- excepție aici trebuie să devină un verdict, nu să omoare fibra și să lase butonul pe
+  -- „Connecting…" pînă la reîncărcarea paginii. Prins de `cip30-test-wallet` cu `enableRejected`.
+  enabled <- attempt (enable walletName [ cip95Extension, cip142Extension ])
+  case enabled of
+    Left err -> pure
+      ( Blocked (WalletDeclined (describe err))
+          { walletName
+          , advertised
+          , negotiated: []
+          , cip95Present: false
+          , cip142Present: false
+          , networkMagic: Nothing
+          }
+      )
+    Right api -> judge expected walletName advertised api
+  where
+  -- Erorile CIP-30 sînt `{code, info}`, NU `Error`, deci `message` e gol pentru cele mai multe.
+  -- Ce rămîne util e ce se poate citi din ce a venit; cînd nu e nimic, mesajul porții spune
+  -- oricum ce să facă omul mai departe.
+  describe err =
+    let
+      m = message err
+    in
+      if m == "" then "" else m
+
+judge
+  :: NetworkMagic
+  -> WalletName
+  -> Array Extension
+  -> Api
+  -> Aff GateVerdict
+judge expected walletName advertised api = do
   negotiated <- orEmpty (getExtensions api)
   cip95 <- orFalse (liftEffect (hasCip95 api))
   cip142 <- orFalse (liftEffect (hasCip142 api))
@@ -55,18 +89,22 @@ connectGovernanceDefault expected walletName = liftAff do
   pure case verdictOf capabilities expected of
     Just reason -> Blocked reason capabilities
     Nothing -> Allowed { api, capabilities }
-  where
-  orEmpty :: forall a. Aff (Array a) -> Aff (Array a)
-  orEmpty act = attempt act <#> case _ of
-    Right xs -> xs
-    Left _ -> []
 
-  orFalse :: Aff Boolean -> Aff Boolean
-  orFalse act = attempt act <#> case _ of
-    Right b -> b
-    Left _ -> false
+-- | Fiecare citire de pe API poate arunca la un wallet care anunță o capacitate și n-o are — cazul
+-- | OBIȘNUIT în ecosistem — iar o excepție acolo ar arăta ca „aplicația s-a stricat" în loc de
+-- | „wallet-ul ăsta nu poate". Un eșec devine „nu avem capacitatea", care e exact ce citește
+-- | `verdictOf` mai departe.
+orEmpty :: forall a. Aff (Array a) -> Aff (Array a)
+orEmpty act = attempt act <#> case _ of
+  Right xs -> xs
+  Left _ -> []
 
-  orNothing :: forall a. Aff a -> Aff (Maybe a)
-  orNothing act = attempt act <#> case _ of
-    Right a -> Just a
-    Left _ -> Nothing
+orFalse :: Aff Boolean -> Aff Boolean
+orFalse act = attempt act <#> case _ of
+  Right b -> b
+  Left _ -> false
+
+orNothing :: forall a. Aff a -> Aff (Maybe a)
+orNothing act = attempt act <#> case _ of
+  Right a -> Just a
+  Left _ -> Nothing

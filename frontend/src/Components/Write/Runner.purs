@@ -25,6 +25,7 @@ import Capabilities.Interaction.Types (InteractionStatus(..), OracleGate(..), Or
 import Components.Write.Flows (FieldKind(..), buildRequest, flowSpecs, missingFields, specFor)
 import Format (formatAda)
 import Control.Monad.Reader (class MonadAsk)
+import Cardano.Wallet.Cip30 (getAvailableWallets)
 import Data.Array (length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
@@ -33,6 +34,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
 import Data.Tuple (Tuple(..))
+import Effect.Class (class MonadEffect, liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -66,26 +68,28 @@ type State =
   , gate :: Maybe GateVerdict
   -- Starea protocolului, citită o dată la intrarea pe ecran. `Nothing` cît timp n-a răspuns.
   , oracle :: Maybe InteractionStatus
+  , wallets :: Array String
   , step :: Step
   }
 
 data Action
   = Initialize
   | Receive Input
-  | Connect
+  | Connect String
   | SetField String String
   | Submit
 
 component
   :: forall q m
    . MonadInteract m
+  => MonadEffect m
   => MonadGovWallet m
   => MonadAsk Env m
   => MonadRouter Route m
   => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: \filters -> { filters, values: seedFrom filters, gate: Nothing, oracle: Nothing, step: Idle }
+    { initialState: \filters -> { filters, values: seedFrom filters, gate: Nothing, oracle: Nothing, wallets: [], step: Idle }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -105,6 +109,11 @@ component =
     -- Starea oracolului se cere ÎNAINTE de orice: dacă protocolul e oprit, nu are rost nici
     -- măcar să conectezi wallet-ul.
     Initialize -> do
+      -- Wallet-urile din browser se citesc, nu se presupun: un buton „Connect Lace" pe o mașină
+      -- fără Lace e un buton care nu face nimic, iar unul care spune „Connect wallet" fără să
+      -- zică pe care nu dă omului nicio informație despre ce i se va deschide.
+      names <- liftEffect getAvailableWallets
+      H.modify_ _ { wallets = names }
       res <- interactionStatus
       H.modify_ _
         { oracle = case res of
@@ -115,9 +124,9 @@ component =
       st <- H.get
       when (filters /= st.filters) do
         H.modify_ _ { filters = filters, values = seedFrom filters, step = Idle }
-    Connect -> do
+    Connect walletName -> do
       H.modify_ _ { step = Connecting }
-      verdict <- connectGovernance "lace"
+      verdict <- connectGovernance walletName
       H.modify_ _ { gate = Just verdict, step = Idle }
     SetField k v -> H.modify_ \st -> st { values = Map.insert k v st.values }
     Submit -> do
@@ -207,12 +216,12 @@ component =
       HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
         [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
             [ HH.p_ [ HH.text "Connect a wallet to see what it can and cannot do here." ]
-            , HH.button
-                [ HP.class_ (HH.ClassName "btn btn-sm btn-primary")
-                , HP.type_ HP.ButtonButton
-                , HE.onClick (const Connect)
-                ]
-                [ HH.text (if st.step == Connecting then "Connecting…" else "Connect wallet") ]
+            , if null st.wallets then
+                HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
+                  [ HH.text "No Cardano wallet is installed in this browser." ]
+              else
+                HH.div [ HP.class_ (HH.ClassName "flex flex-wrap gap-2") ]
+                  (map (walletButton st) st.wallets)
             ]
         ]
     Just (Allowed w) ->
@@ -234,8 +243,28 @@ component =
                 ]
             , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (blockMessage reason) ]
             , matrix caps
+            -- Un refuz fără cale de întoarcere e un fund de sac: cineva care a apăsat „Decline"
+            -- din greșeală, sau care tocmai a schimbat rețeaua în wallet, trebuie să poată
+            -- încerca din nou fără să reîncarce pagina. Prins de `cip30-test-wallet` cu
+            -- `enableRejected`: ecranul rămînea cu matricea și fără niciun buton.
+            , HH.div [ HP.class_ (HH.ClassName "card-actions") ]
+                [ HH.button
+                    [ HP.class_ (HH.ClassName "btn btn-sm")
+                    , HP.type_ HP.ButtonButton
+                    , HE.onClick (const (Connect caps.walletName))
+                    ]
+                    [ HH.text (if st.step == Connecting then "Connecting…" else "Connect " <> caps.walletName) ]
+                ]
             ]
         ]
+
+  walletButton st name =
+    HH.button
+      [ HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+      , HP.type_ HP.ButtonButton
+      , HE.onClick (const (Connect name))
+      ]
+      [ HH.text (if st.step == Connecting then "Connecting…" else "Connect " <> name) ]
 
   -- Cele trei forme de detecție, una lîngă alta. Se arată toate pentru că se CONTRAZIC în
   -- practică, iar un wallet refuzat deși „scrie pe cutie" că suportă extensia e exact cazul în

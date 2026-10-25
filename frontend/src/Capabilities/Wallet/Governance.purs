@@ -65,6 +65,11 @@ data BlockReason
   | WrongNetwork NetworkMagic NetworkMagic
   -- | Wallet-ul nu poate identifica o credențială de guvernanță.
   | NoGovernanceKeys
+  -- | Wallet-ul n-a dat un API deloc: omul a refuzat prompt-ul, sau extensia a aruncat.
+  --
+  -- E o stare SEPARATĂ de celelalte pentru că nu spune nimic despre wallet — spune că n-am
+  -- ajuns să aflăm. Un mesaj despre extensii lipsă aici ar fi o acuzație nedreaptă.
+  | WalletDeclined String
 
 derive instance Eq BlockReason
 
@@ -75,6 +80,7 @@ instance Show BlockReason where
     NetworkUndetermined -> "NetworkUndetermined"
     WrongNetwork e a -> "WrongNetwork expected=" <> show e <> " actual=" <> show a
     NoGovernanceKeys -> "NoGovernanceKeys"
+    WalletDeclined e -> "WalletDeclined " <> e
 
 data GateVerdict
   = Allowed GovWallet
@@ -96,6 +102,10 @@ blockMessage = case _ of
   NoGovernanceKeys ->
     "This wallet does not expose governance keys (CIP-95), so it cannot prove which DRep or \
     \committee credential belongs to it. Reading works; claiming a credential does not."
+  WalletDeclined detail ->
+    "The wallet did not connect"
+      <> (if detail == "" then "" else " (" <> detail <> ")")
+      <> ". If you dismissed the prompt, press connect again."
 
 supportsCip95 :: WalletCapabilities -> Boolean
 supportsCip95 c = c.cip95Present
