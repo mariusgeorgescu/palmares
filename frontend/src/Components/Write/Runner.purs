@@ -18,16 +18,16 @@ module Components.Write.Runner
 import Prelude
 
 import AppEnv (Env)
-import Capabilities.Interaction.MonadInteract (class MonadInteract, buildFlow, interactionStatus)
+import Capabilities.Interaction.MonadInteract (class MonadInteract, buildFlow, interactionStatus, submitSigned, txStatus)
 import Capabilities.Query.Gov.Http (renderApiError)
 import Capabilities.Wallet.Governance (class MonadGovWallet, GateVerdict(..), blockMessage, connectGovernance, hasExtension)
-import Capabilities.Interaction.Types (InteractionStatus(..), OracleGate(..), OracleParams(..), oracleGate)
+import Capabilities.Interaction.Types (InteractionStatus(..), OracleGate(..), OracleParams(..), UserAddresses, oracleGate)
 import Components.Shared.DRepIdentity (shortId)
 import Components.Write.Flows (FieldKind(..), buildRequest, flowSpecs, missingFields, specFor)
 import Components.Write.TxSummaryDecode (summarise)
 import Format (formatAda, pluralize)
 import Control.Monad.Reader (class MonadAsk)
-import Cardano.Wallet.Cip30 (getAvailableWallets)
+import Cardano.Wallet.Cip30 (Api, getAvailableWallets, getChangeAddress, getUsedAddresses, signTx)
 import Data.Array (length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
@@ -36,7 +36,10 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
 import Data.Tuple (Tuple(..))
+import Effect.Aff (Aff, attempt)
+import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Exception (message)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -62,6 +65,13 @@ data Step
   | Connecting
   | Building
   | Built String
+  -- Cei trei pași de după construire, fiecare cu numele lui pe ecran. „Signing" e singurul în care
+  -- așteptarea e a OMULUI, nu a rețelei, iar „Submitted" e primul în care ceva s-a întâmplat pe
+  -- lanț și nu se mai poate lua înapoi.
+  | Signing String
+  | Submitting
+  | Submitted String
+  | Confirmed String
   | Failed String
 
 type State =
@@ -85,10 +95,12 @@ data Action
   | Connect String
   | SetField String String
   | Submit
+  | SignAndSubmit String
 
 component
   :: forall q m
    . MonadInteract m
+  => MonadAff m
   => MonadEffect m
   => MonadGovWallet m
   => MonadAsk Env m
@@ -143,24 +155,66 @@ component =
         Just (Allowed _) -> runBuild st
         _ -> pure unit
 
+    -- Semnătura e a wallet-ului, trimiterea e a serverului, iar între ele nu e nimic al nostru.
+    -- Un refuz la semnare NU e o eroare a aplicației: omul a apăsat „Decline", iar ecranul trebuie
+    -- să spună asta și să lase butonul apăsabil.
+    SignAndSubmit tx -> do
+      st <- H.get
+      case st.gate of
+        Just (Allowed w) -> do
+          H.modify_ _ { step = Signing tx }
+          signed <- H.liftAff (attempt (signTx w.api tx true))
+          case signed of
+            Left err ->
+              H.modify_ _
+                { step = Failed
+                    ( "The wallet did not sign"
+                        <> (if message err == "" then "" else " (" <> message err <> ")")
+                        <> ". Nothing has been submitted; you can try again."
+                    )
+                }
+            Right witness -> do
+              H.modify_ _ { step = Submitting }
+              res <- submitSigned { txUnsigned: tx, txWit: witness }
+              case res of
+                Left e -> H.modify_ _ { step = Failed (renderApiError e) }
+                Right txId -> do
+                  H.modify_ _ { step = Submitted txId }
+                  -- O singură verificare, nu o buclă: confirmarea vine în minute, iar un ecran
+                  -- care ar bate la ușă în fundal ar cheltui bateria cuiva ca să afle un lucru
+                  -- pe care tx-ul îl spune oricum. `Submitted` e deja starea ireversibilă.
+                  confirmed <- txStatus txId
+                  case confirmed of
+                    Right true -> H.modify_ _ { step = Confirmed txId }
+                    _ -> pure unit
+        _ -> pure unit
+
   -- Se construiește cu adresele wallet-ului. Nu se semnează aici: semnătura e a wallet-ului, iar
   -- trimiterea e pasul pe care produsul îl ține deliberat separat.
-  runBuild st = case st.filters.flow of
-    Nothing -> pure unit
-    Just flowId -> do
+  runBuild st = case st.filters.flow, st.gate of
+    Just flowId, Just (Allowed w) -> do
       H.modify_ _ { step = Building }
-      -- Adresele vin din wallet la pasul următor; aici se trimit cele pe care le-a dat poarta.
-      case buildRequest flowId st.values emptyAddresses of
-        Nothing -> H.modify_ _ { step = Failed "Some required fields are still empty." }
-        Just req -> do
-          res <- buildFlow req
+      -- ADRESELE VIN DIN WALLET, iar versiunea dinainte trimitea o listă goală și o adresă de rest
+      -- goală: serverul alege intrările și dă restul pe baza lor, deci cu ele goale nu putea
+      -- construi nimic. Nu s-a văzut pe fixturi, unde `buildFlow` e un mock care întoarce un CBOR
+      -- oricum.
+      addrs <- H.liftAff (walletAddresses w.api)
+      case addrs of
+        Nothing ->
           H.modify_ _
-            { step = case res of
-                Left e -> Failed (renderApiError e)
-                Right tx -> Built tx
+            { step = Failed
+                "The wallet did not return an address to build from. Reconnect and try again."
             }
-
-  emptyAddresses = { usedAddresses: [], changeAddress: "" }
+        Just addresses -> case buildRequest flowId st.values addresses of
+          Nothing -> H.modify_ _ { step = Failed "Some required fields are still empty." }
+          Just req -> do
+            res <- buildFlow req
+            H.modify_ _
+              { step = case res of
+                  Left e -> Failed (renderApiError e)
+                  Right tx -> Built tx
+              }
+    _, _ -> pure unit
 
   -- `OracleUnknown` cît timp n-a răspuns încă: ecranul nu promite nimic pe baza unui răspuns care
   -- n-a venit. Când vine, devine ce spune serverul.
@@ -498,31 +552,65 @@ component =
                   \offered for signing. Nothing has happened on chain."
               ]
           ]
-      Just sum ->
-        HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
-          [ HH.div [ HP.class_ (HH.ClassName "card-body gap-3") ]
-              [ HH.h3 [ HP.class_ (HH.ClassName "card-title text-base") ]
-                  [ HH.text "What this transaction does" ]
-              , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-                  [ HH.text
-                      "Read out of the transaction itself, not out of the form you filled in. \
-                      \Nothing has been signed or submitted yet."
+      Just sum -> summaryCard st tx sum
+    Signing _ ->
+      HH.div [ HP.class_ (HH.ClassName "alert alert-info text-sm") ]
+        [ HH.span_ [ HH.text "Waiting for your wallet. Nothing has been submitted yet." ] ]
+    Submitting ->
+      HH.div [ HP.class_ (HH.ClassName "alert alert-info text-sm") ]
+        [ HH.span_ [ HH.text "Signed. Submitting…" ] ]
+    Submitted txId -> submittedCard txId false
+    Confirmed txId -> submittedCard txId true
+
+  -- Trimis, și apoi confirmat. Cele două sunt stări DIFERITE: „trimis" înseamnă că nodul a primit
+  -- tranzacția, „confirmat" că e într-un bloc. Un singur mesaj pentru amândouă ar face pe cineva să
+  -- creadă că s-a terminat când încă se poate pierde în mempool.
+  submittedCard txId confirmed =
+    HH.div [ HP.class_ (HH.ClassName ("alert text-sm flex-col items-start gap-2 " <> if confirmed then "alert-success" else "alert-info")) ]
+      [ HH.span_
+          [ HH.text
+              ( if confirmed then "Confirmed on chain. The register will show it once the indexer catches up."
+                else "Submitted. The node has it; it is not in a block yet."
+              )
+          ]
+      , HH.code [ HP.class_ (HH.ClassName "font-mono text-xs break-all opacity-80") ] [ HH.text txId ]
+      ]
+
+  summaryCard st tx sum =
+    HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body gap-3") ]
+          [ HH.h3 [ HP.class_ (HH.ClassName "card-title text-base") ]
+              [ HH.text "What this transaction does" ]
+          , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
+              [ HH.text
+                  "Read out of the transaction itself, not out of the form you filled in. \
+                  \Nothing has been signed or submitted yet."
+              ]
+          , HH.ul [ HP.class_ (HH.ClassName "text-sm space-y-1 list-disc ml-5") ]
+              ( [ HH.li_ [ HH.text ("Pays a network fee of " <> formatAda sum.fee <> ".") ] ]
+                  <> map mintLine sum.mints
+                  <> map outputLine sum.outputs
+                  <> certLine sum.certificates
+                  <> signerLine sum.requiredSigners
+              )
+          , HH.details_
+              [ HH.summary [ HP.class_ (HH.ClassName "text-xs opacity-70 cursor-pointer") ]
+                  [ HH.text "Show the raw transaction" ]
+              , HH.pre [ HP.class_ (HH.ClassName "bg-base-300 rounded p-2 overflow-x-auto text-xs mt-2") ]
+                  [ HH.code_ [ HH.text tx ] ]
+              ]
+          -- Butonul stă SUB sumar, nu lângă „Build": semnătura se cere după ce ai citit ce
+          -- semnezi, iar ordinea pe ecran e ordinea în care se face.
+          , HH.div [ HP.class_ (HH.ClassName "card-actions") ]
+              [ HH.button
+                  [ HP.class_ (HH.ClassName "btn btn-primary btn-sm")
+                  , HP.type_ HP.ButtonButton
+                  , HE.onClick (const (SignAndSubmit tx))
                   ]
-              , HH.ul [ HP.class_ (HH.ClassName "text-sm space-y-1 list-disc ml-5") ]
-                  ( [ HH.li_ [ HH.text ("Pays a network fee of " <> formatAda sum.fee <> ".") ] ]
-                      <> map mintLine sum.mints
-                      <> map outputLine sum.outputs
-                      <> certLine sum.certificates
-                      <> signerLine sum.requiredSigners
-                  )
-              , HH.details_
-                  [ HH.summary [ HP.class_ (HH.ClassName "text-xs opacity-70 cursor-pointer") ]
-                      [ HH.text "Show the raw transaction" ]
-                  , HH.pre [ HP.class_ (HH.ClassName "bg-base-300 rounded p-2 overflow-x-auto text-xs mt-2") ]
-                      [ HH.code_ [ HH.text tx ] ]
-                  ]
+                  [ HH.text "Sign and submit" ]
               ]
           ]
+      ]
 
 derive instance Eq Step
 
@@ -539,3 +627,28 @@ subjectKeysFor = case _ of
   "withdraw-credential" -> [ "profile_id" ]
   "issue-attestation" -> [ "subject_profile_id" ]
   _ -> []
+
+-- | Adresele pe care serverul le folosește ca să aleagă intrările și să dea restul.
+-- |
+-- | `Nothing` cînd wallet-ul nu dă o adresă de rest — fără ea nu se poate construi, iar un
+-- | `changeAddress` gol trimis la server ar produce o eroare de validare care arată ca o greșeală
+-- | a utilizatorului.
+-- |
+-- | Adresele FOLOSITE pot fi legitim zero, pe un portofel nou: serverul are nevoie de cel puțin
+-- | una ca să caute intrări, iar adresa de rest e și ea una a portofelului, deci intră în listă
+-- | cînd altceva nu există.
+walletAddresses :: Api -> Aff (Maybe UserAddresses)
+walletAddresses api = do
+  change <- attempt (getChangeAddress api)
+  used <- attempt (getUsedAddresses api Nothing)
+  case change of
+    Left _ -> pure Nothing
+    Right changeAddress ->
+      pure
+        ( Just
+            { changeAddress
+            , usedAddresses: case used of
+                Right us | not (null us) -> us
+                _ -> [ changeAddress ]
+            }
+        )

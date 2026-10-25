@@ -122,3 +122,84 @@ test.describe('the same wallet, with the CIP-142 namespace the CIP defines', () 
     await expect(page.getByText(/required field\(s\) still empty/)).toBeVisible();
   });
 });
+
+test.describe('what the build request actually carries', () => {
+  // Testul ăsta a fost scris pentru un defect pe care nimic altceva nu-l putea prinde: ecranul
+  // trimitea `user_addresses: []` și `change_address: ""`, fiindcă pasul „citește adresele din
+  // portofel" lipsea pur și simplu. Unitarele treceau — ele verifică serializarea corpului, nu de
+  // unde vin valorile — iar suita de fixturi n-are portofel. Se vedea doar aici: un wallet real,
+  // apăsat pe butonul real, cu corpul cererii citit de pe sîrmă.
+  //
+  // Adresele contează: serverul alege intrările și dă restul pe baza lor. Cu ele goale, nicio
+  // tranzacție nu se putea construi, pe nicio rețea.
+  const withCip142 = async (page) => {
+    await page.addInitScript((walletName) => {
+      const install = () => {
+        const w = window.cardano?.[walletName];
+        if (!w || w.__cip142Patched) return false;
+        w.__cip142Patched = true;
+        const original = w.enable.bind(w);
+        w.enable = async (opts) => {
+          const api = await original(opts);
+          api.cip142 = { getNetworkMagic: async () => 1 };
+          return api;
+        };
+        w.supportedExtensions = [...(w.supportedExtensions ?? []), { cip: 142 }];
+        return true;
+      };
+      if (!install()) {
+        const t = setInterval(() => {
+          if (install()) clearInterval(t);
+        }, 25);
+      }
+    }, WALLET);
+  };
+
+  test('sends the wallet own address, not an empty list', async ({ page, wallet }) => {
+    await withCip142(page);
+
+    // Corpul se citește de pe sîrmă, nu din starea componentei: ce ajunge la server e singurul
+    // lucru care contează.
+    const bodies = [];
+    // DOAR ruta de construire: un `**` peste tot interaction-api ar prinde și interogarea
+    // oracolului, iar poarta de oracol ar bloca pe bună dreptate pe „nu știm dacă e pauzat" —
+    // adică testul n-ar mai ajunge niciodată la buton.
+    await page.route('**/api/interaction/claim-profile', async (route) => {
+      bodies.push(route.request().postDataJSON());
+      // Se oprește aici: ce face serverul cu cererea e altă întrebare, iar un răspuns adevărat ar
+      // lega testul de starea lanțului.
+      await route.fulfill({ status: 503, contentType: 'application/json', body: '{}' });
+    });
+
+    await page.goto('/write?flow=claim-profile');
+    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await expect(page.getByText('ready', { exact: true })).toBeVisible();
+
+    // „Kind" e un <select>, nu un <input>: `fill` pe el dă „Element is not an <input>". Varianta
+    // dinainte a testului a căzut exact aici.
+    await page.getByLabel('Kind', { exact: false }).first().selectOption('person_d_rep');
+    await page.getByLabel('Name', { exact: false }).first().fill('gate-address-check');
+    await page.getByLabel('Description', { exact: false }).first().fill('reads the wallet address');
+    await page.getByLabel('Image URI', { exact: false }).first().fill('ipfs://gate-check');
+
+    const build = page.getByRole('button', { name: /Build the transaction/ });
+    await expect(build).toBeEnabled();
+    await build.click();
+
+    await expect.poll(() => bodies.length, { timeout: 30_000 }).toBeGreaterThan(0);
+    const body = bodies[bodies.length - 1];
+
+    // Adresa de rest e cea a portofelului, nu un string gol. `wallet.addresses.payment` e bech32,
+    // iar CIP-30 întoarce hex — deci comparația se face pe ce a cerut codul de la portofel și pe ce
+    // a ajuns în corp, nu pe forma bech32.
+    const asked = await wallet.calls('getChangeAddress');
+    expect(asked.length).toBeGreaterThan(0);
+    // Cheile: `user_addresses` e snake_case la exterior, dar camelCase în interior — vezi
+    // `Capabilities.Interaction.Types`.
+    const addrs = body.user_addresses;
+    expect(addrs.changeAddress).toBe(asked[asked.length - 1].result);
+    expect(addrs.changeAddress).not.toBe('');
+    expect(addrs.usedAddresses.length).toBeGreaterThan(0);
+    expect(addrs.usedAddresses).toContain(addrs.changeAddress);
+  });
+});
