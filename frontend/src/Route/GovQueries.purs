@@ -38,6 +38,14 @@ module Route.GovQueries
   , votesForActionHref
   , encodePathSegment
   , encodeQueryValue
+  , SpoFilters
+  , emptySpoFilters
+  , spoFiltersCodec
+  , spoFilterPairs
+  , renderSpoFilters
+  , spoListPath
+  , spoListHrefFor
+  , committeePath
   , MethodologyFilters
   , emptyMethodologyFilters
   , methodologyCodec
@@ -252,6 +260,48 @@ actionListHrefFor f = actionListPath <> renderGovActionFilters f
 -- | deci ar cere pagina listei în loc de acțiune.
 actionDetailHrefFor :: String -> String
 actionDetailHrefFor actionId = actionListPath <> "/" <> encodePathSegment actionId
+
+-- | Filtrele listei de SPO-uri. Doar sortare și paginare: cele patru filtre numerice pe care
+-- | serverul le acceptă (`min_voting_power`, `min_votes_cast`, `active_in_epoch`) n-au niciun
+-- | control în ecran, iar o rută care poartă ce nimeni nu poate seta e stare moartă.
+type SpoFilters =
+  { order_by :: Maybe String
+  , sort_order :: Maybe String
+  , limit :: Maybe String
+  , offset :: Maybe String
+  }
+
+emptySpoFilters :: SpoFilters
+emptySpoFilters = { order_by: Nothing, sort_order: Nothing, limit: Nothing, offset: Nothing }
+
+spoFiltersCodec :: RouteDuplex' SpoFilters
+spoFiltersCodec =
+  record
+    # prop (Proxy :: Proxy "order_by") (optional (param "order_by"))
+    # prop (Proxy :: Proxy "sort_order") (optional (param "sort_order"))
+    # prop (Proxy :: Proxy "limit") (optional (param "limit"))
+    # prop (Proxy :: Proxy "offset") (optional (param "offset"))
+
+spoFilterPairs :: SpoFilters -> Array (Tuple String String)
+spoFilterPairs f = order <> opt "limit" f.limit <> opt "offset" f.offset
+  where
+  opt k = maybe [] \v -> [ Tuple k v ]
+
+  order = case f.order_by of
+    Nothing -> []
+    Just ob -> [ Tuple "order_by" ob, Tuple "sort_order" (fromMaybe "desc" f.sort_order) ]
+
+renderSpoFilters :: SpoFilters -> String
+renderSpoFilters = renderQuery <<< spoFilterPairs
+
+spoListPath :: String
+spoListPath = "/spos"
+
+spoListHrefFor :: SpoFilters -> String
+spoListHrefFor f = spoListPath <> renderSpoFilters f
+
+committeePath :: String
+committeePath = "/committee"
 
 -- | Filtrele explorerului de voturi.
 type VoteFilters =

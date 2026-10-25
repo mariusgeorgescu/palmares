@@ -15,6 +15,8 @@ module Capabilities.Query.Gov.Fixtures
   , votesListFixture
   , searchFixture
   , formulasFixture
+  , spoListFixture
+  , committeeFixture
   ) where
 
 -- | `GET /status` pe preprod, 2026-10-24. `epoch_params` e omis: niciun decodor nu-l citește încă,
@@ -1198,3 +1200,125 @@ formulasFixture =
     }
   ]
   """
+
+-- | `GET /spos?limit=5`, măsurat 2026-10-25 pe preprod sincronizat (epoca 321).
+-- |
+-- | Toate cele 511 rânduri au `ticker` și `participation_rate` `null`; cele cinci de aici nu sunt
+-- | alese ca să fie comode, ci sunt primele cinci. Vezi `SpoRow` pentru de ce.
+spoListFixture :: String
+spoListFixture =
+  """
+{
+  "items": [
+    {
+      "pool_id": "pool1945cfqzmy2qe2z59mfdwm7jwqtucncfee5xkd8f4wu97zr8xuys",
+      "ticker": null,
+      "voting_power": 488729208474515,
+      "voting_power_epoch": 321,
+      "delegator_count": 5,
+      "votes_cast": 8,
+      "participation_rate": null
+    },
+    {
+      "pool_id": "pool1sh4cddrln788xmnjnsqhdwj9e7th3c3ck3zjk7ny9znwj44t8he",
+      "ticker": null,
+      "voting_power": 293919746779515,
+      "voting_power_epoch": 321,
+      "delegator_count": 7,
+      "votes_cast": 3,
+      "participation_rate": null
+    },
+    {
+      "pool_id": "pool18svpptnxfctewpx7ntnmlazy4w9cr24f4rcq8smkvpggw600ql4",
+      "ticker": null,
+      "voting_power": 189419869189615,
+      "voting_power_epoch": 321,
+      "delegator_count": 3,
+      "votes_cast": 8,
+      "participation_rate": null
+    },
+    {
+      "pool_id": "pool1kxtrz8evgdrwwrdajhwweng6k8eysjvqgn59r8a5wkqw6rlnvv6",
+      "ticker": null,
+      "voting_power": 189414245806748,
+      "voting_power_epoch": 321,
+      "delegator_count": 5,
+      "votes_cast": 8,
+      "participation_rate": null
+    },
+    {
+      "pool_id": "pool1nmfr5j5rnqndprtazre802glpc3h865sy50mxdny65kfgf3e5eh",
+      "ticker": null,
+      "voting_power": 48927508984815,
+      "voting_power_epoch": 321,
+      "delegator_count": 326,
+      "votes_cast": 2,
+      "participation_rate": null
+    }
+  ],
+  "total": 511,
+  "limit": 200,
+  "offset": 0
+}
+"""
+
+-- | `GET /committee`, măsurat 2026-10-25. Trei membri, cvorum 2/3, toți cu cheia fierbinte
+-- | autorizată și niciunul demisionat — adică exact cazul în care ecranul trebuie să arate că
+-- | `resigned_at` lipsind e normalul, nu o lipsă de date.
+committeeFixture :: String
+committeeFixture =
+  """
+{
+  "quorum_numerator": 2,
+  "quorum_denominator": 3,
+  "established_by": "bbfa303aa35d19919934fb5fe36b174609a0c1dfb47a546ccd6ea58aa752e2aa#0",
+  "epoch": 321,
+  "members": [
+    {
+      "cold_hash": "615b54137e73f090d2dddb04317bee41624f4013e5cfe4a5efa76d76",
+      "cold_bech32": "cc_cold1zds4k4qn0eelpyxjmhdsgvtmaeqkyn6qz0jule99a7nk6asezxvlu",
+      "hot_hash": "5bfa7d850280c54110534065fa91a3635bbcc0eadc69c5c792c35e1e",
+      "expiration_epoch": 372,
+      "status": "active",
+      "votes_cast": 6,
+      "authorized_at": {
+        "slot": 96856972,
+        "epoch": 228,
+        "time": "2025-07-15T00:42:52Z",
+        "tx_hash": "bb70cd05900c3057688ddc9ed90189fba19d53ec0fe82f75532a2183afcb45ca"
+      },
+      "resigned_at": null
+    },
+    {
+      "cold_hash": "e36d5e45b277bff4962d6c63be2375af8e68e558e6a373137a0ad6f2",
+      "cold_bech32": "cc_cold1z03k6hj9kfmmlayk94kx803rwkhcu689trn2xucn0g9ddusykdhpl",
+      "hot_hash": "26648e2c6bc4e4863a373bd28d480b2eb788922545e1df357e76a3d2",
+      "expiration_epoch": 372,
+      "status": "active",
+      "votes_cast": 6,
+      "authorized_at": {
+        "slot": 96856972,
+        "epoch": 228,
+        "time": "2025-07-15T00:42:52Z",
+        "tx_hash": "772a5039051d06c9e75d2871a81e8c9768f59c340ea9566c83975eb29594194c"
+      },
+      "resigned_at": null
+    },
+    {
+      "cold_hash": "e883ad4599af7b01fe9d01c92bfa405151226db53982931d445b4a96",
+      "cold_bech32": "cc_cold1z05g8t29nxhhkq07n5quj2l6gpg4zgndk5uc9ycag3d549svk3hyp",
+      "hot_hash": "19ebff7033fe1c1f9cd2b346f2c9b0d7ff28b1527ebed1cc071155b4",
+      "expiration_epoch": 372,
+      "status": "active",
+      "votes_cast": 6,
+      "authorized_at": {
+        "slot": 96856972,
+        "epoch": 228,
+        "time": "2025-07-15T00:42:52Z",
+        "tx_hash": "2c6f3437b2f6b662375677408c318854baad0d85798e5525aa38ac52cdd1f3ae"
+      },
+      "resigned_at": null
+    }
+  ]
+}
+"""

@@ -15,6 +15,8 @@ module Capabilities.Query.Gov.Mock
   , getVotesMock
   , searchAllMock
   , getFormulasMock
+  , getSposMock
+  , getCommitteeMock
   , decodeFixture
   ) where
 
@@ -30,6 +32,8 @@ import Capabilities.Query.Gov.Fixtures
   , searchFixture
   , statusFixture
   , votesListFixture
+  , spoListFixture
+  , committeeFixture
   )
 import Capabilities.Query.Gov.Http (ApiError(..), classifyResponse)
 import Capabilities.Query.Gov.Types
@@ -42,11 +46,13 @@ import Capabilities.Query.Gov.Types
   , GovStatus
   , SearchResults
   , VotePage
+  , SpoPage
+  , CommitteeState
   )
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
-import Route.GovQueries (DRepFilters, GovActionFilters, VoteFilters)
+import Route.GovQueries (DRepFilters, GovActionFilters, SpoFilters, VoteFilters)
 
 -- | Decodează o fixtură exact cum s-ar decoda un 200 real.
 decodeFixture :: forall a. DecodeJson a => String -> Either ApiError a
@@ -85,3 +91,9 @@ searchAllMock _ = pure (decodeFixture searchFixture)
 
 getFormulasMock :: forall m. Applicative m => m (Either ApiError (Array Formula))
 getFormulasMock = pure (decodeFixture formulasFixture)
+
+getSposMock :: forall m. Applicative m => SpoFilters -> m (Either ApiError SpoPage)
+getSposMock _ = pure (decodeFixture spoListFixture)
+
+getCommitteeMock :: forall m. Applicative m => m (Either ApiError CommitteeState)
+getCommitteeMock = pure (decodeFixture committeeFixture)

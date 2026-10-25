@@ -189,6 +189,8 @@ test.describe('at phone width', () => {
     '/',
     '/dreps',
     '/dreps/drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z',
+    '/spos',
+    '/committee',
     '/gov-actions',
     '/gov-actions/90de87d46e6345118c01dc5ec701b4dce5621ffa3b1f98a3d55eb34e85da7392%230',
     '/votes',
@@ -228,6 +230,10 @@ test('the document title names the screen', async ({ page }) => {
   await expect(page).toHaveTitle('Votes — Palmares');
   await page.goto('/gov-actions');
   await expect(page).toHaveTitle('Governance actions — Palmares');
+  await page.goto('/spos');
+  await expect(page).toHaveTitle('Stake pool operators — Palmares');
+  await page.goto('/committee');
+  await expect(page).toHaveTitle('Constitutional committee — Palmares');
   await page.goto('/this-does-not-exist');
   await expect(page).toHaveTitle('Not found — Palmares');
 });
@@ -252,6 +258,8 @@ for (const route of [
   '/gov-actions',
   '/gov-actions/90de87d46e6345118c01dc5ec701b4dce5621ffa3b1f98a3d55eb34e85da7392%230',
   '/votes',
+  '/spos',
+  '/committee',
 ]) {
   test(`${route} renders no PureScript constructor`, async ({ page }) => {
     await page.goto(route);

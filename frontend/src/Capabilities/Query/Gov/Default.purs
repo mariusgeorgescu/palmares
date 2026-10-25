@@ -12,6 +12,8 @@ module Capabilities.Query.Gov.Default
   , getVotesDefault
   , searchAllDefault
   , getFormulasDefault
+  , getSposDefault
+  , getCommitteeDefault
   ) where
 
 import Prelude
@@ -28,13 +30,17 @@ import Capabilities.Query.Gov.Types
   , GovStatus
   , SearchResults
   , VotePage
+  , SpoPage
+  , CommitteeState
   )
 import Data.Either (Either)
 import Effect.Aff.Class (class MonadAff)
 import Route.GovQueries
   ( DRepFilters
   , GovActionFilters
+  , SpoFilters
   , VoteFilters
+  , renderSpoFilters
   , encodePathSegment
   , renderDRepFilters
   , renderGovActionFilters
@@ -115,3 +121,18 @@ getFormulasDefault
   => Record (HasGovEnv r)
   -> m (Either ApiError (Array Formula))
 getFormulasDefault env = getJson (env.queryBaseUrl <> "/metrics/formulas")
+
+getSposDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> SpoFilters
+  -> m (Either ApiError SpoPage)
+getSposDefault env filters = getJson (env.queryBaseUrl <> "/spos" <> renderSpoFilters filters)
+
+getCommitteeDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> m (Either ApiError CommitteeState)
+getCommitteeDefault env = getJson (env.queryBaseUrl <> "/committee")

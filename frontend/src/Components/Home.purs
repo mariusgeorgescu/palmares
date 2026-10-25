@@ -10,12 +10,14 @@ import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
+import Components.Explorer.Committee as Committee
 import Components.Explorer.Dashboard as Dashboard
 import Components.Explorer.ActionDetail as ActionDetail
 import Components.Explorer.ActionList as ActionList
 import Components.Explorer.DRepDetail as DRepDetail
 import Components.Explorer.DRepList as DRepList
 import Components.Explorer.Methodology as Methodology
+import Components.Explorer.SpoList as SpoList
 import Components.Explorer.VoteList as VoteList
 import Components.Layout.NavBar as NavBar
 import Components.Shared.DRepIdentity (shortId)
@@ -57,6 +59,8 @@ type Slots =
   , drepDetail :: DRepDetail.Slot
   , actionList :: ActionList.Slot
   , actionDetail :: ActionDetail.Slot
+  , spoList :: SpoList.Slot
+  , committee :: Committee.Slot
   , voteList :: VoteList.Slot
   , methodology :: Methodology.Slot
   )
@@ -138,6 +142,8 @@ component =
     ActionList filters -> HH.slot_ ActionList._actionList unit ActionList.component filters
     ActionDetail actionId -> HH.slot_ ActionDetail._actionDetail unit ActionDetail.component actionId
     VoteList filters -> HH.slot_ VoteList._voteList unit VoteList.component filters
+    SpoList filters -> HH.slot_ SpoList._spoList unit SpoList.component filters
+    Committee -> HH.slot_ Committee._committee unit Committee.component unit
     Methodology filters -> HH.slot_ Methodology._methodology unit Methodology.component filters
     NotFound -> renderNotFound
 
@@ -162,5 +168,7 @@ documentTitle = case _ of
   ActionList _ -> "Governance actions — Palmares"
   ActionDetail _ -> "Proposal — Palmares"
   VoteList _ -> "Votes — Palmares"
+  SpoList _ -> "Stake pool operators — Palmares"
+  Committee -> "Constitutional committee — Palmares"
   Methodology _ -> "Methodology — Palmares"
   NotFound -> "Not found — Palmares"

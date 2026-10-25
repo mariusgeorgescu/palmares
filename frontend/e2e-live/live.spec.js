@@ -19,6 +19,8 @@ const ROUTES = [
   ['/dreps', 'DReps — Palmares'],
   ['/gov-actions', 'Governance actions — Palmares'],
   ['/votes', 'Votes — Palmares'],
+  ['/spos', 'Stake pool operators — Palmares'],
+  ['/committee', 'Constitutional committee — Palmares'],
   ['/methodology', 'Methodology — Palmares'],
 ];
 

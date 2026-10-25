@@ -17,6 +17,8 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getVotes
   , searchAll
   , getFormulas
+  , getSpos
+  , getCommittee
   ) where
 
 import Prelude
@@ -31,12 +33,14 @@ import Capabilities.Query.Gov.Types
   , Formula
   , GovStatus
   , SearchResults
+  , SpoPage
+  , CommitteeState
   , VotePage
   )
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Halogen (HalogenM)
-import Route.GovQueries (DRepFilters, GovActionFilters, VoteFilters)
+import Route.GovQueries (DRepFilters, GovActionFilters, SpoFilters, VoteFilters)
 
 class Monad m <= MonadQueryGov m where
   -- | `GET /status` — rețeaua, epoca, lag-ul, pragurile și starea proiectorului, într-un singur
@@ -74,6 +78,14 @@ class Monad m <= MonadQueryGov m where
   -- | `GET /metrics/formulas` — un array nud cu toate formulele publicate, SQL inclus.
   getFormulas :: m (Either ApiError (Array Formula))
 
+  -- | `GET /spos` — operatorii cu putere de vot. Fără compozit de pagină și fără faceturi: plicul
+  -- | poartă tot ce randează tabelul, iar singurele controale sunt sortarea și paginarea.
+  getSpos :: SpoFilters -> m (Either ApiError SpoPage)
+
+  -- | `GET /committee` — comitetul ÎNTREG, nu o pagină de membri: cvorumul e o proprietate a
+  -- | corpului, iar trei membri nu au nevoie de paginare.
+  getCommittee :: m (Either ApiError CommitteeState)
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
@@ -86,3 +98,5 @@ instance monadQueryGovHalogenM ::
   getVotes = lift <<< getVotes
   searchAll = lift <<< searchAll
   getFormulas = lift getFormulas
+  getSpos = lift <<< getSpos
+  getCommittee = lift getCommittee

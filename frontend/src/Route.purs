@@ -10,9 +10,11 @@ import Route.GovQueries
   ( DRepFilters
   , GovActionFilters
   , MethodologyFilters
+  , SpoFilters
   , VoteFilters
   , renderDRepFilters
   , renderGovActionFilters
+  , renderSpoFilters
   , renderVoteFilters
   )
 
@@ -30,6 +32,8 @@ data Route
   | ActionDetail String
   | ActionList GovActionFilters
   | VoteList VoteFilters
+  | SpoList SpoFilters
+  | Committee
   | Methodology MethodologyFilters
   | NotFound
 
@@ -50,5 +54,7 @@ instance Show Route where
     ActionDetail i -> "ActionDetail " <> i
     ActionList f -> "ActionList " <> renderGovActionFilters f
     VoteList f -> "VoteList " <> renderVoteFilters f
+    SpoList f -> "SpoList " <> renderSpoFilters f
+    Committee -> "Committee"
     Methodology f -> "Methodology " <> fromMaybe "" f.focus
     NotFound -> "NotFound"

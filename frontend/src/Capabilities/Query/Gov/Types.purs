@@ -46,6 +46,10 @@ module Capabilities.Query.Gov.Types
   , SearchGroup(..)
   , SearchResults(..)
   , Formula(..)
+  , SpoRow(..)
+  , SpoPage(..)
+  , CommitteeMember(..)
+  , CommitteeState(..)
   ) where
 
 import Prelude
@@ -494,7 +498,9 @@ instance DecodeJson DRepExplorerPage where
       )
 
 -- | Un punct în lanț: slotul, epoca, ora și tranzacția. Apare peste tot unde un eveniment trebuie
--- | să poată fi verificat de cineva care nu ne crede pe cuvânt — de aceea `txHash` nu e opțional.
+-- | să poată fi verificat de cineva care nu ne crede pe cuvânt. `txHash` lipseşte TOTUŞI la
+-- | evenimentele de graniţă de epocă — expirări, schimbări de stare — pe care nu le-a provocat
+-- | nicio tranzacţie.
 newtype ChainPoint = ChainPoint
   { slot :: Int
   , epoch :: Int
@@ -1239,3 +1245,133 @@ chipStateFor (GovStatus s) =
     Nothing -> 0
     Just (AttestSync a) -> a.lagSeconds
   worstLag = max govLag attestLag
+
+-- | Un operator de pool, cu puterea de vot și ce a făcut cu ea.
+-- |
+-- | Două câmpuri sunt `null` pe TOATE cele 511 rânduri măsurate pe preprod, și asta e o proprietate
+-- | a rețelei, nu un accident de eșantion:
+-- |
+-- |   * `ticker` vine din metadatele off-chain ale pool-ului, pe care db-sync le aduce doar cu
+-- |     `--fetch-pool-metadata`; fără el coloana e goală pentru toți;
+-- |   * `participation_rate` cere un denominator — acțiunile pe care SPO-ul avea drept de vot — iar
+-- |     pe preprod nu există încă o fereastră în care să fi fost eligibil și să se fi măsurat.
+-- |
+-- | Ecranul nu le ascunde și nu le pune 0: spune că nu sunt, pentru că „0%" ar fi o acuzație.
+newtype SpoRow = SpoRow
+  { poolId :: String
+  , ticker :: Maybe String
+  , votingPower :: Lovelace
+  , votingPowerEpoch :: Int
+  , delegatorCount :: Int
+  , votesCast :: Int
+  , participationRate :: Maybe Number
+  }
+
+derive instance Eq SpoRow
+
+instance DecodeJson SpoRow where
+  decodeJson json = do
+    o <- decodeJson json
+    poolId <- o .: "pool_id"
+    ticker <- o .:? "ticker"
+    votingPower <- o .: "voting_power"
+    votingPowerEpoch <- o .: "voting_power_epoch"
+    delegatorCount <- o .: "delegator_count"
+    votesCast <- o .: "votes_cast"
+    participationRate <- o .:? "participation_rate"
+    pure
+      ( SpoRow
+          { poolId
+          , ticker
+          , votingPower
+          , votingPowerEpoch
+          , delegatorCount
+          , votesCast
+          , participationRate
+          }
+      )
+
+newtype SpoPage = SpoPage
+  { items :: Array SpoRow
+  , total :: Int
+  , limit :: Int
+  , offset :: Int
+  }
+
+derive instance Eq SpoPage
+
+instance DecodeJson SpoPage where
+  decodeJson json = do
+    o <- decodeJson json
+    items <- o .: "items"
+    total <- o .: "total"
+    limit <- o .: "limit"
+    offset <- o .: "offset"
+    pure (SpoPage { items, total, limit, offset })
+
+-- | Un membru al comitetului constituțional.
+-- |
+-- | `hotHash` lipsește înainte ca membrul să-și autorizeze cheia fierbinte — adică exact în
+-- | intervalul în care e numit dar nu poate vota — iar `resignedAt` lipsește pentru toți cei care
+-- | n-au demisionat, care sunt majoritatea. Amândouă sunt informație, nu goluri.
+newtype CommitteeMember = CommitteeMember
+  { coldHash :: String
+  , coldBech32 :: String
+  , hotHash :: Maybe String
+  , expirationEpoch :: Int
+  , status :: String
+  , votesCast :: Int
+  , authorizedAt :: Maybe ChainPoint
+  , resignedAt :: Maybe ChainPoint
+  }
+
+derive instance Eq CommitteeMember
+
+instance DecodeJson CommitteeMember where
+  decodeJson json = do
+    o <- decodeJson json
+    coldHash <- o .: "cold_hash"
+    coldBech32 <- o .: "cold_bech32"
+    hotHash <- o .:? "hot_hash"
+    expirationEpoch <- o .: "expiration_epoch"
+    status <- o .: "status"
+    votesCast <- o .: "votes_cast"
+    authorizedAt <- o .:? "authorized_at"
+    resignedAt <- o .:? "resigned_at"
+    pure
+      ( CommitteeMember
+          { coldHash
+          , coldBech32
+          , hotHash
+          , expirationEpoch
+          , status
+          , votesCast
+          , authorizedAt
+          , resignedAt
+          }
+      )
+
+-- | Comitetul ca ÎNTREG: cvorumul e o proprietate a corpului, nu a membrilor, iar un ecran care
+-- | listează doar membrii nu răspunde la întrebarea pentru care se deschide — câte voturi trebuie
+-- | ca un vot al comitetului să conteze.
+-- |
+-- | `establishedBy` e acțiunea care l-a instalat: comitetul inițial, cel din genesis, n-are una.
+newtype CommitteeState = CommitteeState
+  { quorumNumerator :: Int
+  , quorumDenominator :: Int
+  , establishedBy :: Maybe String
+  , epoch :: Int
+  , members :: Array CommitteeMember
+  }
+
+derive instance Eq CommitteeState
+
+instance DecodeJson CommitteeState where
+  decodeJson json = do
+    o <- decodeJson json
+    quorumNumerator <- o .: "quorum_numerator"
+    quorumDenominator <- o .: "quorum_denominator"
+    establishedBy <- o .:? "established_by"
+    epoch <- o .: "epoch"
+    members <- o .: "members"
+    pure (CommitteeState { quorumNumerator, quorumDenominator, establishedBy, epoch, members })

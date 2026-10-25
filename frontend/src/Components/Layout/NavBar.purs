@@ -36,6 +36,7 @@ import Route.GovQueries
   , emptyDRepFilters
   , emptyGovActionFilters
   , emptyMethodologyFilters
+  , emptySpoFilters
   )
 import Store as Store
 import Type.Proxy (Proxy(..))
@@ -133,6 +134,8 @@ component =
     navItems =
       [ navLink st.route Home "Home"
       , navLink st.route (DRepList emptyDRepFilters) "DReps"
+      , navLink st.route (SpoList emptySpoFilters) "SPOs"
+      , navLink st.route Committee "Committee"
       , navLink st.route (ActionList emptyGovActionFilters) "Actions"
       , navLink st.route (VoteList defaultVoteFilters) "Votes"
       , navLink st.route (Methodology emptyMethodologyFilters) "Methodology"
@@ -229,5 +232,7 @@ sameSection a b = section a == section b
     ActionList _ -> "actions"
     ActionDetail _ -> "actions"
     VoteList _ -> "votes"
+    SpoList _ -> "spos"
+    Committee -> "committee"
     Methodology _ -> "methodology"
     NotFound -> "none"

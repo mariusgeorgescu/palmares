@@ -20,6 +20,8 @@ import Capabilities.Query.Gov.Mock
   , getGovActionDetailMock
   , getGovActionsMock
   , getFormulasMock
+  , getSposMock
+  , getCommitteeMock
   , getStatusMock
   , getVotesMock
   , searchAllMock
@@ -98,3 +100,5 @@ instance MonadQueryGov DemoM where
   getVotes = getVotesMock
   searchAll = searchAllMock
   getFormulas = getFormulasMock
+  getSpos = getSposMock
+  getCommittee = getCommitteeMock
