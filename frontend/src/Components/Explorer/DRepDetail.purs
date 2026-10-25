@@ -215,8 +215,15 @@ component =
               , case s.registeredAt of
                   Nothing -> HH.text ""
                   Just at ->
-                    HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
-                      [ HH.text ("registered " <> at <> maybe "" (\d -> " (" <> formatInt d <> " days ago)") s.ageDays) ]
+                    -- Data, nu marca de timp ISO: ora exacta ramine in `title`, ca peste tot
+                    -- altundeva pe site. „2024-09-06T23:10:12Z" intr-o propozitie e date brute
+                    -- scapate in pagina.
+                    HH.span [ HP.class_ (HH.ClassName "opacity-70"), HP.title at ]
+                      [ HH.text
+                          ( "registered " <> formatDay at
+                              <> maybe "" (\d -> " (" <> formatInt d <> " days ago)") s.ageDays
+                          )
+                      ]
               , HH.span [ HP.class_ (HH.ClassName "opacity-70") ]
                   [ HH.text (maybe "no declared language" (\l -> "language: " <> l) s.language) ]
               ]
