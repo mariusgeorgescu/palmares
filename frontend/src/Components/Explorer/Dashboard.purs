@@ -119,7 +119,11 @@ component =
     }
   where
   handleAction = case _ of
-    Initialize -> load
+    -- `H.fork`, nu `load` direct: initializatorul unui copil ține deschisă inițializarea
+    -- PĂRINTELUI, iar părintele e cel care pune titlul documentului. Măsurat pe deploy:
+    -- `/activity` răspunde în 12 secunde pe baza vie, iar tab-ul scria titlul generic tot timpul
+    -- ăla. Un ecran lent nu are voie să țină în loc cadrul aplicației.
+    Initialize -> void (H.fork load)
     Retry -> load
 
   load = do

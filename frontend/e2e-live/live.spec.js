@@ -49,6 +49,11 @@ test.describe('the deployed site', () => {
       expect(response.status()).toBe(200);
       // Titlul e per-rută, deci dovedește că routerul a citit adresa cerută. Un SPA care cade
       // înapoi pe pagina de pornire ar servi tot 200.
+      //
+      // E ȘI testul de ordonare: `toHaveTitle` așteaptă cinci secunde, iar titlul se pune în
+      // inițializarea rădăcinii. Dacă un ecran blochează inițializarea pe cererea lui, linia asta
+      // cade pe orice rută lentă — și chiar a căzut, pe `/activity`, care răspunde în 12 secunde
+      // pe baza vie.
       await expect(page).toHaveTitle(title);
       await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
     });

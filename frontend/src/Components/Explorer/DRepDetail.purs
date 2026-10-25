@@ -122,7 +122,8 @@ component =
     Initialize -> do
       o <- liftEffect (window >>= location >>= origin)
       H.modify_ _ { origin = o }
-      load
+      -- Vezi celelalte ecrane: cererea nu ține în loc inițializarea părintelui, care pune titlul.
+      void (H.fork load)
     Retry -> load
     Receive drepId -> do
       st <- H.get

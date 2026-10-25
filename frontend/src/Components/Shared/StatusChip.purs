@@ -56,14 +56,18 @@ component =
     }
   where
   handleAction = case _ of
-    Initialize -> do
-      H.modify_ _ { status = Loading }
-      res <- getStatus
-      H.modify_ _
-        { status = case res of
-            Left e -> Failure e
-            Right s -> Success s
-        }
+    -- Banda de stare e PRIMUL lucru de pe fiecare ecran și stă în afara slotului de rută, deci
+    -- cererea ei ar ține în loc inițializarea întregii aplicații — inclusiv titlul documentului.
+    Initialize -> void (H.fork load)
+
+  load = do
+    H.modify_ _ { status = Loading }
+    res <- getStatus
+    H.modify_ _
+      { status = case res of
+          Left e -> Failure e
+          Right s -> Success s
+      }
 
   render st = case st.status of
     NotAsked -> badge Unknown "status unknown"
