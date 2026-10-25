@@ -15,6 +15,7 @@ import Route.GovQueries
   , delegationFiltersCodec
   , drepFiltersCodec
   , govActionFiltersCodec
+  , embedFiltersCodec
   , graphFiltersCodec
   , methodologyCodec
   , registryFiltersCodec
@@ -44,6 +45,7 @@ routeCodec = root $ sum
   , "AttestationList": path "attestations" registryFiltersCodec
   , "DisputeList": path "disputes" registryFiltersCodec
   , "Graph": path "graph" graphFiltersCodec
+  , "Embed": path "embed" embedFiltersCodec
   , "Methodology": path "methodology" methodologyCodec
   , "NotFound": path "__not_found__" noArgs
   }

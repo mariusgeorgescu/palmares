@@ -41,13 +41,14 @@ import Capabilities.Query.Gov.Types
   , WithdrawalRow(..)
   )
 import Components.Explorer.DelegationList (isStandingChoice, standingLabel)
+import Components.Embed (embedSnippet)
 import Components.Explorer.Graph (buildGraph)
 import Route as R
 import Route.Codec (parseRoute, printRoute)
-import Data.Array (any, filter)
-import Data.Array (head, length)
+import Data.Array (all, any, elem, filter, head, length, nub)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust, isNothing)
+import Data.String as String
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 
@@ -173,17 +174,31 @@ spec = do
         `shouldEqual` R.Graph { drep: Just "drep1abc" }
       parseRoute "/graph" `shouldEqual` R.Graph { drep: Nothing }
 
+  describe "the embed snippet" do
+    it "is absolute, titled and lazy" do
+      -- Absolut: un `src` relativ pe site-ul altcuiva ar arata spre originea LUI. Titlu: un
+      -- `iframe` fara nume se anunta ca „frame" la cititoarele de ecran. Lazy: o pagina cu zece
+      -- fise n-are de ce sa faca zece cereri inainte sa se vada ceva.
+      let snip = embedSnippet "https://gov.cardano.vip" "drep1abc"
+      String.contains (String.Pattern "src=\"https://gov.cardano.vip/embed?drep=drep1abc\"") snip
+        `shouldEqual` true
+      String.contains (String.Pattern "title=") snip `shouldEqual` true
+      String.contains (String.Pattern "loading=\"lazy\"") snip `shouldEqual` true
+
   describe "the delegation graph" do
-    it "puts the representative in the middle, once" do
+    it "gives every edge two endpoints that exist, and exactly one centre" do
       case (decodeFixture delegationListFixture :: Either ApiError DelegationPage) of
         Left e -> fail ("fixture did not decode: " <> show e)
         Right (DelegationPage p) -> do
-          let g = buildGraph "drep1root" p.items
-          -- Radacina plus cite un nod per delegator. Daca radacina ar fi dedusa din rinduri in loc
-          -- sa fie data, un DRep fara delegari n-ar avea centru si graful ar fi gol in loc de
-          -- „niciun delegator".
-          length g.nodes `shouldEqual` (length p.items + 1)
+          let
+            g = buildGraph "drep1root" p.items
+            ids = map _.id g.nodes
+          -- Invarianta a carei incalcare a rupt pagina: Cytoscape arunca „Can not create edge with
+          -- nonexistant target", iar eroarea omora tot ciclul de initializare — inclusiv titlul
+          -- documentului, pus in aceeasi secventa.
+          all (\e -> elem e.source ids && elem e.target ids) g.edges `shouldEqual` true
           length (filter (\n -> n.isRoot) g.nodes) `shouldEqual` 1
+          length (nub ids) `shouldEqual` length ids
           length g.edges `shouldEqual` length p.items
 
     it "draws a representative with no delegators as a lone centre, not an empty canvas" do

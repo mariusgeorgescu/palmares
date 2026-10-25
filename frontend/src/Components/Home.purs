@@ -14,6 +14,7 @@ import Components.Explorer.Committee as Committee
 import Components.Explorer.Activity as Activity
 import Components.Explorer.AttestationList as AttestationList
 import Components.Explorer.DisputeList as DisputeList
+import Components.Embed as Embed
 import Components.Explorer.Graph as Graph
 import Components.Explorer.Dashboard as Dashboard
 import Components.Explorer.DelegationList as DelegationList
@@ -75,6 +76,7 @@ type Slots =
   , attestationList :: AttestationList.Slot
   , disputeList :: DisputeList.Slot
   , graph :: Graph.Slot
+  , embed :: Embed.Slot
   , voteList :: VoteList.Slot
   , methodology :: Methodology.Slot
   )
@@ -126,6 +128,14 @@ component =
     H.modify_ _ { route = route }
     liftEffect (window >>= document >>= setTitle (documentTitle route))
 
+  -- Fișa de încorporat se randează FĂRĂ cadru: fără bară, fără bandă de prospețime, fără linkul
+  -- de sărire. Ce se pune pe site-ul altcuiva trebuie să fie fapta, nu produsul nostru în
+  -- miniatură — iar o bară de navigare într-un cadru de 380px e doar zgomot pe care nimeni nu-l
+  -- poate folosi.
+  render { route: Embed filters } =
+    HH.div [ HP.class_ (HH.ClassName "bg-base-100") ]
+      [ HH.slot_ Embed._embed unit Embed.component filters ]
+
   render st =
     HH.div [ HP.class_ (HH.ClassName "min-h-screen bg-base-100") ]
       -- Linkul de sărire e primul lucru tabulabil din pagină și se vede doar când îl ții cu
@@ -165,6 +175,7 @@ component =
     AttestationList filters -> HH.slot_ AttestationList._attestationList unit AttestationList.component filters
     DisputeList filters -> HH.slot_ DisputeList._disputeList unit DisputeList.component filters
     Graph filters -> HH.slot_ Graph._graph unit Graph.component filters
+    Embed filters -> HH.slot_ Embed._embed unit Embed.component filters
     Methodology filters -> HH.slot_ Methodology._methodology unit Methodology.component filters
     NotFound -> renderNotFound
 
@@ -198,5 +209,6 @@ documentTitle = case _ of
   AttestationList _ -> "Attestations — Palmares"
   DisputeList _ -> "Disputes — Palmares"
   Graph _ -> "Delegation graph — Palmares"
+  Embed _ -> "Palmares governance record"
   Methodology _ -> "Methodology — Palmares"
   NotFound -> "Not found — Palmares"

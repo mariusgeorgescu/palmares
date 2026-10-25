@@ -61,6 +61,10 @@ module Route.GovQueries
   , activityFiltersCodec
   , activityPath
   , activityHrefFor
+  , EmbedFilters
+  , emptyEmbedFilters
+  , embedPreviewHref
+  , embedFiltersCodec
   , GraphFilters
   , emptyGraphFilters
   , graphFiltersCodec
@@ -289,6 +293,19 @@ actionListHrefFor f = actionListPath <> renderGovActionFilters f
 -- | deci ar cere pagina listei în loc de acțiune.
 actionDetailHrefFor :: String -> String
 actionDetailHrefFor actionId = actionListPath <> "/" <> encodePathSegment actionId
+
+-- | Fișa de încorporat primește DRep-ul tot prin URL, pentru că `iframe`-ul de pe site-ul gazdă
+-- | n-are alt canal: `src` e tot ce poate să trimită.
+type EmbedFilters = { drep :: Maybe String }
+
+emptyEmbedFilters :: EmbedFilters
+emptyEmbedFilters = { drep: Nothing }
+
+embedFiltersCodec :: RouteDuplex' EmbedFilters
+embedFiltersCodec = record # prop (Proxy :: Proxy "drep") (optional (param "drep"))
+
+embedPreviewHref :: String -> String
+embedPreviewHref drepId = "/embed?drep=" <> encodeQueryValue drepId
 
 -- | Graful se desenează în jurul unui singur DRep, iar acela vine din URL: un graf partajat
 -- | trebuie să se deschidă la fel la celălalt capăt.

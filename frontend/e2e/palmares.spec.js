@@ -199,6 +199,7 @@ test.describe('at phone width', () => {
     '/disputes',
     '/graph',
     '/graph?drep=drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z',
+    '/embed?drep=drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z',
     '/gov-actions',
     '/gov-actions/90de87d46e6345118c01dc5ec701b4dce5621ffa3b1f98a3d55eb34e85da7392%230',
     '/votes',
@@ -297,3 +298,23 @@ for (const route of [
     expect(hit && text.slice(Math.max(0, hit.index - 40), hit.index + 20), `${route} leaks a constructor`).toBeFalsy();
   });
 }
+
+// Check 15: fisa se pune pe site-ul altcuiva ca `iframe`. Testul e exact afirmatia aceea — o
+// pagina straina, un `iframe` catre noi, si continutul randat inauntru. Daca cineva adauga vreodata
+// `X-Frame-Options` pe BFF, widgetul moare in tacere pe toate site-urile care l-au pus; aici cade
+// zgomotos.
+test('the embed card renders inside an iframe on a foreign page', async ({ page, baseURL }) => {
+  const drep = 'drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z';
+  await page.setContent(
+    `<!doctype html><html><body><h1>Someone else's site</h1>
+     <iframe id="w" src="${baseURL}/embed?drep=${drep}" title="Palmares governance record"
+             width="380" height="220" style="border:0"></iframe></body></html>`
+  );
+  const frame = page.frameLocator('#w');
+  await expect(frame.getByText('Voting power')).toBeVisible();
+  await expect(frame.getByText(drep.slice(0, 12), { exact: false })).toBeVisible();
+  // Linkul inapoi iese din cadru, altfel Palmares s-ar deschide intr-o fereastra de 380px.
+  await expect(frame.getByRole('link', { name: /full record/ })).toHaveAttribute('target', '_top');
+  // Si NU randeaza produsul nostru in miniatura: fara bara de navigare in cadru.
+  await expect(frame.getByRole('navigation', { name: 'Main' })).toHaveCount(0);
+});

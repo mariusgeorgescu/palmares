@@ -42,15 +42,20 @@ import Data.Foldable (maximum, minimum)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
+import Effect.Class (class MonadEffect, liftEffect)
 import Data.String as String
 import Data.Tuple (Tuple(..))
 import Format (formatAda, formatDay, formatHours, formatInt, formatPercent, humanize, pluralize)
+import Components.Embed (embedSnippet)
 import Halogen as H
+import Web.HTML (window)
+import Web.HTML.Location (origin)
+import Web.HTML.Window (location)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.RemoteData (RemoteData(..))
-import Route.GovQueries (drepListHrefFor, emptyDRepFilters, methodologyHrefFor, votesForDRepHref)
+import Route.GovQueries (embedPreviewHref, drepListHrefFor, emptyDRepFilters, methodologyHrefFor, votesForDRepHref)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -65,6 +70,10 @@ type Input = String
 type State =
   { drepId :: String
   , page :: RemoteData ApiError DRepDetail
+  -- Originea se citește din browser, nu se scrie în cod: fragmentul de încorporat trebuie să
+  -- arate spre DEPLOYUL de pe care l-a copiat cineva, iar o constantă ar da unui tester local un
+  -- `iframe` către producție.
+  , origin :: String
   }
 
 data Action
@@ -96,10 +105,11 @@ latencyLabel hours sample = case hours of
 component
   :: forall q m
    . MonadQueryGov m
+  => MonadEffect m
   => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: \drepId -> { drepId, page: NotAsked }
+    { initialState: \drepId -> { drepId, page: NotAsked, origin: "" }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -109,7 +119,10 @@ component =
     }
   where
   handleAction = case _ of
-    Initialize -> load
+    Initialize -> do
+      o <- liftEffect (window >>= location >>= origin)
+      H.modify_ _ { origin = o }
+      load
     Retry -> load
     Receive drepId -> do
       st <- H.get
@@ -135,7 +148,7 @@ component =
           NotAsked -> loading
           Loading -> loading
           Failure e -> failure st.drepId e
-          Success p -> renderDetail p
+          Success p -> renderDetail st.origin p
       ]
 
   loading =
@@ -164,7 +177,7 @@ component =
           ]
       ]
 
-  renderDetail (DRepDetail d) =
+  renderDetail origin' (DRepDetail d) =
     HH.div [ HP.class_ (HH.ClassName "space-y-4") ]
       [ identityCard d.drep
       , votesLink d.drep
@@ -178,7 +191,34 @@ component =
       , topDelegatorsCard d.topDelegators
       , updatesCard d.updates
       , anchorCard d.drep d.anchorContent d.updates
+      , embedCard origin' d.drep
       , formulasNote d.metrics
+      ]
+
+  -- Fișa de încorporat există pentru că cineva — un DRep, un jurnalist, un site de comunitate —
+  -- vrea să PUNĂ fapta pe pagina lui, nu să trimită un link. Ca `iframe` și nu ca `<script>`:
+  -- serverul rulează cu o allowlist de origini fail-closed, deci un script de pe alt site n-ar
+  -- putea citi niciun răspuns al API-ului, pe cînd `iframe`-ul cere pagina de la noi și cererile
+  -- lui sînt same-origin.
+  --
+  -- `details`/`summary` și nu un buton cu stare: e închis la intrare, deschis de cine-l caută, și
+  -- nu adaugă un al doilea loc în care starea ecranului se poate desincroniza.
+  embedCard origin' (DRepSummary s) =
+    HH.details [ HP.class_ (HH.ClassName "card bg-base-200") ]
+      [ HH.summary [ HP.class_ (HH.ClassName "card-body py-3 cursor-pointer text-sm font-medium") ]
+          [ HH.text "Embed this record on your own site" ]
+      , HH.div [ HP.class_ (HH.ClassName "card-body pt-0 gap-2") ]
+          [ HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
+              [ HH.text "Copy this into your page. It renders the figures above, live, and links back here." ]
+          , HH.pre [ HP.class_ (HH.ClassName "bg-base-300 rounded p-2 overflow-x-auto text-xs") ]
+              [ HH.code_ [ HH.text (embedSnippet origin' s.id) ] ]
+          , HH.a
+              [ HP.href (embedPreviewHref s.id)
+              , HP.class_ (HH.ClassName "link link-hover text-xs")
+              , HP.target "_blank"
+              ]
+              [ HH.text "Open the card on its own →" ]
+          ]
       ]
 
   -- Istoricul de voturi nu e lipit aici: e propriul ecran, cu propria paginare și propriile
