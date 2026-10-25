@@ -91,7 +91,10 @@ pluralize n word = formatInt n <> " " <> word <> (if n == 1 then "" else "s")
 -- | 1–0" e o propoziție care nu înseamnă nimic, iar un tabel gol sub ea arată ca un defect.
 matchLine :: Int -> Int -> Int -> String -> String
 matchLine total offset shown noun =
-  if total == 0 || shown == 0 then "No " <> noun <> "s match these filters."
+  -- Zero rezultate nu se scrie AICI: cardul de dedesubt o spune deja, si o spune mai bine,
+  -- pentru ca stie daca exista filtre. Doua propozitii identice una sub alta erau prima
+  -- impresie a ecranului pe un deploy fara date.
+  if total == 0 || shown == 0 then ""
   else
     pluralize total noun <> " match, showing "
       <> formatInt (offset + 1)

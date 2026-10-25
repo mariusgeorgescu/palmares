@@ -246,7 +246,7 @@ component =
   emptyState st =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
-          [ HH.p_ [ HH.text "No proposals match these filters." ]
+          [ HH.p_ [ HH.text (if hasAnyFilter st.filters then "No proposals match these filters." else "No proposals have been recorded yet.") ]
           , if hasAnyFilter st.filters then
               HH.a
                 [ HP.href (actionListHrefFor emptyGovActionFilters)

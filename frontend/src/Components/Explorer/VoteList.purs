@@ -275,15 +275,25 @@ component =
           ]
       ]
 
-  emptyState _ =
+  -- Ecranul de voturi porneste MEREU cu un filtru (`is_final=true`), deci „niciun vot nu se
+  -- potriveste" ar fi adevarat si pe un lant fara niciun vot — iar butonul care duce inapoi la
+  -- filtrele implicite ar duce exact unde esti deja.
+  emptyState st =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
-          [ HH.p_ [ HH.text "No votes match these filters." ]
-          , HH.a
-              [ HP.href (voteListHrefFor defaultVoteFilters)
-              , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+          [ HH.p_
+              [ HH.text
+                  ( if st.filters == defaultVoteFilters then "No votes have been recorded yet."
+                    else "No votes match these filters."
+                  )
               ]
-              [ HH.text "Back to final votes" ]
+          , if st.filters == defaultVoteFilters then HH.text ""
+            else
+              HH.a
+                [ HP.href (voteListHrefFor defaultVoteFilters)
+                , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+                ]
+                [ HH.text "Back to final votes" ]
           ]
       ]
 

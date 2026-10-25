@@ -8,7 +8,7 @@ import Components.Shared.DRepIdentity (identityText, shortId)
 import Data.Array (replicate)
 import Data.Maybe (Maybe(..))
 import Data.String as String
-import Format (formatAda, formatInt, formatPercent, groupDigits, humanize, pluralize, roleLabel)
+import Format (formatAda, formatInt, formatPercent, groupDigits, humanize, matchLine, pluralize, roleLabel)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
@@ -45,6 +45,16 @@ spec = do
 
     it "renders exactly a thousand ADA with separators" do
       formatAda 1000000000.0 `shouldEqual` "1,000 ADA"
+
+  describe "matchLine" do
+    it "says nothing when there is nothing, because the empty card says it better" do
+      -- Masurat pe deployul de preprod: linia si cardul de sub ea scriau aceeasi propozitie, una
+      -- sub alta, si asta era tot ce se vedea pe ecran.
+      matchLine 0 0 0 "DRep" `shouldEqual` ""
+      matchLine 12 0 0 "DRep" `shouldEqual` ""
+
+    it "counts the whole set and names the page inside it" do
+      matchLine 294 20 20 "DRep" `shouldEqual` "294 DReps match, showing 21–40"
 
   describe "formatPercent" do
     it "says n/a for an absent metric, never 0%" do
