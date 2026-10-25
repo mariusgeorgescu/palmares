@@ -10,6 +10,7 @@ import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
+import Components.Explorer.Dashboard as Dashboard
 import Components.Layout.NavBar as NavBar
 import Components.Shared.StatusChip as StatusChip
 import Data.Const (Const)
@@ -40,6 +41,7 @@ data Action
 type Slots =
   ( navbar :: NavBar.Slot
   , statusChip :: StatusChip.Slot
+  , dashboard :: Dashboard.Slot
   )
 
 component
@@ -82,26 +84,8 @@ component =
       ]
 
   renderRoute = case _ of
-    Home -> renderHomePage
+    Home -> HH.slot_ Dashboard._dashboard unit Dashboard.component unit
     NotFound -> renderNotFound
-
-  renderHomePage =
-    HH.div [ HP.class_ (HH.ClassName "container mx-auto p-6") ]
-      [ HH.div [ HP.class_ (HH.ClassName "hero bg-base-200 rounded-box") ]
-          [ HH.div [ HP.class_ (HH.ClassName "hero-content text-center") ]
-              [ HH.div [ HP.class_ (HH.ClassName "max-w-2xl") ]
-                  [ HH.h1 [ HP.class_ (HH.ClassName "text-5xl font-bold") ]
-                      [ HH.text "Palmares" ]
-                  , HH.p [ HP.class_ (HH.ClassName "py-6") ]
-                      [ HH.text
-                          "A verifiable track record for Cardano governance. Every figure here is \
-                          \derived independently from the chain, and every metric resolves to a \
-                          \published formula."
-                      ]
-                  ]
-              ]
-          ]
-      ]
 
   renderNotFound =
     HH.div [ HP.class_ (HH.ClassName "container mx-auto p-12 text-center space-y-4") ]

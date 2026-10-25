@@ -9,12 +9,13 @@
 module Capabilities.Query.Gov.MonadQueryGov
   ( class MonadQueryGov
   , getStatus
+  , getDashboard
   ) where
 
 import Prelude
 
 import Capabilities.Query.Gov.Http (ApiError)
-import Capabilities.Query.Gov.Types (GovStatus)
+import Capabilities.Query.Gov.Types (DashboardPage, GovStatus)
 import Control.Monad.Trans.Class (lift)
 import Data.Either (Either)
 import Halogen (HalogenM)
@@ -24,7 +25,13 @@ class Monad m <= MonadQueryGov m where
   -- | apel. Nu există un al doilea.
   getStatus :: m (Either ApiError GovStatus)
 
+  -- | `GET /pages/dashboard` — tot ecranul de pornire într-un apel. Fără parametri: serverul are
+  -- | deja valori implicite potrivite (`top_limit` 10, `closing_soon_limit` 5, `epochs` 20) și
+  -- | niciun control din UI nu le schimbă. Când apare un control, parametrii intră aici.
+  getDashboard :: m (Either ApiError DashboardPage)
+
 instance monadQueryGovHalogenM ::
   MonadQueryGov m =>
   MonadQueryGov (HalogenM st act slots msg m) where
   getStatus = lift getStatus
+  getDashboard = lift getDashboard

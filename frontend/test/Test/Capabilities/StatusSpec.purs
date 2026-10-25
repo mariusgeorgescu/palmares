@@ -4,7 +4,8 @@ module Test.Capabilities.StatusSpec (spec) where
 import Prelude
 
 import Capabilities.Query.Gov.Http (ApiError)
-import Capabilities.Query.Gov.Mock (decodeFixture, statusFixture)
+import Capabilities.Query.Gov.Fixtures (statusFixture)
+import Capabilities.Query.Gov.Mock (decodeFixture)
 import Capabilities.Query.Gov.Types (AttestSync(..), ChipState(..), GovStatus(..), GovSync(..), chipState, chipStateFor)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust, isNothing)

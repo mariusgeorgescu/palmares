@@ -14,7 +14,7 @@ import AppEnv (Env)
 import Capabilities.Delay (class MonadDelay)
 import Capabilities.DomEvent (class MonadDomEvent)
 import Capabilities.LogMessages (class LogMessages)
-import Capabilities.Query.Gov.Default (getStatusDefault)
+import Capabilities.Query.Gov.Default (getDashboardDefault, getStatusDefault)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
 import Cardano.Capabilities.Transaction.MonadInteraction (class MonadInteraction)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
@@ -85,3 +85,4 @@ instance MonadDomEvent AppM where
 
 instance MonadQueryGov AppM where
   getStatus = ask >>= getStatusDefault
+  getDashboard = ask >>= getDashboardDefault

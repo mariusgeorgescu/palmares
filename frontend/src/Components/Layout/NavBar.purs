@@ -79,7 +79,7 @@ component =
               , HE.onClick (NavLinkClicked Home)
               , HP.class_ (HH.ClassName "btn btn-ghost text-xl normal-case")
               ]
-              [ HH.text "Cardano dApp" ]
+              [ HH.text "Palmares" ]
           ]
       , HH.div [ HP.class_ (HH.ClassName "flex-none gap-2") ]
           [ HH.ul [ HP.class_ (HH.ClassName "menu menu-horizontal px-1") ]
