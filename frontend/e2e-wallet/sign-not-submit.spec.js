@@ -143,7 +143,13 @@ test.describe('the wallet really signs, and the bytes stop at the last edge', ()
 
     // 5. Ecranul spune „trimis", nu „confirmat". Două stări distincte, fiindcă sunt două lucruri
     //    diferite, iar un ecran care le confundă minte despre finalitate.
-    await expect(page.getByText(/submitted/i).first()).toBeVisible();
-    await expect(page.getByText(/^confirmed$/i)).toHaveCount(0);
+    // Propoziția exactă, nu `/submitted/i`: textul introductiv al ecranului conține „submitted", la
+    // fel și starea `Signing` („Nothing has been submitted yet."). Aici afirmația nu era vacuă —
+    // dovada e corpul interceptat de mai sus — dar un matcher larg peste copy de interfață e
+    // greșit oricum, și în `m2-1-chain.spec.js` a costat o rulare întreagă.
+    await expect(
+      page.getByText('Submitted. The node has it; it is not in a block yet.')
+    ).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Confirmed on chain/)).toHaveCount(0);
   });
 });

@@ -134,14 +134,25 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
 
     await page.getByRole('button', { name: /Sign and submit/ }).click();
 
-    // „Trimis" e o stare proprie, distinctă de „confirmat", iar testul o citește DE PE ECRAN și nu
-    // dintr-un apel de rețea: ce vede omul e criteriul.
+    // PROPOZIȚIA EXACTĂ a cardului de trimitere, nu `/submitted/i`.
     //
-    // Nu se aștepta pe `wallet.calls('submitTx')`, cum făcea prima variantă, și asta era o eroare
-    // de model: aplicația nu cheamă niciodată `submitTx`-ul portofelului — trimite martorul la
-    // `/submit-tx`, iar serverul asamblează și trimite. Așteptarea aceea n-ar fi venit niciodată.
-    await expect(page.getByText(/submitted/i).first()).toBeVisible({ timeout: 180_000 });
-    console.log(`[m2-1] ${label}: submitted`);
+    // Prima rulare a căzut exact aici, și nu pe lanț: `/submitted/i` prinde textul introductiv al
+    // ecranului — „nothing here is submitted on your behalf" — și îl prinde ÎNAINTE de orice
+    // semnătură. Deci afirmația trecea instantaneu, testul naviga la `/profiles`, iar navigarea
+    // anula semnarea care era în curs. Zero tranzacții trimise, zece minute de așteptare, și un
+    // test „verde" până la pasul următor. Starea `Signing` scrie și ea „Nothing has been submitted
+    // yet.", deci regexul larg ar fi trecut și pe ea.
+    //
+    // Clasa e aceeași cu cea a gărzii pentru `Show (Maybe a)`, unde „Nothing is deleted" din copy
+    // prindea regexul: un matcher larg peste text de interfață prinde copy, nu stare.
+    const card = page.getByText('Submitted. The node has it; it is not in a block yet.');
+    await expect(card).toBeVisible({ timeout: 180_000 });
+
+    // Id-ul tranzacției, de pe ecran — singurul loc unde un om îl vede.
+    const txId = await page.locator('code.font-mono').last().innerText();
+    expect(txId, 'the submitted card shows no transaction id').toMatch(/^[0-9a-f]{64}$/);
+    console.log(`[m2-1] ${label} submitted: ${txId}`);
+    return txId;
   };
 
   const marker = `m2-1-${Date.now()}`;
@@ -153,7 +164,7 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
     await fill(page, 'Name', `${marker}-profile`);
     await fill(page, 'Description', 'M2-1 end-to-end run');
     await fill(page, 'Image URI', 'ipfs://palmares-m2-1');
-    await buildSignSubmit(page, 'profile');
+    const txProfile = await buildSignSubmit(page, 'profile');
 
     // Proiecția trebuie să prindă tranzacția. attest-sync citește Kupo și e la ZERO decalaj pe
     // deploy, deci e o chestiune de un bloc sau două. Guvernanța e în urmă cu sute de epoci, dar
@@ -173,7 +184,7 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
     await fill(page, 'Name', `${marker}-attestation`);
     await fill(page, 'Description', 'issued and countersigned from the browser');
     await fill(page, 'Image URI', 'ipfs://palmares-m2-1');
-    await buildSignSubmit(page, 'attestation');
+    const txAttestation = await buildSignSubmit(page, 'attestation');
 
     await page.goto('/attestations');
     const attRow = page.getByRole('row', { name: new RegExp(`${marker}-attestation`) });
@@ -185,11 +196,15 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
 
     // 3. Contrasemnătura, cu portofelul SUBIECTULUI — aici același, fiindcă subiectul e profilul lui.
     await connect(page, 'accept-attestation', attestationId);
-    await buildSignSubmit(page, 'acceptance');
+    const txAcceptance = await buildSignSubmit(page, 'acceptance');
 
     // 4. Criteriul însuși: rândul arată „accepted".
     await page.goto('/attestations');
     const accepted = page.getByRole('row', { name: new RegExp(`${marker}-attestation`) });
     await expect(accepted.getByText('accepted')).toBeVisible({ timeout: 10 * 60 * 1000 });
+
+    // Cele trei id-uri, pentru jurnal: fără ele „a trecut" nu e o dovadă pe care cineva o poate
+    // verifica pe lanț.
+    console.log(`[m2-1] DONE profile=${txProfile} attestation=${txAttestation} acceptance=${txAcceptance}`);
   });
 });
