@@ -214,11 +214,21 @@ test.describe('every buildable write flow, signed but not submitted', () => {
   // iar la `expire-dispute` nu există tranzacție de semnat. Ce se afirmă aici e că ruta răspunde
   // adevărul: o tranzacție pentru prima, un refuz numit pentru a doua.
 
-  const openDisputeId = async (request) => {
+  // SKIP, nu o aserțiune dură — a treia oară cînd lecția asta mă prinde, deci de data asta o scriu
+  // ca regulă, nu ca excepție.
+  //
+  // Testul cere o dispută NEDECISĂ, iar asta e stare de lanț care se schimbă sub el: azi n-a mai
+  // existat niciuna fiindcă una a fost rezolvată și cealaltă expirată, exact în tura în care cele
+  // două fluxuri au fost închise. Un test care pică fiindcă produsul a făcut ce trebuia e zgomot,
+  // nu semnal — iar sărit, spune limpede ce îi lipsește.
+  const openDisputeOrSkip = async (request) => {
     const d = await (await request.get('/api/query/disputes?limit=200')).json();
     const undecided = d.items.find((x) => !x.verdict);
-    expect(undecided, 'needs an undecided dispute; run remaining-flows-chain.spec.js first')
-      .toBeTruthy();
+    test.skip(
+      !undecided,
+      `No undecided dispute on chain (${d.total} total, all decided), so there is nothing to ` +
+        'resolve or expire. Open one with remaining-flows-chain.spec.js first.'
+    );
     return undecided.id;
   };
 
@@ -227,7 +237,7 @@ test.describe('every buildable write flow, signed but not submitted', () => {
     request,
     wallet,
   }) => {
-    const disputeId = await openDisputeId(request);
+    const disputeId = await openDisputeOrSkip(request);
 
     await withCip142(page);
     await page.goto('/write?flow=resolve-dispute');
@@ -252,7 +262,7 @@ test.describe('every buildable write flow, signed but not submitted', () => {
   });
 
   test('expire-dispute is refused while the deadline stands, and says so', async ({ page, request }) => {
-    const disputeId = await openDisputeId(request);
+    const disputeId = await openDisputeOrSkip(request);
 
     await withCip142(page);
     await page.goto('/write?flow=expire-dispute');
