@@ -45,6 +45,7 @@ routeCodec = root $ sum
   -- Detaliul INAINTEA listei, ca `/profiles/<id>` sa nu fie inghitit de `/profiles`.
   , "ProfileDetail": "profiles" / segment
   , "ProfileList": path "profiles" registryFiltersCodec
+  , "AttestationDetail": "attestations" / segment
   , "AttestationList": path "attestations" registryFiltersCodec
   , "DisputeList": path "disputes" registryFiltersCodec
   , "Graph": path "graph" graphFiltersCodec

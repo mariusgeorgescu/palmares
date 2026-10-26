@@ -16,6 +16,7 @@ import Control.Monad.Reader (class MonadAsk)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Components.Explorer.Committee as Committee
 import Components.Explorer.Activity as Activity
+import Components.Explorer.AttestationDetail as AttestationDetail
 import Components.Explorer.AttestationList as AttestationList
 import Components.Explorer.DisputeList as DisputeList
 import Components.Embed as Embed
@@ -82,6 +83,7 @@ type Slots =
   , activity :: Activity.Slot
   , profileDetail :: ProfileDetail.Slot
   , profileList :: ProfileList.Slot
+  , attestationDetail :: AttestationDetail.Slot
   , attestationList :: AttestationList.Slot
   , disputeList :: DisputeList.Slot
   , graph :: Graph.Slot
@@ -209,6 +211,7 @@ component =
     Activity filters -> HH.slot_ Activity._activity unit Activity.component filters
     ProfileDetail pid -> HH.slot_ ProfileDetail._profileDetail unit ProfileDetail.component pid
     ProfileList filters -> HH.slot_ ProfileList._profileList unit ProfileList.component filters
+    AttestationDetail aid -> HH.slot_ AttestationDetail._attestationDetail unit AttestationDetail.component aid
     AttestationList filters -> HH.slot_ AttestationList._attestationList unit AttestationList.component filters
     DisputeList filters -> HH.slot_ DisputeList._disputeList unit DisputeList.component filters
     Graph filters -> HH.slot_ Graph._graph unit Graph.component filters
@@ -246,6 +249,7 @@ documentTitle = case _ of
   -- Numele profilului nu se stie cind se pune titlul, deci id-ul scurtat, ca la DRep.
   ProfileDetail pid -> shortId pid <> " — Palmares"
   ProfileList _ -> "Profiles — Palmares"
+  AttestationDetail aid -> shortId aid <> " — Palmares"
   AttestationList f ->
     if f.kind == Just "credential_claim" then "Verified credentials — Palmares"
     else "Vouches — Palmares"

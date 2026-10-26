@@ -323,6 +323,7 @@ sameSection a b = section a == section b
     Activity _ -> "activity"
     ProfileDetail _ -> "profiles"
     ProfileList _ -> "profiles"
+    AttestationDetail _ -> "attestations"
     AttestationList _ -> "attestations"
     DisputeList _ -> "disputes"
     Graph _ -> "graph"

@@ -93,6 +93,7 @@ sameSection current target = case current, target of
   ProfileList _, ProfileList _ -> true
   ProfileDetail _, ProfileList _ -> true
   AttestationList _, AttestationList _ -> true
+  AttestationDetail _, AttestationList _ -> true
   DisputeList _, DisputeList _ -> true
   Write _, Write _ -> true
   Activity _, Activity _ -> true

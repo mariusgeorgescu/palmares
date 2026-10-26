@@ -86,6 +86,7 @@ module Route.GovQueries
   , profileDetailHrefFor
   , vouchesAboutHrefFor
   , vouchesByHrefFor
+  , attestationDetailHrefFor
   , disputeListPath
   , disputeListHrefFor
   , MethodologyFilters
@@ -428,6 +429,10 @@ attestationListPath = "/attestations"
 -- | fiindca un ecran nou ar fi fost cod duplicat pentru acelasi tabel.
 verifiedCredentialsPath :: String
 verifiedCredentialsPath = attestationListHrefFor (emptyRegistryFilters { kind = Just "credential_claim" })
+
+-- | Pagina unui singur vouch. Segment, nu parametru: e o adresa pe care o dai cuiva.
+attestationDetailHrefFor :: String -> String
+attestationDetailHrefFor aid = attestationListPath <> "/" <> aid
 
 attestationListHrefFor :: RegistryFilters -> String
 attestationListHrefFor f = attestationListPath <> renderQuery (registryPairs f)

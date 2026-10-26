@@ -20,6 +20,7 @@ module Capabilities.Query.Gov.Fixtures
   , withdrawalListFixture
   , delegationListFixture
   , activityFixture
+  , attestationDetailFixture
   , profileDetailFixture
   , profileListFixture
   , attestationListFixture
@@ -1910,5 +1911,56 @@ profileDetailFixture =
   "claimant_count": 6,
   "slot": 137280273,
   "block_hash": "41f7db42e235aa400456cb50ba6b4519fc33889c4551807fb66c20855e0c0a65"
+}
+"""
+
+-- | O atestare cu disputele ei, pentru `GET /attestations/{id}`. E PRIMA din
+-- | `attestationListFixture`, si subiectul/emitentul ei sint primele doua profiluri din
+-- | `profileListFixture` — ca in bundle-ul demo linkurile paginii sa duca la lucruri care EXISTA.
+-- |
+-- | Are o dispută decisă intentionat: altfel secțiunea de provocări n-ar avea ce randa, iar
+-- | tocmai ea e motivul pentru care pagina asta e o singură cerere.
+attestationDetailFixture :: String
+attestationDetailFixture =
+  """
+{
+  "attestation": {
+    "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010708aa68abb20aa664efe2f68a46d4dc28c0ffe5f20b3dbd01b7ecc9df5",
+    "subject": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043",
+    "issuer": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0de31c9a96041fdeafb91d5d8f6b24f26826b3d740c4fc40090ffcae9",
+    "kind": "audit_passed",
+    "date": "2026-10-24T21:11:39Z",
+    "claimed_period": [ "2025-01-01T00:00:00Z", "2025-12-31T00:00:00Z" ],
+    "credential": null,
+    "accepted": false,
+    "name": "smoke-20261024T205314Z-unresolvable",
+    "description": "unresolvable anchor for smoke-20261024T205314Z",
+    "image_uri": "ipfs://palmares-smoke-placeholder",
+    "other_metadata": [],
+    "slot": 137280366,
+    "block_hash": "d411899af3f25e72d25b703ad775872630c460c0135e28824ddb19c6caf7e39f",
+    "tx_hash": "fe7bf7a1bfe7963d4beeed1d4c4b5c8914e085fb310c5f866a017786ad62c2d3",
+    "output_index": 0,
+    "dispute_count": 1,
+    "open_dispute_count": 0,
+    "upheld_dispute_count": 0
+  },
+  "disputes": [
+    {
+      "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e052db653ab132a1a314476882f4be6fc918c67659dc39b9d26a2675ae",
+      "target": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010708aa68abb20aa664efe2f68a46d4dc28c0ffe5f20b3dbd01b7ecc9df5",
+      "opened_by": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0de31c9a96041fdeafb91d5d8f6b24f26826b3d740c4fc40090ffcae9",
+      "opened_at": "2026-10-26T12:26:58Z",
+      "stale_after": "2026-10-26T12:31:58Z",
+      "deposit": 5000000,
+      "verdict": "expired",
+      "name": "flows-1793017633063-dispute",
+      "description": "contested from the browser",
+      "image_uri": "ipfs://palmares-flows-dispute",
+      "slot": 137334776,
+      "block_hash": "67800a09567e8b1bf1d1c474b1928c78b4f2f84f1a88e58480c9a5045cb527fc"
+    }
+  ],
+  "level1_anchor": null
 }
 """

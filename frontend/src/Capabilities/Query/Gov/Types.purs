@@ -60,6 +60,7 @@ module Capabilities.Query.Gov.Types
   , ProfilePage(..)
   , AttestationRow(..)
   , AttestationPage(..)
+  , AttestationDetail(..)
   , DisputeRow(..)
   , DisputePage(..)
   , RegistrySummary
@@ -1657,6 +1658,47 @@ instance DecodeJson AttestationPage where
     limit <- o .: "limit"
     offset <- o .: "offset"
     pure (AttestationPage { items, total, limit, offset })
+
+-- | O atestare cu disputele ei: `GET /attestations/{id}`.
+-- |
+-- | Serverul le trimite ÎMPREUNĂ, deci pagina unui vouch e o singură cerere. Partea comună se
+-- | decodează refolosind `AttestationRow`, iar peste ea se citesc câmpurile care există numai
+-- | aici — adică cele pe care lista le primește și nu le citește: `tx_hash`, `credential`,
+-- | `claimed_period`.
+-- |
+-- | `tx_hash` e dovada: identificatorul tranzacției care a scris atestarea. Fără el, pagina spune
+-- | că ceva e pe lanț fără să arate unde.
+-- |
+-- | `claimed_period` e un interval autodeclarat, două marcaje ISO. NU e un fapt de pe lanț —
+-- | nimic nu-l verifică — deci ecranul îl scrie ca pretenție, niciodată ca lucru dovedit.
+-- |
+-- | `level1_anchor` din răspuns NU se decodează: e `null` în toate datele măsurate, deci forma lui
+-- | ar fi o presupunere. Când apare un exemplu real, se adaugă atunci.
+newtype AttestationDetail = AttestationDetail
+  { attestation :: AttestationRow
+  , credential :: Maybe String
+  , claimedPeriod :: Maybe (Array String)
+  , txHash :: String
+  , outputIndex :: Int
+  , disputes :: Array DisputeRow
+  }
+
+derive instance Eq AttestationDetail
+
+instance DecodeJson AttestationDetail where
+  decodeJson json = do
+    o <- decodeJson json
+    attJson <- o .: "attestation"
+    attestation <- decodeJson attJson
+    -- Același obiect, citit a doua oară pentru cheile pe care `AttestationRow` nu le are. Mai
+    -- ieftin decât să duplici unsprezece câmpuri într-un tip aproape identic.
+    a <- decodeJson attJson
+    credential <- a .:? "credential"
+    claimedPeriod <- a .:? "claimed_period"
+    txHash <- a .: "tx_hash"
+    outputIndex <- a .: "output_index"
+    disputes <- o .: "disputes"
+    pure (AttestationDetail { attestation, credential, claimedPeriod, txHash, outputIndex, disputes })
 
 -- | O dispută deschisă împotriva unei atestări.
 -- |

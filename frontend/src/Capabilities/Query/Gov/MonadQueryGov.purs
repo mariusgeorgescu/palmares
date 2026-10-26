@@ -24,6 +24,7 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getActivity
   , getProfile
   , getProfiles
+  , getAttestation
   , getAttestations
   , getDisputes
   , getRegistrySummary
@@ -48,6 +49,7 @@ import Capabilities.Query.Gov.Types
   , ActivityPage
   , ProfilePage
   , ProfileRow
+  , AttestationDetail
   , AttestationPage
   , DisputePage
   , RegistrySummary
@@ -128,6 +130,7 @@ class Monad m <= MonadQueryGov m where
   getProfiles :: RegistryFilters -> m (Either ApiError ProfilePage)
 
   -- | `GET /attestations` — cine ce a afirmat despre cine, și dacă subiectul a recunoscut.
+  getAttestation :: String -> m (Either ApiError AttestationDetail)
   getAttestations :: RegistryFilters -> m (Either ApiError AttestationPage)
 
   -- | `GET /disputes` — contestațiile deschise împotriva atestărilor, cu depozitul pus la bătaie.
@@ -156,6 +159,7 @@ instance monadQueryGovHalogenM ::
   getActivity = lift <<< getActivity
   getProfile = lift <<< getProfile
   getProfiles = lift <<< getProfiles
+  getAttestation = lift <<< getAttestation
   getAttestations = lift <<< getAttestations
   getDisputes = lift <<< getDisputes
   getRegistrySummary = lift getRegistrySummary

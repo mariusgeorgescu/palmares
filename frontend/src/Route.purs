@@ -46,6 +46,7 @@ data Route
   | Activity ActivityFilters
   | ProfileDetail String
   | ProfileList RegistryFilters
+  | AttestationDetail String
   | AttestationList RegistryFilters
   | DisputeList RegistryFilters
   | Graph GraphFilters
@@ -78,6 +79,7 @@ instance Show Route where
     Activity f -> "Activity " <> fromMaybe "" f.before
     ProfileDetail i -> "ProfileDetail " <> i
     ProfileList _ -> "ProfileList"
+    AttestationDetail i -> "AttestationDetail " <> i
     AttestationList _ -> "AttestationList"
     DisputeList _ -> "DisputeList"
     Graph f -> "Graph " <> fromMaybe "" f.drep

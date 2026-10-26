@@ -226,6 +226,7 @@ test.describe('at phone width', () => {
     '/profiles',
     '/profiles/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043',
     '/attestations',
+    '/attestations/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010708aa68abb20aa664efe2f68a46d4dc28c0ffe5f20b3dbd01b7ecc9df5',
     '/disputes',
     '/graph',
     '/graph?drep=drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z',
@@ -345,6 +346,7 @@ for (const route of [
   '/profiles',
   '/profiles/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043',
   '/attestations',
+  '/attestations/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010708aa68abb20aa664efe2f68a46d4dc28c0ffe5f20b3dbd01b7ecc9df5',
   '/disputes',
   '/graph',
   '/write?flow=issue-attestation',
@@ -696,4 +698,30 @@ test('a profile page shows the two halves of a track record, not just the identi
 
   // Drumul înapoi în registru există din fiecare jumătate.
   await expect(page.getByRole('link', { name: /See (all|these)/ }).first()).toBeVisible();
+});
+
+test('a vouch page puts the challenge under the claim it attacks, with the proof beside it', async ({ page }) => {
+  // În listă, provocările sînt un contor într-o celulă: ca să vezi CE s-a contestat trebuia să
+  // treci pe alt ecran și să filtrezi după un id de șaizeci de caractere. Serverul le trimite
+  // împreună, deci ecranul ăsta e o singură cerere.
+  await page.goto('/attestations/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010708aa68abb20aa664efe2f68a46d4dc28c0ffe5f20b3dbd01b7ecc9df5');
+
+  await expect(page.getByRole('heading', { name: 'smoke-20261024T205314Z-unresolvable', level: 1 }))
+    .toBeVisible();
+
+  // Părțile sînt LINKURI către profiluri, nu id-uri trunchiate.
+  await expect(page.getByRole('link', { name: 'palmares-smoke-20261024T205314Z-subject' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'palmares-smoke-20261024T205314Z-issuer' })).toBeVisible();
+
+  // Dovada de pe lanț: tranzacția care a scris-o.
+  await expect(page.getByText('Written by transaction')).toBeVisible();
+
+  // Intervalul revendicat e AUTODECLARAT, și ecranul o spune — altfel promite o verificare pe
+  // care nu o face nimeni.
+  await expect(page.getByText('self-reported, nothing on chain establishes it')).toBeVisible();
+
+  // Și provocarea, sub afirmația pe care o atacă, cu depozitul ei.
+  await expect(page.getByRole('heading', { name: 'Challenges' })).toBeVisible();
+  await expect(page.getByText('flows-1793017633063-dispute')).toBeVisible();
+  await expect(page.getByText('5 ADA')).toBeVisible();
 });

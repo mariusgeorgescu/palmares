@@ -19,6 +19,7 @@ module Capabilities.Query.Gov.Default
   , getActivityDefault
   , getProfileDefault
   , getProfilesDefault
+  , getAttestationDefault
   , getAttestationsDefault
   , getDisputesDefault
   , getRegistrySummaryDefault
@@ -45,6 +46,7 @@ import Capabilities.Query.Gov.Types
   , ActivityPage
   , ProfilePage
   , ProfileRow
+  , AttestationDetail
   , AttestationPage
   , DisputePage
   , RegistrySummary
@@ -225,6 +227,14 @@ getAttestationsDefault
   -> RegistryFilters
   -> m (Either ApiError AttestationPage)
 getAttestationsDefault env f = getJson (env.queryBaseUrl <> "/attestations" <> queryOf (attestationListHrefFor f))
+
+getAttestationDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> String
+  -> m (Either ApiError AttestationDetail)
+getAttestationDefault env aid = getJson (env.queryBaseUrl <> "/attestations/" <> aid)
 
 getDisputesDefault
   :: forall m r

@@ -31,6 +31,7 @@ import Capabilities.Query.Gov.Mock
   , getActivityMock
   , getProfileMock
   , getProfilesMock
+  , getAttestationMock
   , getAttestationsMock
   , getDisputesMock
   , getRegistrySummaryMock
@@ -119,6 +120,7 @@ instance MonadQueryGov DemoM where
   getActivity = getActivityMock
   getProfile = getProfileMock
   getProfiles = getProfilesMock
+  getAttestation = getAttestationMock
   getAttestations = getAttestationsMock
   getDisputes = getDisputesMock
   getRegistrySummary = getRegistrySummaryMock

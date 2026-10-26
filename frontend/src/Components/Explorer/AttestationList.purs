@@ -43,7 +43,13 @@ import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
 import Route (Route)
-import Route.GovQueries (RegistryFilters, attestationListHrefFor, emptyRegistryFilters, writeHrefFor)
+import Route.GovQueries
+  ( RegistryFilters
+  , attestationDetailHrefFor
+  , attestationListHrefFor
+  , emptyRegistryFilters
+  , writeHrefFor
+  )
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -225,7 +231,15 @@ component =
   row st (AttestationRow a) =
     HH.tr_
       [ HH.td_
-          [ HH.div_ [ HH.text a.name ]
+          -- Numele duce la pagina vouch-ului. Fara ea, ca sa vezi CE s-a contestat trebuia sa
+          -- treci pe ecranul de provocari si sa filtrezi dupa un id de saizeci de caractere.
+          [ HH.div_
+              [ HH.a
+                  [ HP.href (attestationDetailHrefFor a.id)
+                  , HP.class_ (HH.ClassName "link link-hover")
+                  ]
+                  [ HH.text a.name ]
+              ]
           , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text (humanize a.kind) ]
           -- IDENTIFICATORUL ATESTĂRII, care nu era randat nicăieri. Exista doar în `href`-urile de
           -- mai jos, iar `/write` îi cere omului să-l „lipească" — deci calea de scriere
