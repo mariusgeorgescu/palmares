@@ -150,6 +150,18 @@ test.describe('the wallet really signs, and the bytes stop at the last edge', ()
     await expect(
       page.getByText('Submitted. The node has it; it is not in a block yet.')
     ).toBeVisible({ timeout: 60_000 });
+
+    // SELECTORUL cu care celelalte teste citesc id-ul tranzacției, verificat AICI — unde nu pleacă
+    // nimic pe lanț.
+    //
+    // A trebuit: cardul arăta id-ul într-un `<code class="font-mono">` până cînd chipul de
+    // identificator l-a înlocuit, iar cele trei teste care TRIMIT au început să pice la citirea
+    // id-ului, după ce tranzacția plecase deja. Un test care raportează eșec pentru o operație
+    // ireversibilă reușită e felul de defect care face pe cineva s-o repete.
+    //
+    // Acum selectorul trăiește și într-un test care nu trimite, deci se rupe gratis, nu scump.
+    const shownTx = await page.locator('[data-copy]').last().getAttribute('data-copy');
+    expect(shownTx, 'the submitted card must expose the transaction id').toMatch(/^[0-9a-f]{64}$/);
     await expect(page.getByText(/Confirmed on chain/)).toHaveCount(0);
   });
 });

@@ -131,7 +131,16 @@ test.describe('expire-dispute, on chain from the browser', () => {
       page.getByText('Submitted. The node has it; it is not in a block yet.')
     ).toBeVisible({ timeout: 180_000 });
 
-    const txId = await page.locator('code.font-mono').last().innerText();
+    // Id-ul se citeste din CHIPUL de identificator, nu dintr-un `<code>`.
+    //
+    // Regresie proprie: cardul de trimitere arata id-ul intr-un `<code class="font-mono">` pana cand
+    // chipul l-a inlocuit, iar `data-copy` poarta acum valoarea INTREAGA — ceea ce e si mai bun,
+    // fiindca textul vizibil poate fi scurtat.
+    //
+    // A costat exact ce trebuia sa coste: testul a picat DUPA ce tranzactia plecase deja pe lant.
+    // Un test care raporteaza esec pentru o operatie ireversibila reusita e felul de defect care
+    // face pe cineva s-o repete.
+    const txId = await page.locator('[data-copy]').last().getAttribute('data-copy');
     expect(txId).toMatch(/^[0-9a-f]{64}$/);
     console.log(`[expire] submitted: ${txId}`);
 
