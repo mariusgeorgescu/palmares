@@ -27,6 +27,25 @@ npm run e2e:wallet
 
 `PALMARES_WALLET_URL` schimbă ținta.
 
+## Cele două porți, și de ce există
+
+Suita are 22 de teste în trei straturi. Rulată fără niciun flag, **zece se sar** — iar reporterul
+`line`/`list` nu afișează motivul sărituri, deci rularea arată „10 skipped" fără să spună de ce.
+S-a citit deja o dată ca „cod netestat" când de fapt era „flag nepus", de-aia e scris aici:
+
+| Strat                       | Poartă                     | Ce face                                                |
+| --------------------------- | -------------------------- | ------------------------------------------------------ |
+| poarta, formularele, DOM-ul | niciuna                    | 12 teste; nu ating lanțul                               |
+| construire + semnare        | `PALMARES_WALLET_FUNDED=1`  | încă 7; cer UTxO-uri, fiindcă selecția de intrări e a serverului. **Nu trimit nimic.** |
+| trimitere pe lanț           | `PALMARES_FLOWS_SUBMIT=1`   | ultimele 3; tranzacții **ireversibile** pe preprod      |
+
+`npm run e2e:wallet` pune deja `PALMARES_WALLET_FUNDED=1` — adică rulează tot ce se poate rula fără
+să trimită nimic: **19 trecute, 3 sărite**. A doua poartă se pune mereu de mână, prin decizia
+ownerului că trimiterea rămîne manuală.
+
+`expire-dispute-chain.spec.js` mai cere, peste a doua poartă, o dispută al cărei **termen a trecut**;
+altfel se sare cu un mesaj care numără disputele nedecise și citează refuzul serverului textual.
+
 ## Ce NU acoperă
 
 **CIP-142 nu există în niciun wallet.** „Path to Active" din CIP-142 listează implementarea în Lace
@@ -34,6 +53,11 @@ ca pas *viitor*, iar `cip30-test-wallet` anunță doar CIP-95. Calea în care po
 testată peste un provider real căruia testul îi adaugă exact namespace-ul pe care CIP-142 îl
 specifică — un substitut pentru un wallet care nu există încă, scris ca atare în test.
 
-**M2-1 — o atestare emisă și contrasemnată pe preprod — nu e aici.** Ar cere o cheie finanțată și
-trimiterea unei tranzacții reale, iar trimiterea rămîne manuală prin decizia ownerului. Ce se poate
-testa fără ea se testează: poarta, formularul, construirea.
+**Trimiterea nu se face singură.** Cele trei fișiere din stratul al treilea stau sărite pînă cînd
+cineva pune `PALMARES_FLOWS_SUBMIT=1` cu mîna. Asta nu e o lipsă de acoperire: e decizia ownerului
+că trimiterea rămîne manuală, iar o tranzacție ireversibilă nu se declanșează dintr-o rulare de
+rutină.
+
+Istoric: M2-1 a fost multă vreme în secțiunea asta ca „nu e aici". Acum **este** —
+`m2-1-chain.spec.js` a emis o atestare, a contrasemnat-o și a văzut registrul arătînd `accepted`,
+pe preprod. Toate cele nouă fluxuri de scriere au trecut pe lanț.
