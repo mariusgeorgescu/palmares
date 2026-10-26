@@ -35,11 +35,11 @@ test.use({
 test.describe('expire-dispute, on chain from the browser', () => {
   test.skip(
     !SUBMIT,
-    'SUBMITS A REAL TRANSACTION, and only works once a dispute is past its 30-day deadline.\n' +
+    'SUBMITS A REAL TRANSACTION, and only works once a challenge is past its 30-day deadline.\n' +
       '  PALMARES_WALLET_URL=https://gov.cardano.vip PALMARES_FLOWS_SUBMIT=1 \\\n' +
       '    npx playwright test --config playwright.wallet.config.js ' +
       'e2e-wallet/expire-dispute-chain.spec.js\n' +
-      'Needs no key and no authority — that is the point of the flow. The dispute opened on ' +
+      'Needs no key and no authority — that is the point of the flow. The challenge opened on ' +
       '2026-10-25 becomes expirable on 2026-11-24.'
   );
 
@@ -83,11 +83,11 @@ test.describe('expire-dispute, on chain from the browser', () => {
     }
   };
 
-  test('closes an undecided dispute whose deadline has passed', async ({ page, request }) => {
+  test('closes an undecided challenge whose deadline has passed', async ({ page, request }) => {
     // Disputa nedecisă. Dacă nu există niciuna, nu e un eșec al fluxului.
     const disputes = await (await request.get('/api/query/disputes?limit=200')).json();
     const undecidedAll = disputes.items.filter((d) => !d.verdict);
-    test.skip(!undecidedAll.length, 'No undecided dispute to expire. Open one first (open-dispute).');
+    test.skip(!undecidedAll.length, 'No undecided challenge to expire. Open one first (open-dispute).');
 
     // ÎNAINTE de orice: CARE dintre ele e expirabilă? Serverul e singura autoritate pe întrebarea
     // asta, iar refuzul lui numește exact motivul.
@@ -122,7 +122,7 @@ test.describe('expire-dispute, on chain from the browser', () => {
 
     test.skip(
       !undecided,
-      `None of the ${undecidedAll.length} undecided dispute(s) is past its deadline yet. ` +
+      `None of the ${undecidedAll.length} undecided challenge(s) is past its deadline yet. ` +
         `The server says: ${lastRefusal}`
     );
 
@@ -131,7 +131,7 @@ test.describe('expire-dispute, on chain from the browser', () => {
     await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
 
-    await page.getByLabel('Dispute', { exact: false }).first().fill(undecided.id);
+    await page.getByLabel('Challenge', { exact: false }).first().fill(undecided.id);
 
     await page.getByRole('button', { name: /Build the transaction/ }).click();
     await expect(page.getByText('What this transaction does')).toBeVisible({ timeout: 180_000 });

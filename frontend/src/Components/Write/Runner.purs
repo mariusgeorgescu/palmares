@@ -444,7 +444,7 @@ component =
       Just (InteractionStatus s) -> case s.oracle of
         Just (OracleParams o) ->
           "Locks " <> formatAda o.disputeDepositLovelace
-            <> " from your wallet until the dispute resolves. You lose it if the dispute is dismissed."
+            <> " from your wallet until the challenge resolves. You lose it if the challenge is dismissed."
         Nothing -> spec.consequence
       Nothing -> spec.consequence
 
@@ -571,11 +571,11 @@ component =
   -- e la două click-uri în bara de navigare, dar nimic nu leagă fapta de locul unde apare. Prima
   -- întrebare a oricui a scris ceva e „și unde o văd?".
   registerFor flow = case flow of
-    Just "issue-attestation" -> Just { href: "/attestations", label: "See it in the attestations register" }
-    Just "accept-attestation" -> Just { href: "/attestations", label: "See it in the attestations register" }
-    Just "open-dispute" -> Just { href: "/disputes", label: "See it in the disputes register" }
-    Just "resolve-dispute" -> Just { href: "/disputes", label: "See it in the disputes register" }
-    Just "expire-dispute" -> Just { href: "/disputes", label: "See it in the disputes register" }
+    Just "issue-attestation" -> Just { href: "/attestations", label: "See it in the vouches register" }
+    Just "accept-attestation" -> Just { href: "/attestations", label: "See it in the vouches register" }
+    Just "open-dispute" -> Just { href: "/disputes", label: "See it in the challenges register" }
+    Just "resolve-dispute" -> Just { href: "/disputes", label: "See it in the challenges register" }
+    Just "expire-dispute" -> Just { href: "/disputes", label: "See it in the challenges register" }
     Just _ -> Just { href: "/profiles", label: "See it in the profiles register" }
     Nothing -> Nothing
 

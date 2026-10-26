@@ -123,11 +123,11 @@ flowLabel :: FlowRequest -> String
 flowLabel = case _ of
   ClaimProfile _ -> "Claim profile"
   UpdateProfile _ -> "Update profile"
-  IssueAttestation _ -> "Issue attestation"
-  AcceptAttestation _ -> "Accept attestation"
-  OpenDispute _ -> "Open dispute"
-  ResolveDispute _ -> "Resolve dispute"
-  ExpireDispute _ -> "Expire dispute"
+  IssueAttestation _ -> "Issue vouch"
+  AcceptAttestation _ -> "Accept vouch"
+  OpenDispute _ -> "Open challenge"
+  ResolveDispute _ -> "Resolve challenge"
+  ExpireDispute _ -> "Expire challenge"
   ClaimCredential _ -> "Claim credential"
   WithdrawCredential _ -> "Withdraw credential"
 

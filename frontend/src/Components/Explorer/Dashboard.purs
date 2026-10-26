@@ -310,8 +310,8 @@ component =
       , body:
           "A normal database has a delete button. Whoever runs it can make an inconvenient claim \
           \disappear, and from outside you cannot tell never-happened from was-removed. Here that \
-          \button does not exist, for anyone, including us. A disputed claim is shown beside its \
-          \dispute, not instead of it."
+          \button does not exist, for anyone, including us. A challenged claim is shown beside its \
+          \challenge, not instead of it."
       }
     , { title: "Consent cannot be faked by whoever runs it."
       , body:
@@ -361,11 +361,11 @@ component =
           profileListPath
           "from-success to-info"
           "0"
-      , figureCard "Attestations" (countOf st _.attestations) "Claims made about them."
+      , figureCard "Vouches" (countOf st _.attestations) "Claims made about them."
           attestationListPath
           "from-info to-accent"
           "80"
-      , figureCard "Disputes" (countOf st _.disputes) "Claims someone put money against."
+      , figureCard "Challenges" (countOf st _.disputes) "Claims someone put money against."
           disputeListPath
           "from-accent to-warning"
           "160"
@@ -439,8 +439,8 @@ component =
               [ HH.text "Four words this site uses a lot" ]
           , HH.dl [ HP.class_ (HH.ClassName "grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-4 text-sm") ]
               [ term "Profile" "An identity, held as a token. Whoever holds the token holds the profile."
-              , term "Attestation" "A claim one profile makes about another. It is not binding until the subject accepts it."
-              , term "Dispute" "A challenge against a claim, with a deposit at stake. Lose the challenge, lose the deposit."
+              , term "Vouch" "A claim one profile makes about another. It is not binding until the subject accepts it."
+              , term "Challenge" "An objection to a claim, with a deposit at stake. Lose the challenge, lose the deposit."
               , term "DRep" "A Cardano governance representative. A profile can prove it owns one — that is a credential claim."
               ]
           ]
@@ -742,7 +742,7 @@ useCases =
     }
   , { href: writePath
     , title: "Make a claim of your own"
-    , body: "Mint a profile, attest to someone's work, or challenge a claim you believe is false. You sign every transaction yourself."
+    , body: "Mint a profile, vouch for someone's work, or challenge a claim you believe is false. You sign every transaction yourself."
     }
   , { href: drepListHref
     , title: "Check it against the chain"
@@ -765,11 +765,11 @@ registryGroups =
           , description: "Identities. Each one is a token, and whoever holds the token holds the profile."
           }
         , { href: attestationListPath
-          , label: "Attestations"
+          , label: "Vouches"
           , description: "Claims about those identities, and whether the subject accepted them."
           }
         , { href: disputeListPath
-          , label: "Disputes"
+          , label: "Challenges"
           , description: "Claims someone challenged, with a deposit at stake on the outcome."
           }
         ]
@@ -777,7 +777,7 @@ registryGroups =
   , { title: "Taking part"
     , entries:
         [ { href: writePath
-          , label: "Write to the register"
+          , label: "Take action on the register"
           , description: "The nine things you can do here. You sign every transaction yourself."
           }
         , { href: methodologyPath

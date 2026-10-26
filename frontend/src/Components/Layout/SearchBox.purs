@@ -230,7 +230,7 @@ component =
               [ HP.type_ HP.InputSearch
               , HP.ref inputRef
               , HP.class_ (HH.ClassName "input input-bordered w-full")
-              , HP.placeholder "Search profiles, attestations, representatives…"
+              , HP.placeholder "Search profiles, vouches, representatives…"
               , HP.value st.draft
               , HE.onValueInput DraftChanged
               , HE.onKeyDown KeyPressed
@@ -266,7 +266,7 @@ component =
         , { label: "Stake pools", group: r.spos }
         , { label: "Committee members", group: r.committeeMembers }
         , { label: "Profiles", group: r.profiles }
-        , { label: "Attestations", group: r.attestations }
+        , { label: "Vouches", group: r.attestations }
         ]
 
       nonEmpty = filter (\g -> case g.group of SearchGroup s -> not (null s.items)) groups

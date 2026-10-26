@@ -135,12 +135,12 @@ test.describe('the remaining write flows, on chain from the browser', () => {
     expect(issuer, 'the m2-1 issuer profile must exist; run m2-1-chain.spec.js first').toBeTruthy();
     const attestations = await (await request.get('/api/query/attestations?limit=200')).json();
     const att = attestations.items.find((a) => (a.name || '').match(/^m2-1-.*-attestation$/));
-    expect(att, 'the m2-1 attestation must exist').toBeTruthy();
+    expect(att, 'the m2-1 vouch must exist').toBeTruthy();
 
     // Pentru dispută se alege o atestare care nu are DEJA una deschisă.
     //
     // Pasul 4 ținea atestarea M2-1, deci testul nu putea rula de două ori: după prima dispută
-    // ecranul refuză cu „A dispute is already open against this attestation. Wait for it to be
+    // ecranul refuză cu „A challenge is already open against this vouch. Wait for it to be
     // resolved before opening another" — o curtoazie off-chain scrisă tot de noi. Refuzul vine
     // ÎNAINTE de construire, deci nu se pierde nimic pe lanț, dar testul pica obscur pe lipsa
     // ecranului de sumar în loc să spună de ce.
@@ -150,7 +150,7 @@ test.describe('the remaining write flows, on chain from the browser', () => {
     const free = attestations.items.find((a) => (a.open_dispute_count ?? 0) === 0);
     expect(
       free,
-      `all ${attestations.items.length} attestations already have an open dispute; resolve or ` +
+      `all ${attestations.items.length} vouches already have an open challenge; resolve or ` +
         'expire one before running this'
     ).toBeTruthy();
 
@@ -227,17 +227,17 @@ test.describe('the remaining write flows, on chain from the browser', () => {
     if (process.env.PALMARES_FLOWS_SKIP_DISPUTE !== '1') {
       await connect(page, 'open-dispute');
       await expect(
-        page.getByText('Locks 5 ADA from your wallet until the dispute resolves.', { exact: false })
+        page.getByText('Locks 5 ADA from your wallet until the challenge resolves.', { exact: false })
       ).toBeVisible();
-      console.log(`[flows] disputing ${disputableName} (nothing open against it)`);
-      await set(page, 'Attestation', disputableId);
+      console.log(`[flows] challenging ${disputableName} (nothing open against it)`);
+      await set(page, 'Vouch', disputableId);
       await set(page, 'Your profile', profileId);
       await set(page, 'Name', `${marker}-dispute`);
       await set(page, 'Description', 'contested from the browser');
       await set(page, 'Image URI', 'ipfs://palmares-flows-dispute');
       await buildSignSubmit(page, 'open-dispute');
 
-      await awaitProjection(page, 'dispute', '/disputes', () =>
+      await awaitProjection(page, 'challenge', '/disputes', () =>
         page.getByText(`${marker}-dispute`)
       );
     }

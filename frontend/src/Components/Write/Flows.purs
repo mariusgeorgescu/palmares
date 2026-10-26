@@ -93,56 +93,56 @@ flowSpecs =
         ]
     }
   , { id: "issue-attestation"
-    , title: "Issue an attestation"
+    , title: "Issue a vouch"
     , summary:
         "States something about someone else's profile. It is not binding on them until they accept \
-        \it, and anyone can dispute it."
-    , consequence: "Writes a pending attestation on chain, signed by you, naming the subject."
+        \it, and anyone can challenge it."
+    , consequence: "Writes a pending vouch on chain, signed by you, naming the subject."
     , fields:
         [ txt "subject_profile_id" "Subject" "The profile you are making a claim about — paste its identifier."
         , txt "issuer_profile_id" "Issuer" "Your own profile's identifier. You must hold its token to sign this."
         , sel "kind" "Kind" "What sort of claim this is." attestationKinds
-        , txt "name" "Name" "A short title for the attestation."
-        , long "description" "Description" "What exactly is being attested."
+        , txt "name" "Name" "A short title for the vouch."
+        , long "description" "Description" "What exactly is being vouched for."
         , txt "image_uri" "Image URI" "You host the image; the protocol only stores the link."
         ]
     }
   , { id: "accept-attestation"
-    , title: "Accept an attestation"
-    , summary: "Countersigns an attestation about your own profile. Only the subject can do this."
-    , consequence: "Marks the attestation as accepted on chain. It cannot be un-accepted."
-    , fields: [ txt "attestation_id" "Attestation" "Paste the attestation's identifier. The Attestations page has an \"Accept\" link that fills this in for you." ]
+    , title: "Accept a vouch"
+    , summary: "Countersigns a vouch about your own profile. Only the subject can do this."
+    , consequence: "Marks the vouch as accepted on chain. It cannot be un-accepted."
+    , fields: [ txt "attestation_id" "Vouch" "Paste the vouch's identifier. The Vouches page has an \"Accept\" link that fills this in for you." ]
     }
   , { id: "open-dispute"
-    , title: "Open a dispute"
+    , title: "Open a challenge"
     , summary:
-        "Contests an attestation and locks a deposit. The deposit is what separates a challenge \
-        \from an opinion, and you lose it if the dispute is dismissed."
-    , consequence: "Locks the oracle's current deposit from your wallet until the dispute resolves."
+        "Contests a vouch and locks a deposit. The deposit is what separates a challenge \
+        \from an opinion, and you lose it if the challenge is dismissed."
+    , consequence: "Locks the oracle's current deposit from your wallet until the challenge resolves."
     , fields:
-        [ txt "attestation_id" "Attestation" "The claim you are challenging. The Attestations page has a \"Dispute\" link that fills this in."
+        [ txt "attestation_id" "Vouch" "The claim you are challenging. The Vouches page has a \"Challenge\" link that fills this in."
         , txt "opened_by_profile_id" "Your profile" "Your own profile's identifier. The deposit comes from your wallet."
-        , txt "name" "Name" "A short title for the dispute."
+        , txt "name" "Name" "A short title for the challenge."
         , long "description" "Description" "What is being contested, and why."
         , txt "image_uri" "Image URI" "You host the image; the protocol only stores the link."
         ]
     }
   , { id: "resolve-dispute"
-    , title: "Resolve a dispute"
-    , summary: "Records the verdict on a dispute. Only the oracle's authority can do this."
-    , consequence: "Settles the dispute and releases or forfeits the deposit accordingly."
+    , title: "Resolve a challenge"
+    , summary: "Records the verdict on a challenge. Only the oracle's authority can do this."
+    , consequence: "Settles the challenge and releases or forfeits the deposit accordingly."
     , fields:
-        [ txt "dispute_id" "Dispute" "Paste the dispute's identifier. The Disputes page has links that fill this in for you."
-        , sel "verdict" "Verdict" "Upheld means the attestation falls." disputeVerdicts
+        [ txt "dispute_id" "Challenge" "Paste the challenge's identifier. The Challenges page has links that fill this in for you."
+        , sel "verdict" "Verdict" "Upheld means the vouch falls." disputeVerdicts
         ]
     }
   , { id: "expire-dispute"
-    , title: "Expire a dispute"
+    , title: "Expire a challenge"
     , summary:
-        "Closes a dispute that was never decided, after its stale-after moment. Anyone can do this \
+        "Closes a challenge that was never decided, after its stale-after moment. Anyone can do this \
         \— that is the point of a deadline."
-    , consequence: "Closes the dispute as stale and returns the deposit."
-    , fields: [ txt "dispute_id" "Dispute" "Paste the dispute's identifier. The Disputes page has links that fill this in for you." ]
+    , consequence: "Closes the challenge as stale and returns the deposit."
+    , fields: [ txt "dispute_id" "Challenge" "Paste the challenge's identifier. The Challenges page has links that fill this in for you." ]
     }
   , { id: "claim-credential"
     , title: "Claim a governance credential"

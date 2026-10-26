@@ -194,11 +194,11 @@ test.describe('every buildable write flow, signed but not submitted', () => {
       // trimitere — deci cerea un text care tocmai dispăruse. Greșeala era a testului; ecranul
       // arată exact ce trebuie.
       await expect(
-        page.getByText('Locks 5 ADA from your wallet until the dispute resolves.', {
+        page.getByText('Locks 5 ADA from your wallet until the challenge resolves.', {
           exact: false,
         })
       ).toBeVisible();
-      await set(page, 'Attestation', attestationId);
+      await set(page, 'Vouch', attestationId);
       await set(page, 'Your profile', profileId);
       await set(page, 'Name', 'flow-probe dispute');
       await set(page, 'Description', 'contested from the browser, not submitted');
@@ -226,7 +226,7 @@ test.describe('every buildable write flow, signed but not submitted', () => {
     const undecided = d.items.find((x) => !x.verdict);
     test.skip(
       !undecided,
-      `No undecided dispute on chain (${d.total} total, all decided), so there is nothing to ` +
+      `No undecided challenge on chain (${d.total} total, all decided), so there is nothing to ` +
         'resolve or expire. Open one with remaining-flows-chain.spec.js first.'
     );
     return undecided.id;
@@ -244,7 +244,7 @@ test.describe('every buildable write flow, signed but not submitted', () => {
     await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
 
-    await set(page, 'Dispute', disputeId);
+    await set(page, 'Challenge', disputeId);
     await set(page, 'Verdict', 'upheld');
     await page.getByRole('button', { name: /Build the transaction/ }).click();
 
@@ -269,7 +269,7 @@ test.describe('every buildable write flow, signed but not submitted', () => {
     await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
 
-    await set(page, 'Dispute', disputeId);
+    await set(page, 'Challenge', disputeId);
     await page.getByRole('button', { name: /Build the transaction/ }).click();
 
     // Refuzul, cu motivul, în cuvinte. Serverul întoarce `DisputeNotStaleYet` cu „its deadline has

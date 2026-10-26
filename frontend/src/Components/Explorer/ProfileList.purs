@@ -107,7 +107,7 @@ component =
           [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Profiles" ]
           , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
               [ HH.text
-                  "Identities in the attestation registry. A profile is a token: whoever holds it \
+                  "Identities in the vouch registry. A profile is a token: whoever holds it \
                   \holds the profile, and a profile may or may not claim a governance credential."
               ]
           , HH.a

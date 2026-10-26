@@ -129,10 +129,10 @@ component =
   render st =
     HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-4") ]
       [ HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
-          [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Disputes" ]
+          [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Challenges" ]
           , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
               [ HH.text
-                  "Challenges against attestations. Opening one costs a deposit, which is what \
+                  "Challenges against vouches. Opening one costs a deposit, which is what \
                   \separates a challenge from an opinion."
               ]
           ]
@@ -147,14 +147,14 @@ component =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
-          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading disputes…" ]
+          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading challenges…" ]
           ]
       ]
 
   failure e =
     HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
       [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The disputes could not be loaded." ]
+          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The challenges could not be loaded." ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
           , HH.button
               [ HP.class_ (HH.ClassName "btn btn-sm"), HP.type_ HP.ButtonButton, HE.onClick (const Retry) ]
@@ -165,7 +165,7 @@ component =
   body st page@(DisputePage p) =
     HH.div [ HP.class_ (HH.ClassName "space-y-3") ]
       [ HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-          [ HH.text (matchLine p.total p.offset (length p.items) "dispute")
+          [ HH.text (matchLine p.total p.offset (length p.items) "challenge")
           , if st.refreshing then
               HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-xs ml-2") ] []
             else HH.text ""
@@ -177,9 +177,9 @@ component =
   emptyState =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.p_ [ HH.text "No disputes have been opened yet." ]
+          [ HH.p_ [ HH.text "No challenges have been opened yet." ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-              [ HH.text "That is the quiet case, not an empty one: every attestation so far stands unchallenged." ]
+              [ HH.text "That is the quiet case, not an empty one: every vouch so far stands unchallenged." ]
           ]
       ]
 
@@ -190,7 +190,7 @@ component =
               [ HH.table [ HP.class_ (HH.ClassName "table table-sm") ]
                   [ HH.thead_
                       [ HH.tr_
-                          [ HH.th_ [ HH.text "Dispute" ]
+                          [ HH.th_ [ HH.text "Challenge" ]
                           , HH.th_ [ HH.text "Against" ]
                           , HH.th_ [ HH.text "Opened" ]
                           , HH.th [ HP.class_ (HH.ClassName "text-right") ] [ HH.text "Deposit" ]
@@ -276,6 +276,6 @@ component =
         , prev
         , next
         , hrefFor
-        , noun: "dispute"
+        , noun: "challenge"
         }
 

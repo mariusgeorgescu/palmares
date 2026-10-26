@@ -124,11 +124,11 @@ component =
   render st =
     HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-4") ]
       [ HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
-          [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Attestations" ]
+          [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Vouches" ]
           , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
               [ HH.text
                   "Someone stating something about someone else, on chain. Whether the subject \
-                  \accepted it and whether anyone disputed it are separate questions, and both are \
+                  \accepted it and whether anyone challenged it are separate questions, and both are \
                   \shown."
               ]
           ]
@@ -143,14 +143,14 @@ component =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
           [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
-          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading attestations…" ]
+          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading vouches…" ]
           ]
       ]
 
   failure e =
     HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
       [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The attestations could not be loaded." ]
+          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The vouches could not be loaded." ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
           , HH.button
               [ HP.class_ (HH.ClassName "btn btn-sm"), HP.type_ HP.ButtonButton, HE.onClick (const Retry) ]
@@ -161,7 +161,7 @@ component =
   body st page@(AttestationPage p) =
     HH.div [ HP.class_ (HH.ClassName "space-y-3") ]
       [ HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-          [ HH.text (matchLine p.total p.offset (length p.items) "attestation")
+          [ HH.text (matchLine p.total p.offset (length p.items) "vouch")
           , if st.refreshing then
               HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-xs ml-2") ] []
             else HH.text ""
@@ -173,7 +173,7 @@ component =
   emptyState =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.p_ [ HH.text "No attestations have been issued yet." ] ]
+          [ HH.p_ [ HH.text "No vouches have been issued yet." ] ]
       ]
 
   table st items =
@@ -183,12 +183,12 @@ component =
               [ HH.table [ HP.class_ (HH.ClassName "table table-sm") ]
                   [ HH.thead_
                       [ HH.tr_
-                          [ HH.th_ [ HH.text "Attestation" ]
+                          [ HH.th_ [ HH.text "Vouch" ]
                           , HH.th_ [ HH.text "Subject" ]
                           , HH.th_ [ HH.text "Issuer" ]
                           , HH.th_ [ HH.text "Date" ]
                           , HH.th_ [ HH.text "Accepted" ]
-                          , HH.th_ [ HH.text "Disputes" ]
+                          , HH.th_ [ HH.text "Challenges" ]
                           , HH.th_ [ HH.text "Act" ]
                           ]
                       ]
@@ -265,7 +265,7 @@ component =
               [ HP.href (writeHrefFor { flow: Just "open-dispute", subject: Just a.id })
               , HP.class_ (HH.ClassName "link link-hover text-xs")
               ]
-              [ HH.text "Dispute" ]
+              [ HH.text "Challenge" ]
           ]
       ]
 
@@ -303,6 +303,6 @@ component =
         , prev
         , next
         , hrefFor
-        , noun: "attestation"
+        , noun: "vouch"
         }
 

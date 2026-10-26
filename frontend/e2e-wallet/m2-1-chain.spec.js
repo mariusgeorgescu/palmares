@@ -293,10 +293,10 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
     let attestationName = `${marker}-attestation`;
 
     if (attestationId) {
-      console.log(`[m2-1] reusing attestation ${attestationId}`);
+      console.log(`[m2-1] reusing vouch ${attestationId}`);
       const all = await (await request.get('/api/query/attestations?limit=200')).json();
       const found = all.items.find((a) => a.id === attestationId);
-      expect(found, `attestation ${attestationId} is not in the register`).toBeTruthy();
+      expect(found, `vouch ${attestationId} is not in the register`).toBeTruthy();
       attestationName = found.name;
       console.log(`[m2-1] its name is ${attestationName}, accepted=${found.accepted}`);
     } else {
@@ -307,9 +307,9 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
       await fill(page, 'Name', `${marker}-attestation`);
       await fill(page, 'Description', 'issued and countersigned from the browser');
       await fill(page, 'Image URI', 'ipfs://palmares-m2-1');
-      txAttestation = await buildSignSubmit(page, 'attestation');
+      txAttestation = await buildSignSubmit(page, 'vouch');
 
-      await awaitProjection(page, 'attestation', '/attestations', () =>
+      await awaitProjection(page, 'vouch', '/attestations', () =>
         page.getByRole('row', { name: new RegExp(`${marker}-attestation`) })
       );
       const attRow = page.getByRole('row', { name: new RegExp(`${marker}-attestation`) });

@@ -39,7 +39,7 @@ render
      , prev :: Maybe Int
      , next :: Maybe Int
      , hrefFor :: Int -> String
-     -- Forma de SINGULAR. `pluralize` o acordă: „1 dispute in total", nu „1 disputes in total" —
+     -- Forma de SINGULAR. `pluralize` o acordă: „1 challenge in total", nu „1 challenges in total" —
      -- greșeală pe care șase din cele nouă ecrane o evitau deja și trei nu.
      , noun :: String
      }

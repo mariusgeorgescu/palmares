@@ -54,14 +54,14 @@ entries =
     , mask: "[mask-image:url(/images/sidebar/practitioners.svg)]"
     }
   , { route: AttestationList emptyRegistryFilters
-    , label: "Attestations"
+    , label: "Vouches"
     , mask: "[mask-image:url(/images/sidebar/achievements.svg)]"
     }
   , { route: DisputeList emptyRegistryFilters
-    , label: "Disputes"
+    , label: "Challenges"
     , mask: "[mask-image:url(/images/sidebar/bell.svg)]"
     }
-  , { route: Write emptyWriteFilters, label: "Write", mask: "[mask-image:url(/images/edit.svg)]" }
+  , { route: Write emptyWriteFilters, label: "Actions", mask: "[mask-image:url(/images/edit.svg)]" }
   , { route: DRepList emptyDRepFilters
     , label: "Governance"
     , mask: "[mask-image:url(/images/sidebar/dashboard.svg)]"

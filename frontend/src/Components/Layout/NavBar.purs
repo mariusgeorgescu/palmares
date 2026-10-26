@@ -153,11 +153,11 @@ component =
     primaryItems =
       [ navLink st.route Home "Home"
       , navLink st.route (ProfileList emptyRegistryFilters) "Profiles"
-      , navLink st.route (AttestationList emptyRegistryFilters) "Attestations"
-      , navLink st.route (DisputeList emptyRegistryFilters) "Disputes"
+      , navLink st.route (AttestationList emptyRegistryFilters) "Vouches"
+      , navLink st.route (DisputeList emptyRegistryFilters) "Challenges"
       -- Scrierea stă în linie: e singura secțiune care schimbă ceva, iar dacă cineva o caută și
       -- n-o găsește, concluzia e că produsul doar citește.
-      , navLink st.route (Write emptyWriteFilters) "Write"
+      , navLink st.route (Write emptyWriteFilters) "Actions"
       ]
 
     desktopItems =

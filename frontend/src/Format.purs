@@ -99,8 +99,16 @@ formatPercent = case _ of
   Just r -> toStringWith (fixed 1) (r * 100.0) <> "%"
 
 -- | `1 vote`, `0 votes`. Textul e public și în engleză, deci „1 votes" e o greșeală vizibilă.
+-- |
+-- | Pluralul implicit e „s", iar excepțiile se scriu pe nume. O regulă pe terminația „-ch" ar fi
+-- | greșită: ortografia engleză urmează aici PRONUNȚIA, nu literele — „vouch" se termină în /tʃ/ și
+-- | cere „es", dar „epoch" se termină în /k/ și cere „s" simplu („epochs", niciodată „epoches").
+-- | „epoch" e deja un cuvânt dat lui `pluralize` (Explorer/DRepDetail), deci o expresie regulată pe
+-- | litere ar strica un ecran care merge. Cine adaugă un cuvânt nou îl pune în lista de mai jos.
 pluralize :: Int -> String -> String
-pluralize n word = formatInt n <> " " <> word <> (if n == 1 then "" else "s")
+pluralize n word = formatInt n <> " " <> word <> (if n == 1 then "" else suffix)
+  where
+  suffix = if word == "vouch" then "es" else "s"
 
 -- | Linia de deasupra unui tabel de rezultate. Zero potriviri nu promite un interval: „showing
 -- | 1–0" e o propoziție care nu înseamnă nimic, iar un tabel gol sub ea arată ca un defect.

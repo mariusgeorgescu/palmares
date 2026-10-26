@@ -58,7 +58,7 @@ test.describe('palmares, on recorded fixtures', () => {
     await page.goto('/');
     await expect(page.getByText('preprod', { exact: true })).toBeVisible();
     await expect(page.getByText('epoch 321', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText(/attestations: following/)).toBeVisible();
+    await expect(page.getByText(/vouches: following/)).toBeVisible();
     // Banda spune ce e NOU. Când metricile și puterea de vot sunt din epoca curentă — cazul
     // fixturii — a le mai scrie o dată înseamnă același număr de trei ori pe fiecare ecran.
     await expect(page.getByText(/metrics as of epoch/)).toBeHidden();
@@ -179,15 +179,15 @@ test.describe('palmares, on recorded fixtures', () => {
     const problems = watchConsole(page);
     await page.goto('/');
 
-    // „Attestations" e in linie, fiindca registrul e produsul; explorerul de guvernanta e in
+    // „Vouches" e in linie, fiindca registrul e produsul; explorerul de guvernanta e in
     // meniul „Governance".
     //
     // Scopat la bara de sus: de cînd exista si sina laterala, acelasi nume apare de doua ori — o
     // data sus si o data in sina, deliberat. Un `getByRole` nescopat ar cadea pe strict mode, iar
     // raspunsul corect e sa spui PE CARE il apesi, nu sa renunti la unul dintre ele.
     const mainNav = page.getByRole('navigation', { name: 'Main' });
-    await mainNav.getByRole('link', { name: 'Attestations', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Attestations', level: 1 })).toBeVisible();
+    await mainNav.getByRole('link', { name: 'Vouches', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Vouches', level: 1 })).toBeVisible();
     await expect(page).toHaveURL('/attestations');
 
     await page.getByRole('link', { name: 'Methodology', exact: true }).click();
@@ -195,7 +195,7 @@ test.describe('palmares, on recorded fixtures', () => {
 
     // Înapoi în istoric readuce ecranul anterior: rutele sunt stare de navigare, nu de componentă.
     await page.goBack();
-    await expect(page.getByRole('heading', { name: 'Attestations', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Vouches', level: 1 })).toBeVisible();
 
     expect(problems).toEqual([]);
   });
@@ -283,9 +283,9 @@ test('the document title names the screen', async ({ page }) => {
   await page.goto('/profiles');
   await expect(page).toHaveTitle('Profiles — Palmares');
   await page.goto('/attestations');
-  await expect(page).toHaveTitle('Attestations — Palmares');
+  await expect(page).toHaveTitle('Vouches — Palmares');
   await page.goto('/disputes');
-  await expect(page).toHaveTitle('Disputes — Palmares');
+  await expect(page).toHaveTitle('Challenges — Palmares');
   await page.goto('/graph');
   await expect(page).toHaveTitle('Delegation graph — Palmares');
   await page.goto('/write');
@@ -303,7 +303,7 @@ test('the navigation marks the section you are in', async ({ page }) => {
   // amîndouă, fiindcă un marcaj care cade doar într-unul lasă celălalt mincinos.
   const topNav = page.getByRole('navigation', { name: 'Main' });
   const rail = page.getByRole('navigation', { name: 'Sections' }).first();
-  await expect(topNav.getByRole('link', { name: 'Attestations', exact: true }))
+  await expect(topNav.getByRole('link', { name: 'Vouches', exact: true }))
     .toHaveAttribute('aria-current', 'page');
   await expect(rail.locator('a[aria-current="page"]')).toHaveAttribute('href', '/attestations');
   await expect(topNav.getByRole('link', { name: 'Profiles', exact: true }))
@@ -402,11 +402,11 @@ test('all nine write flows are listed and deep-linkable', async ({ page }) => {
   const flows = [
     ['claim-profile', 'Claim a profile'],
     ['update-profile', 'Edit a profile'],
-    ['issue-attestation', 'Issue an attestation'],
-    ['accept-attestation', 'Accept an attestation'],
-    ['open-dispute', 'Open a dispute'],
-    ['resolve-dispute', 'Resolve a dispute'],
-    ['expire-dispute', 'Expire a dispute'],
+    ['issue-attestation', 'Issue a vouch'],
+    ['accept-attestation', 'Accept a vouch'],
+    ['open-dispute', 'Open a challenge'],
+    ['resolve-dispute', 'Resolve a challenge'],
+    ['expire-dispute', 'Expire a challenge'],
     ['claim-credential', 'Claim a governance credential'],
     ['withdraw-credential', 'Withdraw a governance credential'],
   ];
@@ -426,7 +426,7 @@ test('a flow deep-linked with a subject arrives without breaking the route', asy
   // Ca identificatorul ajunge in cimpul potrivit se verifica unitar pe `buildRequest`; aici doar
   // ca ruta cu doi parametri se parseaza si randeaza fluxul cerut.
   await expect(page).toHaveTitle('Act on chain — Palmares');
-  await expect(page.getByRole('heading', { name: 'Open a dispute', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Open a challenge', exact: true })).toBeVisible();
 });
 
 // R1: markdown doar GFM, FARA cale pentru HTML brut.

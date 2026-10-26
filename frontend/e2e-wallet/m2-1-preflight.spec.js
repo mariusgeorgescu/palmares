@@ -56,13 +56,13 @@ test.describe('what M2-1 assumes, checked without submitting anything', () => {
     expect(shown, 'the card must show the tail of its own id').toContain(tail);
   });
 
-  test('an attestation row hands over its FULL id through the Accept deep link', async ({ page }) => {
+  test('a vouch row hands over its FULL id through the Accept deep link', async ({ page }) => {
     await page.goto('/attestations');
 
     const rows = page.locator('tr', { has: page.locator('a[href*="flow=accept-attestation"]') });
     await expect(rows.first()).toBeVisible({ timeout: 60_000 });
     const n = await rows.count();
-    expect(n, 'no unaccepted attestation to read an id from').toBeGreaterThan(0);
+    expect(n, 'no unaccepted vouch to read an id from').toBeGreaterThan(0);
 
     const row = rows.nth(n > 1 ? 1 : 0);
     const href = await row.locator('a[href*="flow=accept-attestation"]').first().getAttribute('href');
