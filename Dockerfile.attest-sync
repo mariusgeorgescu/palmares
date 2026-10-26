@@ -1,5 +1,13 @@
-# syntax=docker/dockerfile:1.4
-
+# BuildKit's built-in frontend, deliberately: no `# syntax=` directive.
+#
+# Directiva aceea cerea `docker/dockerfile:1.4` de pe Docker Hub LA FIECARE BUILD, necacheabil — iar
+# pe 2026-10-26 un `502 Bad Gateway` de acolo a omorât un build musl de peste o oră în prima
+# secundă, înainte ca vreo linie din palmares să fie atinsă.
+#
+# Verificat înainte de a o scoate: niciunul din cele șase Dockerfile nu folosește ceva ce 1.4 aduce
+# — zero `RUN --mount`, zero `COPY --link`, zero `--chmod`, zero heredoc. Singurele flaguri sunt
+# `COPY --from`, standard de ani de zile, plus flaguri ale comenzilor rulate (git, cabal, apk).
+# Deci directiva nu cumpăra nimic și costa o dependență de rețea pe calea critică.
 # The two shared base images, as build args so the same Dockerfile works in both places it is
 # used: locally (and from compose) the defaults are the plain tags a contributor builds with
 # `docker build -f Dockerfile.base -t palmares-builder:9.6.6 .`, while CI overrides them with the
