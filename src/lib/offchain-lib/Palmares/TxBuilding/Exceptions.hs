@@ -9,6 +9,7 @@ import GeniusYield.HTTP.Errors (IsGYApiError)
 import GeniusYield.Transaction.Common (GYBuildTxError (..))
 import GeniusYield.TxBuilder.Errors (GYTxMonadException (..))
 import GeniusYield.Types (GYScriptHash)
+import Palmares.DomainTypes.Core.Types (levelOneAnchorActionKey, levelOneAnchorAddressKey)
 import Prelude
 
 ------------------------------------------------------------------------------------------------
@@ -218,10 +219,18 @@ instance Exception TxBuildingException where
   displayException (AttestationAnchorMalformed why) =
     "The level-1 anchor in other_metadata is not valid: "
       <> T.unpack why
-      <> ". palmares:level1_gov_action takes a CIP-129 governance action id (gov_action1…) and \
-         \palmares:level1_stake_address takes a bech32 stake address; the action alone anchors to an \
-         \action, both together to the treasury withdrawal that pair names, and the address alone is \
-         \not an anchor. Omit both keys to issue an unanchored attestation."
+      -- Numele cheilor se CITESC din constante, nu se scriu de mână. Erau fixate ca text, iar
+      -- Stage 0 le-a mutat pe `attest:`: mesajul ajunsese să spună că lipsește `attest:…` și apoi
+      -- să explice `palmares:…`, adică să trimită cititorul exact unde nu trebuie. Un mesaj de
+      -- eroare care numește altceva decât verifică e mai rău decât niciun mesaj.
+      <> ". "
+      <> T.unpack levelOneAnchorActionKey
+      <> " takes a CIP-129 governance action id (gov_action1…) and "
+      <> T.unpack levelOneAnchorAddressKey
+      <> " takes a bech32 stake address; the action alone anchors to an action, both together to \
+         \the treasury withdrawal that pair names, and the address alone is not an anchor. The \
+         \earlier `palmares:` spelling of both keys is still read, for attestations written before \
+         \the namespace moved. Omit both keys to issue an unanchored attestation."
   displayException DisputeNotFound = "Dispute not found"
   displayException DisputeAlreadyOpen =
     "A dispute is already open against this attestation. Wait for it to be resolved before opening \
