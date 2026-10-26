@@ -224,6 +224,7 @@ test.describe('at phone width', () => {
     '/delegations',
     '/activity',
     '/profiles',
+    '/profiles/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043',
     '/attestations',
     '/disputes',
     '/graph',
@@ -342,6 +343,7 @@ for (const route of [
   '/delegations',
   '/activity',
   '/profiles',
+  '/profiles/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043',
   '/attestations',
   '/disputes',
   '/graph',
@@ -672,4 +674,26 @@ test('the home page answers why this is not just a website, and says what it doe
   // aceea e cel mai ieftin semnal de incredere care exista.
   await expect(page.getByText('What this does not do')).toBeVisible();
   await expect(page.getByText('It does not make claims true')).toBeVisible();
+});
+
+test('a profile page shows the two halves of a track record, not just the identity', async ({ page }) => {
+  // Pînă acum registrul avea doar liste, iar palmaresul unei identități — teza produsului — nu se
+  // vedea nicăieri per persoană. Cele DOUĂ jumătăți sînt tot rostul paginii: ruta dedicată
+  // `/profiles/{id}/attestations` dă numai prima (măsurat: identică cu `?subject=`), deci ecranul
+  // pune două întrebări, nu una.
+  await page.goto('/profiles/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043');
+
+  await expect(page.getByRole('heading', { name: 'palmares-smoke-20261024T205314Z-subject', level: 1 }))
+    .toBeVisible();
+  await expect(page.getByRole('heading', { name: 'What others state about this profile' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'What this profile vouches for' })).toBeVisible();
+
+  // Linia care poartă promisiunea produsului: controlul e DOVEDIT, nu declarat.
+  await expect(page.getByText('Proved control of')).toBeVisible();
+
+  // Și limita, scrisă pe ecran și nu doar într-un tooltip — pe telefon nu există hover.
+  await expect(page.getByText('a signed opinion, not a finding of fact')).toBeVisible();
+
+  // Drumul înapoi în registru există din fiecare jumătate.
+  await expect(page.getByRole('link', { name: /See (all|these)/ }).first()).toBeVisible();
 });

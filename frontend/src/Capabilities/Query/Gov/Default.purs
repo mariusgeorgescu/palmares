@@ -17,6 +17,7 @@ module Capabilities.Query.Gov.Default
   , getWithdrawalsDefault
   , getDelegationsDefault
   , getActivityDefault
+  , getProfileDefault
   , getProfilesDefault
   , getAttestationsDefault
   , getDisputesDefault
@@ -43,6 +44,7 @@ import Capabilities.Query.Gov.Types
   , DelegationPage
   , ActivityPage
   , ProfilePage
+  , ProfileRow
   , AttestationPage
   , DisputePage
   , RegistrySummary
@@ -207,6 +209,14 @@ getProfilesDefault
   -> RegistryFilters
   -> m (Either ApiError ProfilePage)
 getProfilesDefault env f = getJson (env.queryBaseUrl <> "/profiles" <> queryOf (profileListHrefFor f))
+
+getProfileDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> String
+  -> m (Either ApiError ProfileRow)
+getProfileDefault env pid = getJson (env.queryBaseUrl <> "/profiles/" <> pid)
 
 getAttestationsDefault
   :: forall m r

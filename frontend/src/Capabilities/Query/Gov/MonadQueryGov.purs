@@ -22,6 +22,7 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getWithdrawals
   , getDelegations
   , getActivity
+  , getProfile
   , getProfiles
   , getAttestations
   , getDisputes
@@ -46,6 +47,7 @@ import Capabilities.Query.Gov.Types
   , DelegationPage
   , ActivityPage
   , ProfilePage
+  , ProfileRow
   , AttestationPage
   , DisputePage
   , RegistrySummary
@@ -122,6 +124,7 @@ class Monad m <= MonadQueryGov m where
   getActivity :: ActivityFilters -> m (Either ApiError ActivityPage)
 
   -- | `GET /profiles` — registrul de profiluri. Un profil e un TOKEN: cine îl deține, îl deține.
+  getProfile :: String -> m (Either ApiError ProfileRow)
   getProfiles :: RegistryFilters -> m (Either ApiError ProfilePage)
 
   -- | `GET /attestations` — cine ce a afirmat despre cine, și dacă subiectul a recunoscut.
@@ -151,6 +154,7 @@ instance monadQueryGovHalogenM ::
   getWithdrawals = lift <<< getWithdrawals
   getDelegations = lift <<< getDelegations
   getActivity = lift <<< getActivity
+  getProfile = lift <<< getProfile
   getProfiles = lift <<< getProfiles
   getAttestations = lift <<< getAttestations
   getDisputes = lift <<< getDisputes

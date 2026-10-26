@@ -44,6 +44,7 @@ data Route
   | TreasuryList WithdrawalFilters
   | DelegationList DelegationFilters
   | Activity ActivityFilters
+  | ProfileDetail String
   | ProfileList RegistryFilters
   | AttestationList RegistryFilters
   | DisputeList RegistryFilters
@@ -75,6 +76,7 @@ instance Show Route where
     TreasuryList _ -> "TreasuryList"
     DelegationList f -> "DelegationList " <> fromMaybe "" f.drep_id
     Activity f -> "Activity " <> fromMaybe "" f.before
+    ProfileDetail i -> "ProfileDetail " <> i
     ProfileList _ -> "ProfileList"
     AttestationList _ -> "AttestationList"
     DisputeList _ -> "DisputeList"

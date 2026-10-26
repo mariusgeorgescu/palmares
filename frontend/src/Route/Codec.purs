@@ -42,6 +42,8 @@ routeCodec = root $ sum
   , "TreasuryList": path "treasury" withdrawalFiltersCodec
   , "DelegationList": path "delegations" delegationFiltersCodec
   , "Activity": path "activity" activityFiltersCodec
+  -- Detaliul INAINTEA listei, ca `/profiles/<id>` sa nu fie inghitit de `/profiles`.
+  , "ProfileDetail": "profiles" / segment
   , "ProfileList": path "profiles" registryFiltersCodec
   , "AttestationList": path "attestations" registryFiltersCodec
   , "DisputeList": path "disputes" registryFiltersCodec

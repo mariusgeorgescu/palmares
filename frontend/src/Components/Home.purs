@@ -28,6 +28,7 @@ import Components.Explorer.ActionList as ActionList
 import Components.Explorer.DRepDetail as DRepDetail
 import Components.Explorer.DRepList as DRepList
 import Components.Explorer.Methodology as Methodology
+import Components.Explorer.ProfileDetail as ProfileDetail
 import Components.Explorer.ProfileList as ProfileList
 import Components.Explorer.SpoList as SpoList
 import Components.Explorer.TreasuryList as TreasuryList
@@ -79,6 +80,7 @@ type Slots =
   , treasuryList :: TreasuryList.Slot
   , delegationList :: DelegationList.Slot
   , activity :: Activity.Slot
+  , profileDetail :: ProfileDetail.Slot
   , profileList :: ProfileList.Slot
   , attestationList :: AttestationList.Slot
   , disputeList :: DisputeList.Slot
@@ -205,6 +207,7 @@ component =
     TreasuryList filters -> HH.slot_ TreasuryList._treasuryList unit TreasuryList.component filters
     DelegationList filters -> HH.slot_ DelegationList._delegationList unit DelegationList.component filters
     Activity filters -> HH.slot_ Activity._activity unit Activity.component filters
+    ProfileDetail pid -> HH.slot_ ProfileDetail._profileDetail unit ProfileDetail.component pid
     ProfileList filters -> HH.slot_ ProfileList._profileList unit ProfileList.component filters
     AttestationList filters -> HH.slot_ AttestationList._attestationList unit AttestationList.component filters
     DisputeList filters -> HH.slot_ DisputeList._disputeList unit DisputeList.component filters
@@ -240,6 +243,8 @@ documentTitle = case _ of
   TreasuryList _ -> "Treasury withdrawals — Palmares"
   DelegationList _ -> "Delegations — Palmares"
   Activity _ -> "Activity — Palmares"
+  -- Numele profilului nu se stie cind se pune titlul, deci id-ul scurtat, ca la DRep.
+  ProfileDetail pid -> shortId pid <> " — Palmares"
   ProfileList _ -> "Profiles — Palmares"
   AttestationList f ->
     if f.kind == Just "credential_claim" then "Verified credentials — Palmares"

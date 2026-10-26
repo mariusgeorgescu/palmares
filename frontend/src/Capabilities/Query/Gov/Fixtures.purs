@@ -20,6 +20,7 @@ module Capabilities.Query.Gov.Fixtures
   , withdrawalListFixture
   , delegationListFixture
   , activityFixture
+  , profileDetailFixture
   , profileListFixture
   , attestationListFixture
   , disputeListFixture
@@ -1890,5 +1891,24 @@ disputeListFixture =
   "total": 5,
   "limit": 5,
   "offset": 0
+}
+"""
+
+-- | Un singur profil, pentru `GET /profiles/{id}`. E primul din `profileListFixture`, ca linkul
+-- | din card sa duca in bundle-ul demo la un profil care EXISTA in lista de deasupra lui.
+profileDetailFixture :: String
+profileDetailFixture =
+  """
+{
+  "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043",
+  "name": "palmares-smoke-20261024T205314Z-subject",
+  "description": "subject profile for smoke-20261024T205314Z",
+  "image_uri": "ipfs://palmares-smoke-placeholder",
+  "kind": "person_d_rep",
+  "credential": "drep1yfdqa29j3hhsf9lsj490j59t7cgf0k5la5q8nqgkqkahpwq5hl35n",
+  "credential_is_script": false,
+  "claimant_count": 6,
+  "slot": 137280273,
+  "block_hash": "41f7db42e235aa400456cb50ba6b4519fc33889c4551807fb66c20855e0c0a65"
 }
 """

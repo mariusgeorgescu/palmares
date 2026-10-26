@@ -91,6 +91,7 @@ sameSection :: Route -> Route -> Boolean
 sameSection current target = case current, target of
   Home, Home -> true
   ProfileList _, ProfileList _ -> true
+  ProfileDetail _, ProfileList _ -> true
   AttestationList _, AttestationList _ -> true
   DisputeList _, DisputeList _ -> true
   Write _, Write _ -> true

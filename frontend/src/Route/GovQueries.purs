@@ -83,6 +83,9 @@ module Route.GovQueries
   , attestationListPath
   , attestationListHrefFor
   , verifiedCredentialsPath
+  , profileDetailHrefFor
+  , vouchesAboutHrefFor
+  , vouchesByHrefFor
   , disputeListPath
   , disputeListHrefFor
   , MethodologyFilters
@@ -365,11 +368,25 @@ type RegistryFilters =
   -- pune pe un SUBSET al registrului (`credential_claim`), nu pe altceva: aceleasi rinduri, acelasi
   -- tabel, alta intrebare. De-aia nu e un ecran separat.
   , kind :: Maybe String
+  -- Subiectul si emitentul. Sint aici pentru palmaresul unui profil, care are DOUA jumatati:
+  -- ce spun altii despre el (`subject`) si pentru ce girează el (`issuer`). Ruta dedicata
+  -- `/profiles/{id}/attestations` da doar prima — masurat: 4 rinduri, identic cu `?subject=`,
+  -- in timp ce `?issuer=` da 1. Deci nu o folosim: doua cereri pe lista existenta spun mai mult
+  -- decit una pe o ruta speciala.
+  , subject :: Maybe String
+  , issuer :: Maybe String
   }
 
 emptyRegistryFilters :: RegistryFilters
 emptyRegistryFilters =
-  { order_by: Nothing, sort_order: Nothing, limit: Nothing, offset: Nothing, kind: Nothing }
+  { order_by: Nothing
+  , sort_order: Nothing
+  , limit: Nothing
+  , offset: Nothing
+  , kind: Nothing
+  , subject: Nothing
+  , issuer: Nothing
+  }
 
 registryFiltersCodec :: RouteDuplex' RegistryFilters
 registryFiltersCodec =
@@ -379,12 +396,26 @@ registryFiltersCodec =
     # prop (Proxy :: Proxy "limit") (optional (param "limit"))
     # prop (Proxy :: Proxy "offset") (optional (param "offset"))
     # prop (Proxy :: Proxy "kind") (optional (param "kind"))
+    # prop (Proxy :: Proxy "subject") (optional (param "subject"))
+    # prop (Proxy :: Proxy "issuer") (optional (param "issuer"))
 
 profileListPath :: String
 profileListPath = "/profiles"
 
 profileListHrefFor :: RegistryFilters -> String
 profileListHrefFor f = profileListPath <> renderQuery (registryPairs f)
+
+-- | Pagina unui singur profil. Segment, nu parametru: e o adresa pe care o dai cuiva.
+profileDetailHrefFor :: String -> String
+profileDetailHrefFor pid = profileListPath <> "/" <> pid
+
+-- | Cele doua jumatati ale palmaresului, ca adrese pe care le poate deschide oricine: ce s-a
+-- | afirmat DESPRE profil, si ce a girat EL. Sint aceeasi lista de vouches, filtrata.
+vouchesAboutHrefFor :: String -> String
+vouchesAboutHrefFor pid = attestationListHrefFor (emptyRegistryFilters { subject = Just pid })
+
+vouchesByHrefFor :: String -> String
+vouchesByHrefFor pid = attestationListHrefFor (emptyRegistryFilters { issuer = Just pid })
 
 attestationListPath :: String
 attestationListPath = "/attestations"
@@ -519,7 +550,8 @@ sortPairs f = order <> optPair "limit" f.limit <> optPair "offset" f.offset
 -- | schimba corect -- si cererea catre API pleca nefiltrata, cu toate rindurile. Un filtru care se
 -- | vede in bara de adrese dar nu se aplica e mai rau decit unul care lipseste.
 registryPairs :: RegistryFilters -> Array (Tuple String String)
-registryPairs f = sortPairs f <> optPair "kind" f.kind
+registryPairs f = sortPairs f <> optPair "kind" f.kind <> optPair "subject" f.subject
+  <> optPair "issuer" f.issuer
 
 optPair :: String -> Maybe String -> Array (Tuple String String)
 optPair k = maybe [] \v -> [ Tuple k v ]

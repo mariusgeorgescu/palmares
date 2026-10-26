@@ -20,6 +20,7 @@ module Capabilities.Query.Gov.Mock
   , getWithdrawalsMock
   , getDelegationsMock
   , getActivityMock
+  , getProfileMock
   , getProfilesMock
   , getAttestationsMock
   , getDisputesMock
@@ -44,6 +45,7 @@ import Capabilities.Query.Gov.Fixtures
   , withdrawalListFixture
   , delegationListFixture
   , activityFixture
+  , profileDetailFixture
   , profileListFixture
   , attestationListFixture
   , disputeListFixture
@@ -65,6 +67,7 @@ import Capabilities.Query.Gov.Types
   , DelegationPage
   , ActivityPage
   , ProfilePage
+  , ProfileRow
   , AttestationPage
   , DisputePage
   , RegistrySummary
@@ -135,6 +138,9 @@ getDelegationsMock _ = pure (decodeFixture delegationListFixture)
 
 getActivityMock :: forall m. Applicative m => ActivityFilters -> m (Either ApiError ActivityPage)
 getActivityMock _ = pure (decodeFixture activityFixture)
+
+getProfileMock :: forall m. Applicative m => String -> m (Either ApiError ProfileRow)
+getProfileMock _ = pure (decodeFixture profileDetailFixture)
 
 getProfilesMock :: forall m. Applicative m => RegistryFilters -> m (Either ApiError ProfilePage)
 getProfilesMock _ = pure (decodeFixture profileListFixture)

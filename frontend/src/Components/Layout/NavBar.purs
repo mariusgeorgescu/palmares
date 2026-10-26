@@ -321,6 +321,7 @@ sameSection a b = section a == section b
     TreasuryList _ -> "treasury"
     DelegationList _ -> "delegations"
     Activity _ -> "activity"
+    ProfileDetail _ -> "profiles"
     ProfileList _ -> "profiles"
     AttestationList _ -> "attestations"
     DisputeList _ -> "disputes"

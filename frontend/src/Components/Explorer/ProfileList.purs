@@ -36,7 +36,13 @@ import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
 import Route (Route)
-import Route.GovQueries (RegistryFilters, drepDetailHrefFor, profileListHrefFor, writeHrefFor)
+import Route.GovQueries
+  ( RegistryFilters
+  , drepDetailHrefFor
+  , profileDetailHrefFor
+  , profileListHrefFor
+  , writeHrefFor
+  )
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -170,7 +176,16 @@ component =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
           [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline gap-2") ]
-              [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-base") ] [ HH.text r.name ]
+              -- Numele duce la pagina profilului. Pina acum cardul nu ducea nicaieri: ca sa afli
+              -- ce s-a afirmat despre cineva trebuia sa copiezi un id de saizeci de caractere din
+              -- chip si sa filtrezi de mina.
+              [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-base") ]
+                  [ HH.a
+                      [ HP.href (profileDetailHrefFor r.id)
+                      , HP.class_ (HH.ClassName "link link-hover")
+                      ]
+                      [ HH.text r.name ]
+                  ]
               , HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-outline") ] [ HH.text (humanize r.kind) ]
               ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-80") ] [ HH.text r.description ]
