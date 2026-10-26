@@ -28,6 +28,50 @@
 > ireversibilă, iar fără reluare fiecare defect de test ar fi cerut re-mintarea a tot ce era deja pe
 > lanț.
 
+## Cele două care nu se pot închide de aici
+
+Niciuna nu e muncă neterminată. Fiecare așteaptă ceva ce codul nu poate produce.
+
+### `resolve-dispute` — cheia adminului oracolului
+
+Ruta întoarce deliberat o tranzacție **nesemnată**: validatorul oracolului cere semnătura adminului,
+iar *„no admin action is accepted over HTTP"* (`RestAPI.hs`). Un browser obișnuit nu o poate
+încheia, și asta e intenția arhitecturii.
+
+Ce e dovedit: ruta construiește o tranzacție adevărată, sumarul ei se decodează, iar sumarul spune
+*„1 signature required beyond the inputs"* — singurul loc din interfață care explică de ce fluxul se
+oprește acolo. Vezi `e2e-wallet/all-flows-sign.spec.js`.
+
+Pentru a o încheia: semnează tranzacția întoarsă cu cheia al cărei hash e
+`5a0ea8b28def0497f0954af950abf61097da9fed0079811605bb70b8` și trimite-o. Disputa deschisă azi e
+`648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e04c424d3b3f36062346a4ca5de6f7f0f27d84e1f9d4ea82e890aed512`.
+
+### `expire-dispute` — **2026-11-24**
+
+Nu cere nicio autoritate — *„that is the point, since an exit the oracle admin can gate is not an
+exit"* — dar cere ca termenul să fi trecut. `dispute_timeout_ms` e 2.592.000.000 ms, adică 30 de
+zile de la deschidere. Disputa de mai sus a fost deschisă pe 2026-10-25, deci devine expirabilă pe
+**24 noiembrie 2026**.
+
+Până atunci serverul refuză cu `DisputeNotStaleYet`, „its deadline has not passed", iar refuzul e
+testat ca atare — e singura afirmație posibilă azi.
+
+**Comanda, pentru ziua aceea.** Nu cere nicio cheie și nicio autoritate:
+
+```bash
+cd frontend
+PALMARES_WALLET_URL=https://gov.cardano.vip PALMARES_FLOWS_SUBMIT=1 \
+  PALMARES_FLOWS_SKIP_UPDATE=1 PALMARES_FLOWS_SKIP_CLAIM=1 \
+  PALMARES_FLOWS_SKIP_WITHDRAW=1 PALMARES_FLOWS_SKIP_DISPUTE=1 \
+  npx playwright test --config playwright.wallet.config.js e2e-wallet/expire-dispute-chain.spec.js
+```
+
+Fișierul acela nu există încă: se scrie în ziua în care are ce face, fiindcă un test care nu poate
+trece decât peste o lună e un test care se strică în tăcere până atunci. Forma lui e
+`remaining-flows-chain.spec.js`, cu un singur pas — deschide `/write?flow=expire-dispute`, pune
+id-ul disputei, construiește, semnează, trimite, așteaptă ca rândul de pe `/disputes` să arate
+`expired`.
+
 ## Cele nouă fluxuri: unde ajunge fiecare
 
 Măsurat pe deploy la 2026-10-25. **Șapte din nouă sînt pe lanț, din browser.** Celelalte două sînt
