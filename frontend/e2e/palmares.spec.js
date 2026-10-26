@@ -654,3 +654,22 @@ test('a list is not a card you lift, and the pager says what it can do', async (
     'two permanently disabled pager buttons read as a broken control'
   ).toBe(true);
 });
+
+test('the home page answers why this is not just a website, and says what it does not do', async ({ page }) => {
+  // Ownerul a cerut de la inceput ca prima pagina sa explice simplu ce e platforma. Lipsea exact
+  // raspunsul la singura obiectie pe care o are orice vizitator: „de ce pe blockchain si nu o baza
+  // de date?". Fara el, restul paginii descrie un produs care pare ca putea fi un site oarecare.
+  await page.goto('/');
+
+  await expect(page.getByRole('heading', { name: 'Why not just a website?' })).toBeVisible();
+  // Patru contraste cu echivalentul web2, nu patru functii.
+  await expect(page.getByText('Nobody can delete you from someone else')).toBeVisible();
+  await expect(page.getByText('Consent cannot be faked by whoever runs it')).toBeVisible();
+  await expect(page.getByText("The identity is already the chain's")).toBeVisible();
+  await expect(page.getByText('Challenging a false claim is not a contact form')).toBeVisible();
+
+  // Si limitele. Onestitatea despre ce NU face e partea pe care un competitor n-o scrie, si de
+  // aceea e cel mai ieftin semnal de incredere care exista.
+  await expect(page.getByText('What this does not do')).toBeVisible();
+  await expect(page.getByText('It does not make claims true')).toBeVisible();
+});

@@ -31,6 +31,7 @@ import Capabilities.Query.Gov.Types (DRepSummary(..), DashboardPage(..), EpochPo
 import Components.Chart.Series as Series
 import Components.Shared.DRepIdentity as DRepIdentity
 import Data.Array (mapMaybe, null)
+import Data.FunctorWithIndex (mapWithIndex)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Foldable (maximum, minimum)
@@ -273,6 +274,82 @@ component =
           , HH.div [ HP.class_ (HH.ClassName "grid gap-3 md:grid-cols-3 scroll-reveal stagger-2") ]
               (map useCase useCases)
           , HH.div [ HP.class_ (HH.ClassName "scroll-reveal stagger-3") ] [ glossary ]
+          ]
+      , HH.div [ HP.class_ (HH.ClassName "section-divider mt-10") ] []
+      , whyNotAWebsite
+      , whatThisDoesNot
+      ]
+
+  -- OBIECȚIA PE CARE O ARE ORICE VIZITATOR, și la care pagina nu răspundea deloc: „de ce pe
+  -- blockchain și nu o bază de date obișnuită?". Fără ea, restul paginii descrie un produs care pare
+  -- că putea fi un site oarecare.
+  --
+  -- Fiecare punct e un CONTRAST cu echivalentul web2, nu o funcție: „nu există buton de ștergere" îi
+  -- spune cuiva ceva, „append-only" nu.
+  whyNotAWebsite =
+    HH.div [ HP.class_ (HH.ClassName "space-y-4 pt-10") ]
+      [ HH.h2 [ HP.class_ (HH.ClassName "text-2xl font-bold scroll-reveal") ]
+          [ HH.text "Why not just a website?" ]
+      , HH.div [ HP.class_ (HH.ClassName "grid gap-3 md:grid-cols-2") ]
+          (mapWithIndex contrastCard contrasts)
+      ]
+
+  contrastCard i c =
+    HH.div
+      [ HP.class_
+          (HH.ClassName ("card bg-base-200 explorer-card scroll-reveal stagger-" <> show (i + 1)))
+      ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body gap-1 p-4") ]
+          [ HH.h3 [ HP.class_ (HH.ClassName "font-semibold") ] [ HH.text c.title ]
+          , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-80") ] [ HH.text c.body ]
+          ]
+      ]
+
+  contrasts =
+    [ { title: "Nobody can delete you from someone else's history."
+      , body:
+          "A normal database has a delete button. Whoever runs it can make an inconvenient claim \
+          \disappear, and from outside you cannot tell never-happened from was-removed. Here that \
+          \button does not exist, for anyone, including us. A disputed claim is shown beside its \
+          \dispute, not instead of it."
+      }
+    , { title: "Consent cannot be faked by whoever runs it."
+      , body:
+          "On a normal site, accepted is a value the server writes, so whoever holds the database \
+          \can write it. Here it is a signature only the subject can produce. Nobody can confirm a \
+          \claim on your behalf, and the chain also refuses a claim issued about yourself."
+      }
+    , { title: "The identity is already the chain's."
+      , body:
+          "No invented accounts. Proving you control a governance key is cryptographic, checked by \
+          \the ledger's own signature rule, and it works the same for a key and for a script, which \
+          \is what committees and organisations actually are. So the record sits next to what that \
+          \key did."
+      }
+    , { title: "Challenging a false claim is not a contact form."
+      , body:
+          "The deposit is what separates a challenge from an opinion. And an undecided challenge \
+          \expires without needing anyone's permission, so nobody can block you by doing nothing."
+      }
+    ]
+
+  -- Și limitele, imediat sub. Onestitatea despre ce NU face e cel mai ieftin semnal de încredere care
+  -- există, iar un registru de reputație care și-ar ascunde limitele ar fi exact genul de lucru pe
+  -- care produsul ăsta pretinde că-l repară.
+  whatThisDoesNot =
+    HH.div [ HP.class_ (HH.ClassName "pt-8") ]
+      [ HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card scroll-reveal") ]
+          [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2 p-4") ]
+              [ HH.h3 [ HP.class_ (HH.ClassName "font-semibold") ]
+                  [ HH.text "What this does not do" ]
+              , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-80 max-w-3xl") ]
+                  [ HH.text
+                      "It does not make claims true. Nobody here verifies that the milestone \
+                      \shipped or the audit passed, and no system can. What it guarantees is \
+                      \narrower and harder: someone specific signed this, the subject agreed, \
+                      \nobody can take it back, and anyone can check."
+                  ]
+              ]
           ]
       ]
 
