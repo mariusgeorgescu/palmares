@@ -9,6 +9,7 @@ import Data.Aeson.Types qualified as AesonTypes
 import Data.ByteString qualified as BS
 import Data.ByteString.Base16 qualified as B16
 import Data.Char (isHexDigit)
+import Data.Foldable (asum)
 import Data.List.Extra
 import Data.Maybe (fromMaybe)
 import Data.Proxy (Proxy (..))
@@ -295,14 +296,51 @@ instance ToSchema Attestation where
             { AesonTypes.fieldLabelModifier = camelTo2 '_' . dropPrefix "attestation"
             }
 
+-- | The namespace every anchor key this build WRITES is prefixed with.
+--
+-- __Deliberately not the product name.__ Metadata keys go on chain and cannot be rewritten: the
+-- attestations already on preprod carry @palmares:level1_gov_action@ and will carry it for ever.
+-- Had the product been renamed with the brand baked into the namespace, every future reader would
+-- have had to know a name the product no longer uses — and the next rename would add a third.
+--
+-- So the namespace names the PROTOCOL, not the product: an attestation registry writes @attest:@
+-- whatever it is called this year. A rename is now a @sed@ over source and a schema rename; it does
+-- not touch a single byte of chain data.
+--
+-- Changing this value is a protocol change, not a cosmetic one. Adding to 'legacyAnchorNamespaces'
+-- is not.
+anchorNamespace :: Text
+anchorNamespace = "attest:"
+
+-- | Namespaces this build still READS, newest first, after 'anchorNamespace'.
+--
+-- @palmares:@ is here because rows written before 2026-10-26 carry it and always will. An entry is
+-- never removed: removing one makes older attestations silently lose their anchor, and a lost
+-- anchor reads as "this claim was never tied to a governance action" — a false statement about
+-- something somebody published.
+legacyAnchorNamespaces :: [Text]
+legacyAnchorNamespaces = ["palmares:"]
+
+-- | Every namespace a reader accepts, in precedence order.
+acceptedAnchorNamespaces :: [Text]
+acceptedAnchorNamespaces = anchorNamespace : legacyAnchorNamespaces
+
 -- | The @otherMetadata@ key carrying the governance action an attestation is anchored to —
--- __ADR 0008__.
+-- __ADR 0008__. This is the key this build WRITES; readers also accept the legacy spellings.
 levelOneAnchorActionKey :: Text
-levelOneAnchorActionKey = "palmares:level1_gov_action"
+levelOneAnchorActionKey = anchorNamespace <> "level1_gov_action"
 
 -- | The @otherMetadata@ key carrying the stake address paid by the anchored withdrawal.
 levelOneAnchorAddressKey :: Text
-levelOneAnchorAddressKey = "palmares:level1_stake_address"
+levelOneAnchorAddressKey = anchorNamespace <> "level1_stake_address"
+
+-- | Look a key up under every accepted namespace, in precedence order.
+--
+-- A row carrying BOTH spellings takes the current one: that can only happen if something wrote both,
+-- and the newer namespace is the one this build vouches for.
+lookupAnchorKey :: Text -> [(Text, Text)] -> Maybe Text
+lookupAnchorKey suffix entries =
+  asum (Prelude.map (\ns -> lookup (ns <> suffix) entries) acceptedAnchorNamespaces)
 
 -- | An attestation's optional pointer at the level-1 fact it comments on — __ADR 0008__.
 --
@@ -348,7 +386,7 @@ instance ToSchema LevelOneAnchor where
 -- @palmares.treasury_withdrawal.stake_address@ without a second normalisation nobody would remember.
 parseLevelOneAnchor :: [(Text, Text)] -> Either Text (Maybe LevelOneAnchor)
 parseLevelOneAnchor entries =
-  case (lookup levelOneAnchorActionKey entries, lookup levelOneAnchorAddressKey entries) of
+  case (lookupAnchorKey "level1_gov_action" entries, lookupAnchorKey "level1_stake_address" entries) of
     (Nothing, Nothing) -> Right Nothing
     -- An address with no action is not half an anchor: `palmares.treasury_withdrawal` is keyed by
     -- the PAIR, and one address can be paid by many actions, so there is nothing to resolve.
@@ -371,9 +409,16 @@ parseLevelOneAnchor entries =
         Left _ -> Left $ levelOneAnchorAddressKey <> " is not a bech32 stake address (stake…/stake_test…)"
         Right addr' -> Right (Just (LevelOneAnchor canonical addr'))
 
--- | The two anchor keys, for a caller that has to filter them out of a raw metadata listing.
+-- | Every anchor key spelling, for a caller that has to filter them out of a raw metadata listing.
+--
+-- ALL accepted namespaces, not just the one being written: an attestation stored under @palmares:@
+-- would otherwise show its anchor keys as ordinary user metadata, which is exactly the confusion
+-- the anchor exists to avoid.
 levelOneAnchorKeys :: [Text]
-levelOneAnchorKeys = [levelOneAnchorActionKey, levelOneAnchorAddressKey]
+levelOneAnchorKeys =
+  Prelude.concatMap
+    (\ns -> [ns <> "level1_gov_action", ns <> "level1_stake_address"])
+    acceptedAnchorNamespaces
 
 -- | What became of an attestation's level-1 anchor when the read layer confronted it with the data
 -- — __ADR 0008__.

@@ -16,6 +16,8 @@ import Palmares.DomainTypes.Core.Types
   ( LevelOneAnchor (..),
     levelOneAnchorActionKey,
     levelOneAnchorAddressKey,
+    levelOneAnchorKeys,
+    anchorNamespace,
     parseLevelOneAnchor,
   )
 import Data.String (fromString)
@@ -187,6 +189,38 @@ levelOneAnchorTests =
       -- key would make this False.
       testCase "the minting policy accepts the anchor as ordinary metadata" $
         validateOtherMetadata (map (\(k, v) -> (bbs k, bbs v)) anchorEntries) @?= True
+    ,
+      -- STAGE 0: namespace-ul de pe lanț nu mai e numele produsului.
+      --
+      -- Cheile de metadate se scriu pe lanț și nu se pot rescrie: atestările deja pe preprod poartă
+      -- `palmares:level1_gov_action` și o vor purta pentru totdeauna. Dacă namespace-ul ar fi rămas
+      -- legat de marcă, orice redenumire ar fi obligat fiecare cititor viitor să cunoască un nume pe
+      -- care produsul nu-l mai folosește — iar următoarea ar fi adăugat un al treilea.
+      testCase "what this build writes carries the protocol namespace, not the product name" $ do
+        assertBool
+          ("the write namespace must not carry a product name: " <> T.unpack anchorNamespace)
+          (anchorNamespace == "attest:"),
+      testCase "an attestation written under the OLD namespace still resolves its anchor" $ do
+        -- Rândul exact cum e pe preprod azi. Dacă testul ăsta cade, atestările publicate își pierd
+        -- ancora — iar o ancoră pierdută se citește ca „revendicarea asta n-a fost legată niciodată
+        -- de o acțiune de guvernanță", ceea ce e o afirmație falsă despre ceva ce cineva a publicat.
+        parseLevelOneAnchor [("palmares:level1_gov_action", action0)]
+          @?= parseLevelOneAnchor [(levelOneAnchorActionKey, action0)],
+      testCase "the old pair resolves too, address and all" $
+        parseLevelOneAnchor
+          [ ("palmares:level1_gov_action", action0),
+            ("palmares:level1_stake_address", stakeTestAddr)
+          ]
+          @?= parseLevelOneAnchor
+            [ (levelOneAnchorActionKey, action0),
+              (levelOneAnchorAddressKey, stakeTestAddr)
+            ],
+      testCase "both spellings are filtered out of a raw metadata listing" $ do
+        -- Altfel o atestare veche și-ar arăta cheile de ancoră ca metadate oarecare ale
+        -- utilizatorului — exact confuzia pe care ancora există s-o evite.
+        assertBool "the current spelling must be filtered" (levelOneAnchorActionKey `elem` levelOneAnchorKeys)
+        assertBool "the legacy spelling must be filtered" ("palmares:level1_gov_action" `elem` levelOneAnchorKeys)
+        assertBool "the legacy address spelling too" ("palmares:level1_stake_address" `elem` levelOneAnchorKeys)
     ]
   where
     action0 = govActionIdCip129 txid32 0
