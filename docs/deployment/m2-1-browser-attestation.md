@@ -234,3 +234,48 @@ motive, amândouă ale tale de decis:
 
 Dacă vrei automatizat: spune ce cheie, iar suita de wallet capătă un al treilea fișier, cu modul
 chain pornit și marcat să nu ruleze implicit.
+
+## Ciclul scurt pentru `expire-dispute`
+
+Fluxul a fost parcurs pe lanț (`flows-1793009237559-dispute` → `expired`), dar
+`expire-dispute-chain.spec.js` **nu are o rulare verde a lui însuși**: singura lui rulare reală a
+picat pe un selector pe care între timp l-am reparat, DUPĂ ce tranzacția plecase deja. Ca să-l
+înverzești fără să aștepți termenul de 30 de zile, ăsta e ciclul — scurtează, exersează, pune la loc.
+
+Două lucruri de știut înainte:
+
+* **O dispută deja deschisă NU devine expirabilă dacă scurtezi oracolul.** Ajutorul comenzii o spune
+  pe față: *„disputes already open keep their own deadline in their datum"*. Deci îți trebuie o
+  dispută **nouă**, deschisă cât timp parametrul e mic.
+* Costă 4 tranzacții, două dintre ele de admin pe oracolul viu, plus 5 tADA care se plimbă prin
+  depozit și se întorc.
+
+```bash
+cd palmares
+
+# 1. Scurtează oracolul la 5 minute. Cheia e `palmares/operation.prv` (NU cea din
+#    Decentralized-Belt-System — aceea are alt hash și nu e adminul oracolului).
+cabal run -v0 exe:admin -- set-dispute-timeout --milliseconds 300000
+
+# 2. Deschide o dispută NOUĂ din browser. Celelalte trei fluxuri se sar, ca să nu plătești degeaba.
+cd frontend
+PALMARES_WALLET_URL=https://gov.cardano.vip PALMARES_FLOWS_SUBMIT=1 \
+  PALMARES_FLOWS_SKIP_UPDATE=1 PALMARES_FLOWS_SKIP_CLAIM=1 PALMARES_FLOWS_SKIP_WITHDRAW=1 \
+  npx playwright test --config playwright.wallet.config.js e2e-wallet/remaining-flows-chain.spec.js
+
+# 3. Așteaptă să treacă termenul (5 minute de la slotul tranzacției, nu de la comandă).
+
+# 4. Expiră. Testul întreabă serverul despre FIECARE dispută nedecisă și o alege pe cea expirabilă,
+#    deci nu contează că mai există una cu termen de 30 de zile.
+PALMARES_WALLET_URL=https://gov.cardano.vip PALMARES_FLOWS_SUBMIT=1 \
+  npx playwright test --config playwright.wallet.config.js e2e-wallet/expire-dispute-chain.spec.js
+
+# 5. PUNE PARAMETRUL LA LOC. Pasul ăsta nu e opțional: lăsat la 5 minute, oracolul permite oricui
+#    să închidă orice dispută aproape imediat, adică exact protecția pe care fluxul o are de dat.
+cd .. && cabal run -v0 exe:admin -- set-dispute-timeout --milliseconds 2592000000
+```
+
+Pașii 1 și 5 sunt comenzi care **schimbă starea partajată** și sunt oprite de clasificatorul de
+permisiuni într-o sesiune de agent — nu din lipsă de autorizare, ci fiindcă cer o regulă explicită
+pentru `Bash`. Pe 24 noiembrie 2026 disputa deschisă pe 25 octombrie devine expirabilă singură, și
+atunci pasul 4 rulează fără niciunul din ceilalți.
