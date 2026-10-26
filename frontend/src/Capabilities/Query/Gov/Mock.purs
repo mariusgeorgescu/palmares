@@ -24,6 +24,7 @@ module Capabilities.Query.Gov.Mock
   , getProfilesMock
   , getAttestationMock
   , getAttestationsMock
+  , getDisputeMock
   , getDisputesMock
   , getRegistrySummaryMock
   , decodeFixture
@@ -46,6 +47,7 @@ import Capabilities.Query.Gov.Fixtures
   , withdrawalListFixture
   , delegationListFixture
   , activityFixture
+  , disputeDetailFixture
   , attestationDetailFixture
   , profileDetailFixture
   , profileListFixture
@@ -73,6 +75,7 @@ import Capabilities.Query.Gov.Types
   , AttestationDetail
   , AttestationPage
   , DisputePage
+  , DisputeRow
   , RegistrySummary
   )
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
@@ -153,6 +156,9 @@ getAttestationMock _ = pure (decodeFixture attestationDetailFixture)
 
 getAttestationsMock :: forall m. Applicative m => RegistryFilters -> m (Either ApiError AttestationPage)
 getAttestationsMock _ = pure (decodeFixture attestationListFixture)
+
+getDisputeMock :: forall m. Applicative m => String -> m (Either ApiError DisputeRow)
+getDisputeMock _ = pure (decodeFixture disputeDetailFixture)
 
 getDisputesMock :: forall m. Applicative m => RegistryFilters -> m (Either ApiError DisputePage)
 getDisputesMock _ = pure (decodeFixture disputeListFixture)

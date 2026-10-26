@@ -48,6 +48,7 @@ data Route
   | ProfileList RegistryFilters
   | AttestationDetail String
   | AttestationList RegistryFilters
+  | DisputeDetail String
   | DisputeList RegistryFilters
   | Graph GraphFilters
   | Embed EmbedFilters
@@ -81,6 +82,7 @@ instance Show Route where
     ProfileList _ -> "ProfileList"
     AttestationDetail i -> "AttestationDetail " <> i
     AttestationList _ -> "AttestationList"
+    DisputeDetail i -> "DisputeDetail " <> i
     DisputeList _ -> "DisputeList"
     Graph f -> "Graph " <> fromMaybe "" f.drep
     Embed f -> "Embed " <> fromMaybe "" f.drep

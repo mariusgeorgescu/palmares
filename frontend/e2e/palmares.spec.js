@@ -228,6 +228,7 @@ test.describe('at phone width', () => {
     '/attestations',
     '/attestations/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010708aa68abb20aa664efe2f68a46d4dc28c0ffe5f20b3dbd01b7ecc9df5',
     '/disputes',
+    '/disputes/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e019fd9551ab85480b95ed2c9ddb7524c1c6e56cb76f4d2f98a12f33db',
     '/graph',
     '/graph?drep=drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z',
     '/write',
@@ -348,6 +349,7 @@ for (const route of [
   '/attestations',
   '/attestations/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010708aa68abb20aa664efe2f68a46d4dc28c0ffe5f20b3dbd01b7ecc9df5',
   '/disputes',
+  '/disputes/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e019fd9551ab85480b95ed2c9ddb7524c1c6e56cb76f4d2f98a12f33db',
   '/graph',
   '/write?flow=issue-attestation',
 ]) {
@@ -723,5 +725,24 @@ test('a vouch page puts the challenge under the claim it attacks, with the proof
   // Și provocarea, sub afirmația pe care o atacă, cu depozitul ei.
   await expect(page.getByRole('heading', { name: 'Challenges' })).toBeVisible();
   await expect(page.getByText('flows-1793017633063-dispute')).toBeVisible();
+  await expect(page.getByText('5 ADA')).toBeVisible();
+});
+
+test('a challenge page explains its verdict, because a badge cannot', async ({ page }) => {
+  // §5.5 din harta API→ecran cerea exact asta: o adresă pe care o dai cuiva. Dar partea care
+  // contează e explicația: „expired" se citește greșit ca o constatare împotriva cuiva, iar o
+  // insignă singură nu poate spune că înseamnă doar că nimeni nu a decis la timp.
+  await page.goto('/disputes/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e019fd9551ab85480b95ed2c9ddb7524c1c6e56cb76f4d2f98a12f33db');
+
+  await expect(page.getByRole('heading', { name: 'palmares-smoke-20261024T205314Z-dispute', level: 1 }))
+    .toBeVisible();
+  await expect(page.getByText('did not survive the objection')).toBeVisible();
+
+  // Ținta și deschizătorul sînt linkuri, nu id-uri trunchiate.
+  await expect(page.getByText('Against the vouch')).toBeVisible();
+  await expect(page.getByText('Opened by')).toBeVisible();
+
+  // Miza, scrisă ca sumă.
+  await expect(page.getByText('Deposit at stake')).toBeVisible();
   await expect(page.getByText('5 ADA')).toBeVisible();
 });

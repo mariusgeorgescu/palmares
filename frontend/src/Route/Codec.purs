@@ -47,6 +47,7 @@ routeCodec = root $ sum
   , "ProfileList": path "profiles" registryFiltersCodec
   , "AttestationDetail": "attestations" / segment
   , "AttestationList": path "attestations" registryFiltersCodec
+  , "DisputeDetail": "disputes" / segment
   , "DisputeList": path "disputes" registryFiltersCodec
   , "Graph": path "graph" graphFiltersCodec
   , "Embed": path "embed" embedFiltersCodec

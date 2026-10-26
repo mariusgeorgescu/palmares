@@ -30,6 +30,7 @@ import Capabilities.Query.Gov.Default
   , getProfilesDefault
   , getAttestationDefault
   , getAttestationsDefault
+  , getDisputeDefault
   , getDisputesDefault
   , getRegistrySummaryDefault
   , getStatusDefault
@@ -127,6 +128,7 @@ instance MonadQueryGov AppM where
   getProfiles f = ask >>= \env -> getProfilesDefault env f
   getAttestation aid = ask >>= \env -> getAttestationDefault env aid
   getAttestations f = ask >>= \env -> getAttestationsDefault env f
+  getDispute did = ask >>= \env -> getDisputeDefault env did
   getDisputes f = ask >>= \env -> getDisputesDefault env f
   getRegistrySummary = ask >>= getRegistrySummaryDefault
 

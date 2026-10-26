@@ -325,6 +325,7 @@ sameSection a b = section a == section b
     ProfileList _ -> "profiles"
     AttestationDetail _ -> "attestations"
     AttestationList _ -> "attestations"
+    DisputeDetail _ -> "disputes"
     DisputeList _ -> "disputes"
     Graph _ -> "graph"
     -- Fișa de încorporat nu apare în bară, pentru că nu se navighează la ea: se pune în `iframe`.

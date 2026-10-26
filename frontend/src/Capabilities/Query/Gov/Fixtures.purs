@@ -20,6 +20,7 @@ module Capabilities.Query.Gov.Fixtures
   , withdrawalListFixture
   , delegationListFixture
   , activityFixture
+  , disputeDetailFixture
   , attestationDetailFixture
   , profileDetailFixture
   , profileListFixture
@@ -1962,5 +1963,27 @@ attestationDetailFixture =
     }
   ],
   "level1_anchor": null
+}
+"""
+
+-- | O singura provocare, pentru `GET /disputes/{id}`. Ruta intoarce chiar forma `DisputeRow`,
+-- | deci nu e nevoie de niciun tip nou. E PRIMUL rind din `disputeListFixture`, verbatim, ca un
+-- | clic in lista sa duca in bundle-ul demo la aceeasi provocare.
+disputeDetailFixture :: String
+disputeDetailFixture =
+  """
+{
+  "id": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e019fd9551ab85480b95ed2c9ddb7524c1c6e56cb76f4d2f98a12f33db",
+  "target": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.0000107051c34a05faa589d9ea5707dbbd366bd3df5a6338f042a7241c1f4a3f",
+  "opened_by": "648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0de31c9a96041fdeafb91d5d8f6b24f26826b3d740c4fc40090ffcae9",
+  "opened_at": "2026-10-24T21:06:38Z",
+  "stale_after": "2026-11-23T21:06:38Z",
+  "deposit": 5000000,
+  "verdict": "upheld",
+  "name": "palmares-smoke-20261024T205314Z-dispute",
+  "description": "dispute for smoke-20261024T205314Z",
+  "image_uri": "ipfs://palmares-smoke-placeholder",
+  "slot": 137280366,
+  "block_hash": "d411899af3f25e72d25b703ad775872630c460c0135e28824ddb19c6caf7e39f"
 }
 """

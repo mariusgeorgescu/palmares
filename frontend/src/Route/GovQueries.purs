@@ -87,6 +87,7 @@ module Route.GovQueries
   , vouchesAboutHrefFor
   , vouchesByHrefFor
   , attestationDetailHrefFor
+  , disputeDetailHrefFor
   , disputeListPath
   , disputeListHrefFor
   , MethodologyFilters
@@ -433,6 +434,11 @@ verifiedCredentialsPath = attestationListHrefFor (emptyRegistryFilters { kind = 
 -- | Pagina unui singur vouch. Segment, nu parametru: e o adresa pe care o dai cuiva.
 attestationDetailHrefFor :: String -> String
 attestationDetailHrefFor aid = attestationListPath <> "/" <> aid
+
+-- | Pagina unei singure provocari. §5.5 din harta API->ecran o cerea exact asa: „the target of a
+-- | notification or a shared URL".
+disputeDetailHrefFor :: String -> String
+disputeDetailHrefFor did = disputeListPath <> "/" <> did
 
 attestationListHrefFor :: RegistryFilters -> String
 attestationListHrefFor f = attestationListPath <> renderQuery (registryPairs f)

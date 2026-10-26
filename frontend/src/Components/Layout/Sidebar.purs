@@ -95,6 +95,7 @@ sameSection current target = case current, target of
   AttestationList _, AttestationList _ -> true
   AttestationDetail _, AttestationList _ -> true
   DisputeList _, DisputeList _ -> true
+  DisputeDetail _, DisputeList _ -> true
   Write _, Write _ -> true
   Activity _, Activity _ -> true
   Graph _, Graph _ -> true

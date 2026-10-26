@@ -21,6 +21,7 @@ module Capabilities.Query.Gov.Default
   , getProfilesDefault
   , getAttestationDefault
   , getAttestationsDefault
+  , getDisputeDefault
   , getDisputesDefault
   , getRegistrySummaryDefault
   ) where
@@ -49,6 +50,7 @@ import Capabilities.Query.Gov.Types
   , AttestationDetail
   , AttestationPage
   , DisputePage
+  , DisputeRow
   , RegistrySummary
   )
 import Data.Either (Either)
@@ -243,6 +245,14 @@ getDisputesDefault
   -> RegistryFilters
   -> m (Either ApiError DisputePage)
 getDisputesDefault env f = getJson (env.queryBaseUrl <> "/disputes" <> queryOf (disputeListHrefFor f))
+
+getDisputeDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> String
+  -> m (Either ApiError DisputeRow)
+getDisputeDefault env did = getJson (env.queryBaseUrl <> "/disputes/" <> did)
 
 -- | Trei cereri de un rând, trei `total`-uri. Dacă una cade, cade tot: un registru care ar arăta
 -- | „12 profiluri, ? atestări" pe pagina de pornire ar fi mai rău decât unul care spune că n-a

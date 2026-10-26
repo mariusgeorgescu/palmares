@@ -40,7 +40,13 @@ import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
 import Route (Route)
-import Route.GovQueries (RegistryFilters, disputeListHrefFor, emptyRegistryFilters, writeHrefFor)
+import Route.GovQueries
+  ( RegistryFilters
+  , disputeDetailHrefFor
+  , disputeListHrefFor
+  , emptyRegistryFilters
+  , writeHrefFor
+  )
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -221,7 +227,15 @@ component =
   row st (DisputeRow d) =
     HH.tr_
       [ HH.td_
-          [ HH.div_ [ HH.text d.name ]
+          -- Numele duce la pagina provocarii. §5.5 din harta API->ecran o cerea ca „the target of
+          -- a notification or a shared URL" — pina acum nu exista nicio adresa de dat cuiva.
+          [ HH.div_
+              [ HH.a
+                  [ HP.href (disputeDetailHrefFor d.id)
+                  , HP.class_ (HH.ClassName "link link-hover")
+                  ]
+                  [ HH.text d.name ]
+              ]
           , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text d.description ]
           ]
       , HH.td_ [ target st d.target ]

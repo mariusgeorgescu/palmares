@@ -18,6 +18,7 @@ import Components.Explorer.Committee as Committee
 import Components.Explorer.Activity as Activity
 import Components.Explorer.AttestationDetail as AttestationDetail
 import Components.Explorer.AttestationList as AttestationList
+import Components.Explorer.DisputeDetail as DisputeDetail
 import Components.Explorer.DisputeList as DisputeList
 import Components.Embed as Embed
 import Components.Write.Runner as WriteRunner
@@ -85,6 +86,7 @@ type Slots =
   , profileList :: ProfileList.Slot
   , attestationDetail :: AttestationDetail.Slot
   , attestationList :: AttestationList.Slot
+  , disputeDetail :: DisputeDetail.Slot
   , disputeList :: DisputeList.Slot
   , graph :: Graph.Slot
   , embed :: Embed.Slot
@@ -213,6 +215,7 @@ component =
     ProfileList filters -> HH.slot_ ProfileList._profileList unit ProfileList.component filters
     AttestationDetail aid -> HH.slot_ AttestationDetail._attestationDetail unit AttestationDetail.component aid
     AttestationList filters -> HH.slot_ AttestationList._attestationList unit AttestationList.component filters
+    DisputeDetail did -> HH.slot_ DisputeDetail._disputeDetail unit DisputeDetail.component did
     DisputeList filters -> HH.slot_ DisputeList._disputeList unit DisputeList.component filters
     Graph filters -> HH.slot_ Graph._graph unit Graph.component filters
     Write filters -> HH.slot_ WriteRunner._writeRunner unit WriteRunner.component filters
@@ -253,6 +256,7 @@ documentTitle = case _ of
   AttestationList f ->
     if f.kind == Just "credential_claim" then "Verified credentials — Palmares"
     else "Vouches — Palmares"
+  DisputeDetail did -> shortId did <> " — Palmares"
   DisputeList _ -> "Challenges — Palmares"
   Graph _ -> "Delegation graph — Palmares"
   Embed _ -> "Palmares governance record"
