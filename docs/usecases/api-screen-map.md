@@ -7,6 +7,23 @@ never seen this codebase and does not read Haskell.
 Two other documents cover *what the product does* (the attestation protocol; the governance read
 surface). This one covers *what the HTTP looks like*.
 
+## The UI calls these by other names
+
+The interface was given a plainer vocabulary than the protocol. **This document stays on the
+protocol's names, on purpose:** they are the names on the wire, in the route paths, in the JSON keys
+and in the error codes, and none of those changed. Translate only at the point where you write text a
+user reads.
+
+| On the wire, and in this document | What the screen says |
+| --------------------------------- | -------------------- |
+| attestation                       | vouch                |
+| dispute                           | challenge            |
+| the write screen (`/write`)       | Actions              |
+
+So `POST /issue-attestation` is the button labelled "Issue vouch", `dispute_id` is the field labelled
+"Challenge", and `GET /attestations` fills the page titled "Vouches". The URL segments did not change
+either: the register still lives at `/attestations` and `/disputes`.
+
 ## Provenance
 
 Everything below was measured against the live services on **2026-10-24** unless marked
