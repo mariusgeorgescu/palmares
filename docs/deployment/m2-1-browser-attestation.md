@@ -66,11 +66,21 @@ PALMARES_WALLET_URL=https://gov.cardano.vip PALMARES_FLOWS_SUBMIT=1 \
   npx playwright test --config playwright.wallet.config.js e2e-wallet/expire-dispute-chain.spec.js
 ```
 
-Fișierul acela nu există încă: se scrie în ziua în care are ce face, fiindcă un test care nu poate
-trece decât peste o lună e un test care se strică în tăcere până atunci. Forma lui e
-`remaining-flows-chain.spec.js`, cu un singur pas — deschide `/write?flow=expire-dispute`, pune
-id-ul disputei, construiește, semnează, trimite, așteaptă ca rândul de pe `/disputes` să arate
-`expired`.
+**Fișierul există și e sărit până atunci.** Argumentasem întâi că un test care nu poate trece o lună
+„se strică în tăcere" — și era inconsecvent: `m2-1-chain.spec.js` trăia deja exact așa. Un test
+sărit e vizibil în raport, poate fi citit azi, și rulează într-o comandă în ziua în care are ce face;
+unul nescris nu e niciunul din lucrurile astea.
+
+Rulat prea devreme, se sare cu motivul și cu DATA, nu cu un eșec obscur — verificat azi:
+
+> The deadline has not passed yet, so there is nothing to expire. The server says:
+> `{"code":"DisputeNotStaleYet",...}` — dispute 82e890aed512 opened 2026-10-25, expirable from
+> 2026-11-24.
+
+Garda întreabă serverul înainte de orice, cu adrese REALE: cu adrese goale serverul se oprește la
+validarea formei și nu ajunge să se uite la termen, iar testul ar fi căzut obscur în loc să spună
+data. Criteriul final e că rândul arată `expired` — nu `upheld` și nu `dismissed`, fiindcă o expirare
+nu e o constatare împotriva niciuneia dintre părți.
 
 ## Cele nouă fluxuri: unde ajunge fiecare
 
