@@ -35,6 +35,7 @@ import Format (formatDay, formatInt, humanize, matchLine)
 import Halogen as H
 import AppEnv as AppEnv
 import Components.Shared.OnchainId as OnchainId
+import Components.Shared.Pager as Pager
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -294,13 +295,14 @@ component =
       next = nextOffset offsetCeiling limit p.offset p.total
       hrefFor off = attestationListHrefFor (st.filters { offset = Just (show off), limit = Just (show limit) })
     in
-      HH.div [ HP.class_ (HH.ClassName "flex items-center justify-between gap-2") ]
-        [ pagerLink prev hrefFor "Previous"
-        , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
-            [ HH.text (formatInt p.total <> " in total") ]
-        , pagerLink next hrefFor "Next"
-        ]
+      Pager.render
+        { total: p.total
+        , offset: p.offset
+        , shown: length p.items
+        , ceiling: offsetCeiling
+        , prev
+        , next
+        , hrefFor
+        , noun: "attestation"
+        }
 
-  pagerLink target hrefFor label = case target of
-    Nothing -> HH.span [ HP.class_ (HH.ClassName "btn btn-sm btn-disabled") ] [ HH.text label ]
-    Just off -> HH.a [ HP.href (hrefFor off), HP.class_ (HH.ClassName "btn btn-sm") ] [ HH.text label ]

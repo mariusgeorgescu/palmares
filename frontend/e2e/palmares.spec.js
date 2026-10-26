@@ -618,3 +618,39 @@ test('the activity drawer opens over any screen and closes with Escape', async (
   await expect(drawer).toBeHidden();
   await expect(fab).toBeVisible();
 });
+
+test('a list is not a card you lift, and the pager says what it can do', async ({ page }) => {
+  // DOUA defecte raportate de owner pe aceleasi ecrane, amandoua reparate aici.
+  //
+  // 1. RIDICAREA LA HOVER ERA A LISTEI INTREGI. `explorer-card` s-a pus pe toate cele 59 de carduri,
+  //    iar pe /attestations si /disputes cardul acela e UNUL SINGUR si inveleste tabelul — deci
+  //    hover-ul oriunde ridica si scala toata lista. Ridicarea e un gest despre UN obiect; un tabel
+  //    de douazeci de randuri nu e un obiect.
+  // 2. PAGINATORUL arata doua butoane moarte permanent cand totul incape pe o pagina, ceea ce e
+  //    indistinguibil de un control rupt.
+  for (const route of ['/attestations', '/disputes']) {
+    await page.goto(route);
+    await expect(page.getByRole('table')).toBeVisible();
+
+    // Cardul care inveleste tabelul nu mai are tranzitia de ridicare.
+    const wrapper = page.locator('.explorer-card:has(table)').first();
+    await expect(wrapper).toBeVisible();
+    const lifts = await wrapper.evaluate((el) => {
+      const before = el.getBoundingClientRect().top;
+      el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      return getComputedStyle(el).transitionProperty;
+    });
+    expect(lifts, `${route}: a card wrapping a table must not animate a lift`).toBe('none');
+  }
+
+  // Si paginatorul: ori butoane care duc undeva, ori niciunul — niciodata doua moarte.
+  await page.goto('/attestations');
+  const dead = page.locator('span.btn-disabled');
+  const live = page.getByRole('link', { name: /Previous|Next/ });
+  const deadCount = await dead.count();
+  const liveCount = await live.count();
+  expect(
+    deadCount === 0 || liveCount > 0,
+    'two permanently disabled pager buttons read as a broken control'
+  ).toBe(true);
+});

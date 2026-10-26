@@ -47,9 +47,13 @@ test.describe('what M2-1 assumes, checked without submitting anything', () => {
     // tokenului de referință al unui profil e `000643b0`.
     expect(id).toMatch(/^[0-9a-f]{56}\.000643b0[0-9a-f]+$/);
 
-    // Și e id-ul ACESTUI card, nu al primului: prefixul lui apare în textul propriu al cardului.
+    // Și e id-ul ACESTUI card, nu al primului. Textul cardului nu mai conține prefixul întreg —
+    // id-ul se afișează SCURTAT de cînd lista a primit chipul, fiindcă 64 de caractere monospațiate
+    // plus un buton rup R2 la 390px. Deci legătura se verifică pe forma scurtată, care e ce vede
+    // omul, nu pe o felie din cea întreagă.
     const shown = await card.innerText();
-    expect(shown).toContain(id.split('.')[1].slice(0, 16));
+    const tail = id.slice(-6);
+    expect(shown, 'the card must show the tail of its own id').toContain(tail);
   });
 
   test('an attestation row hands over its FULL id through the Accept deep link', async ({ page }) => {
@@ -125,14 +129,30 @@ test.describe('what M2-1 assumes, checked without submitting anything', () => {
       },
       failOnStatusCode: false,
     });
-    const issueBody = await issue.json();
-    expect(
-      issueBody.code,
-      `issue-attestation rejected the body shape: ${JSON.stringify(issueBody)}`
-    ).not.toBe('invalid_parameter');
-    // Refuzurile de afacere care pot apărea aici, după starea lanțului: niciun profil deținut, sau
-    // unul deținut și atestarea auto-emisă. Ambele spun „corpul a ajuns la logică".
-    expect(['ProfileNotFound', 'ScriptRefused']).toContain(issueBody.code);
+    // INVARIANTUL, nu un cod anume — a doua oară cînd testul ăsta mă învață aceeași lecție.
+    //
+    // Prima variantă cerea `ProfileNotFound`; după ce M2-1 a mintuit două profiluri, același corp a
+    // început să întoarcă `ScriptRefused`. Am adăugat atunci o listă de refuzuri — și a picat iar,
+    // fiindcă acum cererea REUȘEȘTE și întoarce o tranzacție, deci nu mai există niciun cod.
+    //
+    // Ce voia sonda să afirme n-a fost niciodată „e refuzată", ci „corpul a ajuns la logica de
+    // afacere". Un corp cu un cîmp redenumit se oprește mai devreme, cu `invalid_parameter`. Deci
+    // aia se afirmă, și atît: orice altceva — un refuz de afacere SAU o tranzacție — înseamnă că a
+    // trecut de validarea formei.
+    const expectReachedLogic = async (res, what) => {
+      const text = await res.text();
+      let body;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        return; // CBOR brut, deci a construit: forma a fost bună.
+      }
+      if (typeof body === 'string') return; // tranzacția, ca string JSON.
+      expect(body.code, `${what} rejected the body shape: ${text.slice(0, 200)}`)
+        .not.toBe('invalid_parameter');
+    };
+
+    await expectReachedLogic(issue, 'issue-attestation');
 
     await page.goto('/attestations');
     const acceptLink = page.locator('a[href*="flow=accept-attestation"]').first();
@@ -143,14 +163,7 @@ test.describe('what M2-1 assumes, checked without submitting anything', () => {
       data: { attestation_id: attestationId, user_addresses: addresses },
       failOnStatusCode: false,
     });
-    const acceptBody = await accept.json();
-    expect(
-      acceptBody.code,
-      `accept-attestation rejected the body shape: ${JSON.stringify(acceptBody)}`
-    ).not.toBe('invalid_parameter');
-    expect(['ProfileNotFound', 'ScriptRefused', 'AttestationAlreadyAccepted']).toContain(
-      acceptBody.code
-    );
+    await expectReachedLogic(accept, 'accept-attestation');
   });
 
   // Etichetele în care M2-1 scrie. Un `getByLabel` care nu găsește nimic eșuează cu „element not

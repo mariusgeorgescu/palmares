@@ -26,6 +26,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Format (formatAda, formatInt, humanize, matchLine, pluralize)
 import Halogen as H
+import Components.Shared.Pager as Pager
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -398,23 +399,16 @@ component =
       next = nextOffset offsetCeiling limit p.offset p.total
       hrefFor off = actionListHrefFor (st.filters { offset = Just (show off), limit = Just (show limit) })
     in
-      HH.div [ HP.class_ (HH.ClassName "flex items-center justify-between gap-2") ]
-        [ pagerLink prev hrefFor "Previous"
-        , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
-            [ HH.text
-                ( case next of
-                    Just _ -> pluralize p.total "proposal" <> " in total"
-                    Nothing ->
-                      if p.offset + length p.items >= p.total then "End of results."
-                      else "Deeper pages are refused past offset " <> show offsetCeiling <> "."
-                )
-            ]
-        , pagerLink next hrefFor "Next"
-        ]
-
-  pagerLink target hrefFor label = case target of
-    Nothing -> HH.span [ HP.class_ (HH.ClassName "btn btn-sm btn-disabled") ] [ HH.text label ]
-    Just off -> HH.a [ HP.href (hrefFor off), HP.class_ (HH.ClassName "btn btn-sm") ] [ HH.text label ]
+      Pager.render
+        { total: p.total
+        , offset: p.offset
+        , shown: length p.items
+        , ceiling: offsetCeiling
+        , prev
+        , next
+        , hrefFor
+        , noun: "proposal"
+        }
 
   hasAnyFilter f =
     not (null f.type_) || not (null f.state) || not (null f.anchor_status) || isJust f.q

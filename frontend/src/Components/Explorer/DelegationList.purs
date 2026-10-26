@@ -30,6 +30,7 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String (Pattern(..), stripPrefix)
 import Format (formatAda, formatDay, matchLine, pluralize)
 import Halogen as H
+import Components.Shared.Pager as Pager
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -308,20 +309,14 @@ component =
       next = nextOffset offsetCeiling limit p.offset p.total
       hrefFor off = delegationListHrefFor (st.filters { offset = Just (show off), limit = Just (show limit) })
     in
-      HH.div [ HP.class_ (HH.ClassName "flex items-center justify-between gap-2") ]
-        [ pagerLink prev hrefFor "Previous"
-        , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
-            [ HH.text
-                ( case next of
-                    Just _ -> pluralize p.total "delegation" <> " in total"
-                    Nothing ->
-                      if p.offset + length p.items >= p.total then "End of results."
-                      else "Deeper pages are refused past offset " <> show offsetCeiling <> "."
-                )
-            ]
-        , pagerLink next hrefFor "Next"
-        ]
+      Pager.render
+        { total: p.total
+        , offset: p.offset
+        , shown: length p.items
+        , ceiling: offsetCeiling
+        , prev
+        , next
+        , hrefFor
+        , noun: "delegation"
+        }
 
-  pagerLink target hrefFor label = case target of
-    Nothing -> HH.span [ HP.class_ (HH.ClassName "btn btn-sm btn-disabled") ] [ HH.text label ]
-    Just off -> HH.a [ HP.href (hrefFor off), HP.class_ (HH.ClassName "btn btn-sm") ] [ HH.text label ]

@@ -37,6 +37,7 @@ import Data.Number.Format (fixed, toStringWith)
 import Data.Tuple (Tuple(..))
 import Format (formatAda, formatAdaOnly, formatInt, formatPercent, humanize, matchLine, pluralize)
 import Halogen as H
+import Components.Shared.Pager as Pager
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -461,20 +462,16 @@ component =
       next = nextOffset offsetCeiling limit p.offset p.total
       hrefFor off = drepListHrefFor (st.filters { offset = Just (show off), limit = Just (show limit) })
     in
-      HH.div [ HP.class_ (HH.ClassName "flex items-center justify-between gap-2") ]
-        [ pagerLink prev hrefFor "Previous"
-        , HH.span [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
-            [ HH.text
-                ( case next of
-                    Just _ -> ""
-                    Nothing ->
-                      if p.offset + length p.items >= p.total then "End of results."
-                      else "Deeper pages are refused past offset " <> show offsetCeiling
-                        <> "; narrow the filters instead."
-                )
-            ]
-        , pagerLink next hrefFor "Next"
-        ]
+      Pager.render
+        { total: p.total
+        , offset: p.offset
+        , shown: length p.items
+        , ceiling: offsetCeiling
+        , prev
+        , next
+        , hrefFor
+        , noun: "DRep"
+        }
 
   pagerLink target hrefFor label = case target of
     Nothing ->

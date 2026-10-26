@@ -501,3 +501,37 @@ html.js-reveal .scroll-reveal.in-view {
     animation: none !important;
   }
 }
+
+/* UN CARD CARE CONȚINE UN TABEL SAU O LISTĂ NU E UN CARD PE CARE ÎL RIDICI.
+ *
+ * Regresie proprie, raportată de owner: `explorer-card` s-a pus pe toate cele 59 de carduri, iar pe
+ * `/attestations` și `/disputes` cardul acela e UNUL SINGUR și învelește tabelul întreg — deci
+ * hover-ul oriunde în listă ridica și scala toată lista. Măsurat pe deploy: un singur
+ * `.explorer-card` per ecran, cu un `<table>` înăuntru.
+ *
+ * Ridicarea e un gest despre UN OBIECT: „ăsta e un lucru pe care îl poți apuca". Un tabel de
+ * douăzeci de rânduri nu e un obiect, iar ridicarea lui spune o minciună despre ce se întâmplă la
+ * clic. Pe `/profiles`, unde fiecare profil ARE cardul lui, comportamentul era corect de la început
+ * — de aceea regula distinge după conținut, nu după ecran.
+ *
+ * Prin `:has()` și nu prin editarea celor 59 de locuri: criteriul e „ce conține cardul", iar asta e
+ * exact ce `:has()` exprimă. O clasă în plus pe fiecare apel ar fi cerut ca fiecare autor viitor
+ * să-și amintească regula. */
+.explorer-card:has(table),
+.explorer-card:has(ul),
+.explorer-card:has(ol) {
+  transition: none;
+}
+
+.explorer-card:has(table):hover,
+.explorer-card:has(ul):hover,
+.explorer-card:has(ol):hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.explorer-card:has(table)::after,
+.explorer-card:has(ul)::after,
+.explorer-card:has(ol)::after {
+  content: none;
+}
