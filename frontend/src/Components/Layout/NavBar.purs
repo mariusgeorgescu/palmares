@@ -78,7 +78,8 @@ type State =
   }
 
 data Action
-  = NavLinkClicked Route MouseEvent
+  = Initialize
+  | NavLinkClicked Route MouseEvent
   | Receive Input
   | ToggleMenu
   | HandleWalletConnect WC.Output
@@ -99,6 +100,7 @@ component =
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
+        , initialize = Just Initialize
         , receive = Just <<< Receive
         }
     }
@@ -263,6 +265,22 @@ component =
     }
 
   handleAction = case _ of
+    -- FĂRĂ ASTA WIDGET-UL NU VEDE NICIUN WALLET, oricâte ar fi instalate.
+    --
+    -- Componenta de wallet nu enumeră extensiile la montare: singurul loc unde își umple
+    -- `availableWalletExtensions` e `handleQuery (SetWalletApi …)`. Deci lista rămâne goală până
+    -- când gazda îi trimite întrebarea aceea — iar palmares n-o trimitea niciodată, fiindcă
+    -- `NavBar` n-avea deloc `initialize`. Rezultatul, pe deploy: bara de sus scria „You do not have
+    -- any wallet installed yet !" în timp ce `/write` conecta același wallet fără probleme, fiindcă
+    -- ecranul acela nu folosește componenta, ci `getAvailableWallets` direct din `purescript-cip30`.
+    --
+    -- `bjj-frontend` o trimite în propriul `Initialize`, și de aceea la el merge. Aceeași bibliotecă,
+    -- aceeași versiune de API, doar că acolo cineva a chemat întrebarea.
+    --
+    -- `Nothing`: la montare nu există încă nicio conexiune. Interogarea nu e despre API, e despre
+    -- efectul ei secundar — enumerarea.
+    Initialize -> void (H.tell WC._walletConnect unit (WC.SetWalletApi Nothing))
+
     NavLinkClicked route ev -> do
       preventDefaultEvent (toEvent ev)
       -- Meniul de telefon se închide la navigare. Fără asta rămâne deschis peste ecranul nou.
