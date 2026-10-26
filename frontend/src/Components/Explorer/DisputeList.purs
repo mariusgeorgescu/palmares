@@ -40,7 +40,7 @@ import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
 import Route (Route)
-import Route.GovQueries (RegistryFilters, disputeListHrefFor, writeHrefFor)
+import Route.GovQueries (RegistryFilters, disputeListHrefFor, emptyRegistryFilters, writeHrefFor)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -120,7 +120,7 @@ component =
     -- Ca la atestări: o singură cerere, iar eșecul ei lasă identificatorii pe ecran în loc să
     -- strice tabelul.
     when (Map.isEmpty st.names) do
-      atts <- getAttestations { order_by: Nothing, sort_order: Nothing, limit: Just "200", offset: Nothing }
+      atts <- getAttestations (emptyRegistryFilters { limit = Just "200" })
       case atts of
         Left _ -> pure unit
         Right (AttestationPage ap) ->

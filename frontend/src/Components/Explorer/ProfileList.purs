@@ -107,8 +107,9 @@ component =
           [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Profiles" ]
           , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
               [ HH.text
-                  "Identities in the vouch registry. A profile is a token: whoever holds it \
-                  \holds the profile, and a profile may or may not claim a governance credential."
+                  "Identities in the register. A profile is a token: whoever holds it holds the \
+                  \profile. A profile may also prove control of a governance credential — that is the \
+                  \part that can be checked."
               ]
           , HH.a
               [ HP.href (writeHrefFor { flow: Just "claim-profile", subject: Nothing })

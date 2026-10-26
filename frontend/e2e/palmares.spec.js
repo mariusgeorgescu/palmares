@@ -25,14 +25,14 @@ test.describe('palmares, on recorded fixtures', () => {
     // navigare, unde omul îl caută ca să știe unde e; titlul e primul lucru pe care îl citește, iar
     // „Palmares" singur nu-i spunea nimic.
     await expect(
-      page.getByRole('heading', { name: /Who vouches for whom/, level: 1 })
+      page.getByRole('heading', { name: /Governance credentials/, level: 1 })
     ).toBeVisible();
     // Și eroul trebuie să ducă undeva: butoanele lui sînt singurul drum din pagina de pornire către
     // registru pentru cineva care nu știe încă ce e în bara de navigare.
-    // `.first()`: eroul și cardul de caz de utilizare poartă acum același îndemn, deliberat — e
-    // același drum, oferit o dată sus și o dată în context.
-    await expect(page.getByRole('link', { name: 'See who vouched for whom' }).first())
-      .toHaveAttribute('href', '/attestations');
+    // Duce la vederea FILTRATĂ pe revendicări de credențială, nu la registrul întreg: aia e
+    // promisiunea din titlu, și e singura care dă un răspuns întreg cu registrul aproape gol.
+    await expect(page.getByRole('link', { name: 'See what has been proved' }).first())
+      .toHaveAttribute('href', '/attestations?kind=credential_claim');
     // 294 înregistrați, dar 204 activi+inactivi: cifra din card și linkul de sub ea.
     await expect(page.getByText('294', { exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: '204 active or inactive' })).toBeVisible();

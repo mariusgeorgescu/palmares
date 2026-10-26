@@ -43,6 +43,7 @@ import Route.GovQueries
   , actionListHrefFor
   , activityPath
   , attestationListPath
+  , verifiedCredentialsPath
   , committeePath
   , defaultVoteFilters
   , delegationListPath
@@ -229,24 +230,24 @@ component =
                           "text-4xl sm:text-5xl lg:text-6xl font-black leading-tight animate-fade-in-up"
                       )
                   ]
-                  [ HH.text "Who vouches for whom, "
-                  , HH.span [ HP.class_ (HH.ClassName "gradient-text") ] [ HH.text "on chain" ]
+                  [ HH.text "Governance credentials, "
+                  , HH.span [ HP.class_ (HH.ClassName "gradient-text") ] [ HH.text "proved not claimed" ]
                   ]
               , HH.p
                   [ HP.class_ (HH.ClassName "text-lg sm:text-xl text-base-content/70 max-w-xl mx-auto animate-fade-in-up")
                   , HP.style "animation-delay: 0.2s"
                   ]
                   [ HH.text
-                      "Anyone can state something about someone else. The subject accepts it or \
-                      \does not, and anyone who thinks it is false can put money behind the \
-                      \challenge."
+                      "Control of a DRep id or committee credential is proved on chain by signature, \
+                      \not claimed in a profile. What people then say about each other is recorded \
+                      \beside it — signed by both sides, and never editable after the fact."
                   ]
               , HH.div
                   [ HP.class_ (HH.ClassName "flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-in-up")
                   , HP.style "animation-delay: 0.6s"
                   ]
-                  [ HH.a [ HP.href "/attestations", HP.class_ (HH.ClassName "btn btn-primary btn-md sm:btn-lg") ]
-                      [ HH.text "See who vouched for whom" ]
+                  [ HH.a [ HP.href verifiedCredentialsPath, HP.class_ (HH.ClassName "btn btn-primary btn-md sm:btn-lg") ]
+                      [ HH.text "See what has been proved" ]
                   , HH.a [ HP.href "/write", HP.class_ (HH.ClassName "btn btn-ghost btn-sm sm:btn-md") ]
                       [ HH.text "Make a claim of your own" ]
                   ]
@@ -361,11 +362,11 @@ component =
           profileListPath
           "from-success to-info"
           "0"
-      , figureCard "Vouches" (countOf st _.attestations) "Claims made about them."
+      , figureCard "Vouches" (countOf st _.attestations) "Signed statements, countersigned."
           attestationListPath
           "from-info to-accent"
           "80"
-      , figureCard "Challenges" (countOf st _.disputes) "Claims someone put money against."
+      , figureCard "Challenges" (countOf st _.disputes) "Statements someone staked a deposit against."
           disputeListPath
           "from-accent to-warning"
           "160"
@@ -732,13 +733,16 @@ component =
       , HH.td [ HP.class_ (HH.ClassName "text-right font-mono") ] [ HH.text (formatPercent d.participationRate) ]
       ]
 
--- | Cele trei lucruri pentru care deschide cineva site-ul. Toate trei sunt despre registru; al
--- | treilea duce în explorer, pentru că acolo se verifică dacă cel care pretinde ceva chiar votează.
+-- | Cele trei lucruri pentru care deschide cineva site-ul. Primul e verificarea controlului, nu
+-- | registrul de vouches: verificarea dă un răspuns întreg la PRIMA intrare, iar un registru de
+-- | reputație arată rupt pînă are o mie. Registrul rămîne la un clic, din plăci și din bara de
+-- | navigare. Al treilea duce în explorer, pentru că acolo se vede dacă cel care pretinde ceva
+-- | chiar votează.
 useCases :: Array { href :: String, title :: String, body :: String }
 useCases =
-  [ { href: attestationListPath
-    , title: "See who vouched for whom"
-    , body: "Every claim on the register: who made it, about whom, whether it was accepted, and whether anyone fought it."
+  [ { href: verifiedCredentialsPath
+    , title: "Check who controls a credential"
+    , body: "Every governance credential whose controller proved it by signature. Where two parties claim the same one, both are shown and neither is ranked."
     }
   , { href: writePath
     , title: "Make a claim of your own"
@@ -760,7 +764,11 @@ registryGroups :: Array { title :: String, entries :: Array { href :: String, la
 registryGroups =
   [ { title: "The register"
     , entries:
-        [ { href: profileListPath
+        [ { href: verifiedCredentialsPath
+          , label: "Verified credentials"
+          , description: "Credentials whose controller proved it by signature. A key and a multisig prove it the same way."
+          }
+        , { href: profileListPath
           , label: "Profiles"
           , description: "Identities. Each one is a token, and whoever holds the token holds the profile."
           }

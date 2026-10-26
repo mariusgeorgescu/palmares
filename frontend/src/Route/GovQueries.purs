@@ -82,6 +82,7 @@ module Route.GovQueries
   , profileListHrefFor
   , attestationListPath
   , attestationListHrefFor
+  , verifiedCredentialsPath
   , disputeListPath
   , disputeListHrefFor
   , MethodologyFilters
@@ -360,10 +361,15 @@ type RegistryFilters =
   , sort_order :: Maybe String
   , limit :: Maybe String
   , offset :: Maybe String
+  -- Felul atestarii. Exista ca filtru pentru ca intrebarea „cine controleaza credentiala asta" se
+  -- pune pe un SUBSET al registrului (`credential_claim`), nu pe altceva: aceleasi rinduri, acelasi
+  -- tabel, alta intrebare. De-aia nu e un ecran separat.
+  , kind :: Maybe String
   }
 
 emptyRegistryFilters :: RegistryFilters
-emptyRegistryFilters = { order_by: Nothing, sort_order: Nothing, limit: Nothing, offset: Nothing }
+emptyRegistryFilters =
+  { order_by: Nothing, sort_order: Nothing, limit: Nothing, offset: Nothing, kind: Nothing }
 
 registryFiltersCodec :: RouteDuplex' RegistryFilters
 registryFiltersCodec =
@@ -372,24 +378,34 @@ registryFiltersCodec =
     # prop (Proxy :: Proxy "sort_order") (optional (param "sort_order"))
     # prop (Proxy :: Proxy "limit") (optional (param "limit"))
     # prop (Proxy :: Proxy "offset") (optional (param "offset"))
+    # prop (Proxy :: Proxy "kind") (optional (param "kind"))
 
 profileListPath :: String
 profileListPath = "/profiles"
 
 profileListHrefFor :: RegistryFilters -> String
-profileListHrefFor f = profileListPath <> renderQuery (sortPairs f)
+profileListHrefFor f = profileListPath <> renderQuery (registryPairs f)
 
 attestationListPath :: String
 attestationListPath = "/attestations"
 
+-- | Lista de vouches filtrata pe revendicari de credentiala -- adica exact intrebarea pe care
+-- | produsul o pune pe primul loc: „cine controleaza de fapt credentiala asta?".
+-- |
+-- | Trece prin `attestationListHrefFor`, nu prin un sir scris de mina, ca numele parametrului sa
+-- | aiba UN singur loc unde se schimba. Si NU e un ecran separat: aceleasi coloane pe un subset,
+-- | fiindca un ecran nou ar fi fost cod duplicat pentru acelasi tabel.
+verifiedCredentialsPath :: String
+verifiedCredentialsPath = attestationListHrefFor (emptyRegistryFilters { kind = Just "credential_claim" })
+
 attestationListHrefFor :: RegistryFilters -> String
-attestationListHrefFor f = attestationListPath <> renderQuery (sortPairs f)
+attestationListHrefFor f = attestationListPath <> renderQuery (registryPairs f)
 
 disputeListPath :: String
 disputeListPath = "/disputes"
 
 disputeListHrefFor :: RegistryFilters -> String
-disputeListHrefFor f = disputeListPath <> renderQuery (sortPairs f)
+disputeListHrefFor f = disputeListPath <> renderQuery (registryPairs f)
 
 -- | Filtrele fluxului de activitate. Se paginează pe CURSOR, nu pe offset: `before` e cursorul
 -- | ultimului eveniment văzut, iar serverul nu publică un total (`D-18`), pentru că un flux pe
@@ -494,6 +510,16 @@ sortPairs f = order <> optPair "limit" f.limit <> optPair "offset" f.offset
   order = case f.order_by of
     Nothing -> []
     Just ob -> [ Tuple "order_by" ob, Tuple "sort_order" (fromMaybe "desc" f.sort_order) ]
+
+-- | Perechile celor trei liste de registru: sortarea si paginarea comune, plus `kind`.
+-- |
+-- | Exista separat de `sortPairs` fiindca `sortPairs` e folosit si de listele de SPO-uri si de
+-- | retrageri, care n-au `kind`. Si exista intr-un SINGUR loc pentru toate trei, fiindca prima
+-- | varianta a pus `kind` doar in codecul rutei: URL-ul browserului il purta, titlul paginii se
+-- | schimba corect -- si cererea catre API pleca nefiltrata, cu toate rindurile. Un filtru care se
+-- | vede in bara de adrese dar nu se aplica e mai rau decit unul care lipseste.
+registryPairs :: RegistryFilters -> Array (Tuple String String)
+registryPairs f = sortPairs f <> optPair "kind" f.kind
 
 optPair :: String -> Maybe String -> Array (Tuple String String)
 optPair k = maybe [] \v -> [ Tuple k v ]

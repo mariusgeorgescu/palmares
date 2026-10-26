@@ -43,7 +43,7 @@ import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
 import Route (Route)
-import Route.GovQueries (RegistryFilters, attestationListHrefFor, writeHrefFor)
+import Route.GovQueries (RegistryFilters, attestationListHrefFor, emptyRegistryFilters, writeHrefFor)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -115,7 +115,7 @@ component =
     -- identificatorii, ca înainte. Registrul are douăsprezece profiluri pe preprod, deci o cerere
     -- de 200 le acoperă; dacă ajunge să nu le mai acopere, ce se vede e un id, nu un nume greșit.
     when (Map.isEmpty st.names) do
-      profiles <- getProfiles { order_by: Nothing, sort_order: Nothing, limit: Just "200", offset: Nothing }
+      profiles <- getProfiles (emptyRegistryFilters { limit = Just "200" })
       case profiles of
         Left _ -> pure unit
         Right (ProfilePage pp) ->
@@ -124,12 +124,22 @@ component =
   render st =
     HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-4") ]
       [ HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
-          [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Vouches" ]
+          [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ]
+              [ HH.text (if isCredentialView st.filters then "Verified credentials" else "Vouches") ]
           , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
               [ HH.text
-                  "Someone stating something about someone else, on chain. Whether the subject \
-                  \accepted it and whether anyone challenged it are separate questions, and both are \
-                  \shown."
+                  ( if isCredentialView st.filters then
+                      "Every governance credential whose controller has proved it by signature. A key \
+                      \and a multisig prove it the same way. Where two parties claim the same \
+                      \credential, both are shown and neither is ranked — the registry does not decide \
+                      \who is right."
+                    else
+                      "What one profile states about another, countersigned by its subject. A vouch is \
+                      \a signed opinion, not a finding of fact: nobody countersigns criticism of \
+                      \themselves, so read this as what people are willing to put their name to. One \
+                      \marked \"not yet\" has been stated but not countersigned, which is not the same \
+                      \as denied."
+                  )
               ]
           ]
       , case st.page of
@@ -306,3 +316,8 @@ component =
         , noun: "vouch"
         }
 
+-- | Vederea filtrata pe revendicari de credentiala. Nu e un ecran separat: aceleasi coloane, acelasi
+-- | tabel, alt titlu si alt paragraf -- fiindca intrebarea „cine controleaza credentiala asta?" se
+-- | pune pe RINDURILE astea, nu pe altele. Un ecran nou ar fi fost cod duplicat.
+isCredentialView :: RegistryFilters -> Boolean
+isCredentialView f = f.kind == Just "credential_claim"

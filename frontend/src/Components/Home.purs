@@ -229,7 +229,7 @@ component =
 -- | coada, deci ce distinge ecranul trebuie să fie în față.
 documentTitle :: Route -> String
 documentTitle = case _ of
-  Home -> "Palmares — an on-chain register of who vouches for whom"
+  Home -> "Palmares — proof of who controls a Cardano governance credential"
   DRepList _ -> "DReps — Palmares"
   DRepDetail drepId -> shortId drepId <> " — Palmares"
   ActionList _ -> "Governance actions — Palmares"
@@ -241,7 +241,9 @@ documentTitle = case _ of
   DelegationList _ -> "Delegations — Palmares"
   Activity _ -> "Activity — Palmares"
   ProfileList _ -> "Profiles — Palmares"
-  AttestationList _ -> "Vouches — Palmares"
+  AttestationList f ->
+    if f.kind == Just "credential_claim" then "Verified credentials — Palmares"
+    else "Vouches — Palmares"
   DisputeList _ -> "Challenges — Palmares"
   Graph _ -> "Delegation graph — Palmares"
   Embed _ -> "Palmares governance record"

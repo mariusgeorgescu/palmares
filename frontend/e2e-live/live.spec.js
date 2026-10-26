@@ -15,7 +15,7 @@
 import { expect, test } from '@playwright/test';
 
 const ROUTES = [
-  ['/', 'Palmares — an on-chain register of who vouches for whom'],
+  ['/', 'Palmares — proof of who controls a Cardano governance credential'],
   ['/dreps', 'DReps — Palmares'],
   ['/gov-actions', 'Governance actions — Palmares'],
   ['/votes', 'Votes — Palmares'],
