@@ -24,7 +24,7 @@ import Data.Array (length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
-import Format (formatInt, humanize, matchLine, pluralize)
+import Format (enumLabel, formatInt, humanize, matchLine, pluralize)
 import Halogen as H
 import AppEnv as AppEnv
 import Components.Shared.OnchainId as OnchainId
@@ -186,7 +186,7 @@ component =
                       ]
                       [ HH.text r.name ]
                   ]
-              , HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-outline") ] [ HH.text (humanize r.kind) ]
+              , HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-outline") ] [ HH.text (enumLabel r.kind) ]
               ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-80") ] [ HH.text r.description ]
           -- Scurtat pe card, întreg în chip. Înainte, cardul randa id-ul INTEGRAL cu un `title`

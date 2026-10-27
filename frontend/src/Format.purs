@@ -16,6 +16,7 @@ module Format
   , formatLag
   , formatPercent
   , groupDigits
+  , enumLabel
   , humanize
   , matchLine
   , pluralize
@@ -132,6 +133,18 @@ roleLabel = case _ of
   "spo" -> "SPO"
   "constitutional_committee" -> "Constitutional committee"
   "committee_member" -> "Committee member"
+  other -> humanize other
+
+-- | Eticheta unei valori de enum de la server, unde maparea mecanică nu e de ajuns. Același tipar
+-- | ca `roleLabel`, din același motiv.
+-- |
+-- | `humanize` dă „Person d rep" pentru `person_d_rep`, care arată ca o greșeală de scriere. Iar
+-- | eticheta NU spune „DRep": a fi DRep e o FUNCȚIE care se poate adăuga oricărui fel de profil —
+-- | o pot revendica și organizațiile — deci nu are ce căuta în *felul* profilului. Credențiala se
+-- | arată separat, acolo unde e chiar dovedită prin semnătură.
+enumLabel :: String -> String
+enumLabel = case _ of
+  "person_d_rep" -> "Individual"
   other -> humanize other
 
 -- | `treasury_withdrawals` → `Treasury withdrawals`. Serverul publică enum-urile în snake_case;

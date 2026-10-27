@@ -23,7 +23,7 @@ test.describe('palmares, on recorded fixtures', () => {
 
     // Titlul paginii de pornire nu mai e numele produsului, ci ce face el. Numele rămîne în bara de
     // navigare, unde omul îl caută ca să știe unde e; titlul e primul lucru pe care îl citește, iar
-    // „Palmares" singur nu-i spunea nimic.
+    // „Testatum" singur nu-i spunea nimic.
     await expect(
       page.getByRole('heading', { name: /Governance credentials/, level: 1 })
     ).toBeVisible();
@@ -268,33 +268,33 @@ test.describe('at phone width', () => {
 // Titlul documentului e singurul lucru care distinge doua taburi deschise pe acelasi site.
 test('the document title names the screen', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle(/^Palmares/);
+  await expect(page).toHaveTitle(/^Testatum/);
   await page.goto('/votes');
-  await expect(page).toHaveTitle('Votes — Palmares');
+  await expect(page).toHaveTitle('Votes — Testatum');
   await page.goto('/gov-actions');
-  await expect(page).toHaveTitle('Governance actions — Palmares');
+  await expect(page).toHaveTitle('Governance actions — Testatum');
   await page.goto('/spos');
-  await expect(page).toHaveTitle('Stake pool operators — Palmares');
+  await expect(page).toHaveTitle('Stake pool operators — Testatum');
   await page.goto('/committee');
-  await expect(page).toHaveTitle('Constitutional committee — Palmares');
+  await expect(page).toHaveTitle('Constitutional committee — Testatum');
   await page.goto('/treasury');
-  await expect(page).toHaveTitle('Treasury withdrawals — Palmares');
+  await expect(page).toHaveTitle('Treasury withdrawals — Testatum');
   await page.goto('/delegations');
-  await expect(page).toHaveTitle('Delegations — Palmares');
+  await expect(page).toHaveTitle('Delegations — Testatum');
   await page.goto('/activity');
-  await expect(page).toHaveTitle('Activity — Palmares');
+  await expect(page).toHaveTitle('Activity — Testatum');
   await page.goto('/profiles');
-  await expect(page).toHaveTitle('Profiles — Palmares');
+  await expect(page).toHaveTitle('Profiles — Testatum');
   await page.goto('/attestations');
-  await expect(page).toHaveTitle('Vouches — Palmares');
+  await expect(page).toHaveTitle('Vouches — Testatum');
   await page.goto('/disputes');
-  await expect(page).toHaveTitle('Challenges — Palmares');
+  await expect(page).toHaveTitle('Challenges — Testatum');
   await page.goto('/graph');
-  await expect(page).toHaveTitle('Delegation graph — Palmares');
+  await expect(page).toHaveTitle('Delegation graph — Testatum');
   await page.goto('/write');
-  await expect(page).toHaveTitle('Act on chain — Palmares');
+  await expect(page).toHaveTitle('Act on chain — Testatum');
   await page.goto('/this-does-not-exist');
-  await expect(page).toHaveTitle('Not found — Palmares');
+  await expect(page).toHaveTitle('Not found — Testatum');
 });
 
 // Bara de navigare marcheaza sectiunea in care te afli, inclusiv pe o pagina de detaliu.
@@ -369,13 +369,13 @@ test('the embed card renders inside an iframe on a foreign page', async ({ page,
   const drep = 'drep1ydmraa6kv8cvmry059v608tehl50nfmg0z764lmsqkvwurs40sw2z';
   await page.setContent(
     `<!doctype html><html><body><h1>Someone else's site</h1>
-     <iframe id="w" src="${baseURL}/embed?drep=${drep}" title="Palmares governance record"
+     <iframe id="w" src="${baseURL}/embed?drep=${drep}" title="Testatum governance record"
              width="380" height="220" style="border:0"></iframe></body></html>`
   );
   const frame = page.frameLocator('#w');
   await expect(frame.getByText('Voting power')).toBeVisible();
   await expect(frame.getByText(drep.slice(0, 12), { exact: false })).toBeVisible();
-  // Linkul inapoi iese din cadru, altfel Palmares s-ar deschide intr-o fereastra de 380px.
+  // Linkul inapoi iese din cadru, altfel Testatum s-ar deschide intr-o fereastra de 380px.
   await expect(frame.getByRole('link', { name: /full record/ })).toHaveAttribute('target', '_top');
   // Si NU randeaza produsul nostru in miniatura: fara bara de navigare in cadru.
   await expect(frame.getByRole('navigation', { name: 'Main' })).toHaveCount(0);
@@ -431,7 +431,7 @@ test('a flow deep-linked with a subject arrives without breaking the route', asy
   await page.goto('/write?flow=open-dispute&subject=pol.assetname');
   // Ca identificatorul ajunge in cimpul potrivit se verifica unitar pe `buildRequest`; aici doar
   // ca ruta cu doi parametri se parseaza si randeaza fluxul cerut.
-  await expect(page).toHaveTitle('Act on chain — Palmares');
+  await expect(page).toHaveTitle('Act on chain — Testatum');
   await expect(page.getByRole('heading', { name: 'Open a challenge', exact: true })).toBeVisible();
 });
 

@@ -16,7 +16,7 @@ function maskValue(value, showLength = true) {
 // Read an env var or hard-fail if missing.
 //
 // The template's `getEnv(name, default)` is deliberately gone, and so are its 'cardano'/'lovelace'
-// defaults. Palmares is fail-closed everywhere else — compose.yaml uses `${VAR:?}` for every
+// defaults. Testatum is fail-closed everywhere else — compose.yaml uses `${VAR:?}` for every
 // password and interaction-api `die`s on an unset BASIC_USER — and .env.example records why: a
 // placeholder that happens to be a real default somewhere is how `devonly` ended up authorising
 // production-shaped boots. A BFF that silently proxies to localhost with guessed credentials is the

@@ -117,7 +117,7 @@ component =
       ]
       -- FĂRĂ `min-w-0` aici, și e intenționat: cu el, containerul mărcii se micșora la 52px în timp
       -- ce linkul dinăuntru rămânea 103px (un `btn` nu-și rupe textul), iar hamburgerul se desena
-      -- PESTE cuvântul „Palmares". Fără el, marca își ține lățimea și ce nu mai încape trece pe
+      -- PESTE cuvântul „Testatum". Fără el, marca își ține lățimea și ce nu mai încape trece pe
       -- rândul al doilea — ceea ce e tot ce voiam de la `flex-wrap`.
       [ HH.div [ HP.class_ (HH.ClassName "flex-1") ]
           [ HH.a
@@ -125,7 +125,7 @@ component =
               , HE.onClick (NavLinkClicked Home)
               , HP.class_ (HH.ClassName "btn btn-ghost text-xl normal-case px-2")
               ]
-              [ HH.text "Palmares" ]
+              [ HH.text "Testatum" ]
           ]
       , HH.div [ HP.class_ (HH.ClassName "flex-none flex items-center gap-1 sm:gap-2") ]
           [ menuButton st

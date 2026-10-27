@@ -27,7 +27,7 @@ import Components.Shared.OnchainId as OnchainId
 import Components.Shared.DRepIdentity (shortId)
 import Components.Write.Flows (FieldKind(..), buildRequest, flowSpecs, missingFields, specFor)
 import Components.Write.TxSummaryDecode (summarise)
-import Format (formatAda, pluralize)
+import Format (enumLabel, formatAda, pluralize)
 import Control.Monad.Reader (class MonadAsk)
 import Cardano.Wallet.Cip30 (Api, getAvailableWallets, getChangeAddress, getUsedAddresses, signTx)
 import Data.Array (length, null)
@@ -488,7 +488,11 @@ component =
         , HE.onValueChange (SetField spec.key)
         ]
         ( [ HH.option [ HP.value "" ] [ HH.text "—" ] ]
-            <> map (\o -> HH.option [ HP.value o, HP.selected (valueOf st spec == o) ] [ HH.text o ]) opts
+            -- Eticheta e umanizata, VALOAREA rimine enum-ul serverului: altfel lista ii arata omului
+            -- `person_d_rep` in snake_case, exact forma pe care nimeni nu ar trebui s-o vada.
+            <> map
+              (\o -> HH.option [ HP.value o, HP.selected (valueOf st spec == o) ] [ HH.text (enumLabel o) ])
+              opts
         )
 
   valueOf st spec = fromMaybe "" (Map.lookup spec.key st.values)

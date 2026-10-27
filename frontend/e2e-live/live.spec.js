@@ -15,20 +15,20 @@
 import { expect, test } from '@playwright/test';
 
 const ROUTES = [
-  ['/', 'Palmares — proof of who controls a Cardano governance credential'],
-  ['/dreps', 'DReps — Palmares'],
-  ['/gov-actions', 'Governance actions — Palmares'],
-  ['/votes', 'Votes — Palmares'],
-  ['/spos', 'Stake pool operators — Palmares'],
-  ['/committee', 'Constitutional committee — Palmares'],
-  ['/treasury', 'Treasury withdrawals — Palmares'],
-  ['/delegations', 'Delegations — Palmares'],
-  ['/activity', 'Activity — Palmares'],
-  ['/profiles', 'Profiles — Palmares'],
-  ['/attestations', 'Vouches — Palmares'],
-  ['/disputes', 'Challenges — Palmares'],
-  ['/graph', 'Delegation graph — Palmares'],
-  ['/methodology', 'Methodology — Palmares'],
+  ['/', 'Testatum — proof of who controls a Cardano governance credential'],
+  ['/dreps', 'DReps — Testatum'],
+  ['/gov-actions', 'Governance actions — Testatum'],
+  ['/votes', 'Votes — Testatum'],
+  ['/spos', 'Stake pool operators — Testatum'],
+  ['/committee', 'Constitutional committee — Testatum'],
+  ['/treasury', 'Treasury withdrawals — Testatum'],
+  ['/delegations', 'Delegations — Testatum'],
+  ['/activity', 'Activity — Testatum'],
+  ['/profiles', 'Profiles — Testatum'],
+  ['/attestations', 'Vouches — Testatum'],
+  ['/disputes', 'Challenges — Testatum'],
+  ['/graph', 'Delegation graph — Testatum'],
+  ['/methodology', 'Methodology — Testatum'],
 ];
 
 const FRESHNESS_HEADERS = [

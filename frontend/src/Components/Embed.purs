@@ -60,7 +60,7 @@ data Action
 embedSnippet :: String -> String -> String
 embedSnippet origin drepId =
   "<iframe src=\"" <> origin <> "/embed?drep=" <> drepId <> "\" "
-    <> "title=\"Palmares governance record\" "
+    <> "title=\"Testatum governance record\" "
     <> "width=\"380\" height=\"220\" loading=\"lazy\" "
     <> "style=\"border:0\"></iframe>"
 
@@ -139,14 +139,14 @@ component =
             ]
         , HH.div [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
             [ HH.text (pluralize m.votesCast "vote" <> " of " <> show m.eligibleActions <> " eligible · as of epoch " <> show m.asOfEpoch) ]
-        -- `target="_top"`: fără el, clicul deschide Palmares ÎN cadrul de 380px de pe site-ul
+        -- `target="_top"`: fără el, clicul deschide Testatum ÎN cadrul de 380px de pe site-ul
         -- gazdă, care e cea mai proastă pagină de pornire posibilă.
         , HH.a
             [ HP.href (drepDetailHrefFor s.id)
             , HP.target "_top"
             , HP.class_ (HH.ClassName "link link-hover text-xs")
             ]
-            [ HH.text "See the full record on Palmares →" ]
+            [ HH.text "See the full record on Testatum →" ]
         ]
 
   figure label value =

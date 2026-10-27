@@ -29,7 +29,7 @@ import Data.Array (length, null, take)
 import Data.Const (Const)
 import Data.Either (either)
 import Data.Maybe (Maybe(..), maybe)
-import Format (formatDay, humanize, pluralize)
+import Format (enumLabel, formatDay, humanize, pluralize)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -153,7 +153,7 @@ component =
     HH.div [ HP.class_ (HH.ClassName "space-y-2") ]
       [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline gap-2") ]
           [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text r.name ]
-          , HH.span [ HP.class_ (HH.ClassName "badge badge-outline") ] [ HH.text (humanize r.kind) ]
+          , HH.span [ HP.class_ (HH.ClassName "badge badge-outline") ] [ HH.text (enumLabel r.kind) ]
           ]
       , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ] [ HH.text r.description ]
       , HH.div [ HP.class_ (HH.ClassName "opacity-70") ]
