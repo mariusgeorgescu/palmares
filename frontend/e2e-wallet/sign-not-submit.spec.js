@@ -166,3 +166,108 @@ test.describe('the wallet really signs, and the bytes stop at the last edge', ()
     await expect(page.getByText(/Confirmed on chain/)).toHaveCount(0);
   });
 });
+
+// Cealaltă jumătate a aceleiași mecanici: ce se întâmplă CÂND se confirmă.
+//
+// Până la `1ed36fa` nu se întâmpla nimic — ecranul făcea o singură verificare, imediat după
+// trimitere, când e garantat prea devreme, iar confirmarea reală nu ajungea nicăieri. Acum
+// urmărirea e în înveliș, deci supraviețuiește navigării, iar o confirmare face trei lucruri:
+// o notificare, cardul de pe ecranul de scriere, și o reinterogare a ecranelor montate.
+//
+// Construirea e reală (serverul local); doar cele două rute de după semnătură sunt oprite —
+// `submit-tx`, fiindcă e ireversibilă, și `tx-status`, fiindcă altfel nu există confirmare de
+// așteptat pentru o tranzacție care n-a plecat.
+test.describe('what a confirmation does, with nothing on chain', () => {
+  const WALLET2 = 'confirmProbe';
+  test.use({ walletOptions: { name: WALLET2, networkId: 0 } });
+
+  // Partea care se vede pe ecranul de scriere, dacă omul a rămas pe el.
+  test('notifies and flips the card', async ({ page }) => {
+    await patch(page);
+    await buildAndSubmit(page, 'confirm-card');
+
+    // Notificarea de trimitere, imediat, plus banda care se vede pe orice ecran.
+    await expect(page.getByText(/submitted\. Waiting for the chain/)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/transaction waiting for the chain/)).toBeVisible();
+
+    // Prima interogare de status vine la 10 secunde — `confirmPollDelayMs 0`, testat unitar.
+    await expect(page.getByText(/is confirmed on chain/)).toBeVisible({ timeout: 60_000 });
+    // Cardul, prin `MarkConfirmed`. Majusculă: propoziția din card, nu notificarea.
+    await expect(page.getByText(/Confirmed on chain/)).toBeVisible();
+    // Și banda a dispărut: nimic nu mai e în zbor.
+    await expect(page.getByText(/transaction waiting for the chain/)).toHaveCount(0);
+  });
+
+  // Partea care contează mai mult, fiindcă e ce face omul: pleacă de pe ecran.
+  //
+  // Afirmația e că urmărirea SUPRAVIEȚUIEȘTE ecranului și că registrul reinteroghează de la sine.
+  // Navigarea e prin linkul din bară, nu `page.goto` — un `goto` reîncarcă pagina, deci ar omorî
+  // exact învelișul care urmărește, și testul ar trece degeaba.
+  test('keeps watching after you leave, and the register re-queries by itself', async ({ page }) => {
+    await patch(page);
+
+    const profileQueries = [];
+    page.on('request', (r) => {
+      if (r.url().includes('/api/query/profiles')) profileQueries.push(r.url());
+    });
+
+    await buildAndSubmit(page, 'confirm-refresh');
+    await expect(page.getByText(/submitted\. Waiting for the chain/)).toBeVisible({ timeout: 60_000 });
+
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Profiles' }).first().click();
+    await expect(page.getByRole('heading', { name: /Profiles/ }).first()).toBeVisible();
+    await expect.poll(() => profileQueries.length, { timeout: 30_000 }).toBeGreaterThan(0);
+    const afterMount = profileQueries.length;
+
+    // Confirmarea ajunge aici, pe alt ecran — și trage registrul după ea.
+    await expect(page.getByText(/is confirmed on chain/)).toBeVisible({ timeout: 60_000 });
+    await expect
+      .poll(() => profileQueries.length, { timeout: 30_000 })
+      .toBeGreaterThan(afterMount);
+  });
+});
+
+// CIP-142 peste providerul real, plus cele două rute de după semnătură. `tx-status` spune „da":
+// de aici vine tot ce verifică testele de mai sus.
+const patch = async (page) => {
+  await page.addInitScript((walletName) => {
+    const install = () => {
+      const w = window.cardano?.[walletName];
+      if (!w || w.__cip142Patched) return false;
+      w.__cip142Patched = true;
+      const original = w.enable.bind(w);
+      w.enable = async (opts) => {
+        const api = await original(opts);
+        api.cip142 = { getNetworkMagic: async () => 1 };
+        return api;
+      };
+      w.supportedExtensions = [...(w.supportedExtensions ?? []), { cip: 142 }];
+      return true;
+    };
+    if (!install()) {
+      const t = setInterval(() => install() && clearInterval(t), 25);
+    }
+  }, 'confirmProbe');
+
+  await page.route('**/api/interaction/submit-tx', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify('1'.repeat(64)) })
+  );
+  await page.route('**/api/interaction/tx-status/**', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: 'true' })
+  );
+};
+
+const buildAndSubmit = async (page, marker) => {
+  await page.goto('/write?flow=claim-profile');
+  await connectFromNavbar(page, 'confirmProbe');
+  await expect(page.getByText('ready', { exact: true })).toBeVisible();
+
+  await page.getByLabel('Kind', { exact: false }).first().selectOption('person_d_rep');
+  await page.getByLabel('Name', { exact: false }).first().fill(`${marker}-${Date.now() % 100000}`);
+  await page.getByLabel('Description', { exact: false }).first().fill('confirmation, nothing on chain');
+  await page.getByLabel('Image URI', { exact: false }).first().fill(`ipfs://${marker}`);
+
+  await page.getByRole('button', { name: /Build the transaction/ }).click();
+  await expect(page.getByText('What this transaction does')).toBeVisible({ timeout: 180_000 });
+  await page.getByRole('button', { name: /Sign and submit/ }).click();
+};

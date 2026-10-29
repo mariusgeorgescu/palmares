@@ -28,7 +28,7 @@ import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String (Pattern(..), stripPrefix)
-import Format (formatAda, formatDay, matchLine, pluralize)
+import Format (formatAda, formatDay, matchLine)
 import Halogen as H
 import Components.Shared.Pager as Pager
 import Halogen.HTML as HH

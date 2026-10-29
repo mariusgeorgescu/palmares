@@ -31,6 +31,7 @@ import Capabilities.Query.Gov.Types
   )
 import Components.Explorer.DisputeList (verdictClass)
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Refresh (subscribeRefresh)
 import Data.Const (Const)
 import Data.Either (Either(..), either)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -40,9 +41,11 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
+import Halogen.Store.Monad (class MonadStore)
 import Network.RemoteData (RemoteData(..))
 import Route (Route)
 import Route.GovQueries (attestationDetailHrefFor, profileDetailHrefFor, writeHrefFor)
+import Store as Store
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -69,6 +72,7 @@ data Action
 component
   :: forall q m
    . MonadQueryGov m
+  => MonadStore Store.Action Store.Store m
   => MonadRouter Route m
   => H.Component q Input Output m
 component =
@@ -84,7 +88,11 @@ component =
     }
   where
   handleAction = case _ of
-    Initialize -> void (H.fork load)
+    Initialize -> do
+      -- O scriere confirmată schimbă ce arată ecranul ăsta, iar proiecția vine ~45s după
+      -- tranzacție — deci nu se poate încărca o dată și gata.
+      subscribeRefresh Retry
+      void (H.fork load)
     Retry -> load
     Receive did -> do
       st <- H.get

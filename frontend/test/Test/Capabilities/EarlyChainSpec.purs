@@ -36,7 +36,6 @@ import Data.Foldable (foldl)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.String.Regex (Regex, regex, replace) as R
 import Data.String.Regex.Flags (global) as RF
-import Effect.Aff (Aff)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 

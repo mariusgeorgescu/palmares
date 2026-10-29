@@ -473,12 +473,6 @@ component =
         , noun: "DRep"
         }
 
-  pagerLink target hrefFor label = case target of
-    Nothing ->
-      HH.span [ HP.class_ (HH.ClassName "btn btn-sm btn-disabled") ] [ HH.text label ]
-    Just off ->
-      HH.a [ HP.href (hrefFor off), HP.class_ (HH.ClassName "btn btn-sm") ] [ HH.text label ]
-
   hasAnyFilter f =
     not (null f.status) || not (null f.anchor_status) || not (null f.language)
       || isJust f.q

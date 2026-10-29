@@ -24,6 +24,7 @@ import Capabilities.Query.Gov.Http (ApiError, renderApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestations, getProfile)
 import Capabilities.Query.Gov.Types (AttestationPage(..), AttestationRow(..), ProfileRow(..))
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Refresh (subscribeRefresh)
 import Components.Shared.OnchainId as OnchainId
 import Data.Array (filter, length, null, take)
 import Data.Const (Const)
@@ -36,6 +37,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
+import Halogen.Store.Monad (class MonadStore)
 import Network.RemoteData (RemoteData(..))
 import Route (Route)
 import Route.GovQueries
@@ -46,6 +48,7 @@ import Route.GovQueries
   , vouchesByHrefFor
   , writeHrefFor
   )
+import Store as Store
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -98,6 +101,7 @@ dropSelfIssued pid (AttestationPage p) =
 component
   :: forall q m
    . MonadQueryGov m
+  => MonadStore Store.Action Store.Store m
   => MonadRouter Route m
   => H.Component q Input Output m
 component =
@@ -115,7 +119,11 @@ component =
   -- `H.fork` pentru acelasi motiv ca in liste: initializatorul copilului tine deschisa
   -- initializarea PARINTELUI, iar parintele pune titlul documentului.
   handleAction = case _ of
-    Initialize -> void (H.fork load)
+    Initialize -> do
+      -- O scriere confirmată schimbă ce arată ecranul ăsta, iar proiecția vine ~45s după
+      -- tranzacție — deci nu se poate încărca o dată și gata.
+      subscribeRefresh Retry
+      void (H.fork load)
     Retry -> load
     Receive pid -> do
       st <- H.get

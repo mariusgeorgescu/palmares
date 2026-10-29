@@ -30,6 +30,7 @@ import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getDashboard, 
 import Capabilities.Query.Gov.Types (DRepSummary(..), DashboardPage(..), EpochPoint(..), GovActionSummary(..), Lovelace, RegistrySummary)
 import Components.Chart.Series as Series
 import Components.Shared.DRepIdentity as DRepIdentity
+import Components.Shared.Refresh (subscribeRefresh)
 import Data.Array (mapMaybe, null)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Const (Const)
@@ -64,7 +65,9 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Store.Monad (class MonadStore)
 import Network.RemoteData (RemoteData(..))
+import Store as Store
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -124,6 +127,7 @@ participationSeries (DashboardPage p) = map point p.participationByEpoch
 component
   :: forall q i m
    . MonadQueryGov m
+  => MonadStore Store.Action Store.Store m
   => H.Component q i Output m
 component =
   H.mkComponent
@@ -140,7 +144,10 @@ component =
     -- PĂRINTELUI, iar părintele e cel care pune titlul documentului. Măsurat pe deploy:
     -- `/activity` răspunde în 12 secunde pe baza vie, iar tab-ul scria titlul generic tot timpul
     -- ăla. Un ecran lent nu are voie să țină în loc cadrul aplicației.
-    Initialize -> void (H.fork load)
+    Initialize -> do
+      -- O scriere confirmată schimbă cifrele de aici, iar proiecția vine ~45s după tranzacție.
+      subscribeRefresh Retry
+      void (H.fork load)
     Retry -> load
 
   load = do

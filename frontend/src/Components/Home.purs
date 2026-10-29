@@ -229,6 +229,9 @@ component =
     case res of
       Right true -> do
         forget tx.txId
+        -- Ecranele montate reinterogheaza. Pînă acum nimeni nu știa CÎND se confirmă o scriere,
+        -- deci registrul rămînea cel dinaintea ei pe ecranul la care omul se uita.
+        updateStore Store.Refresh
         handleAction (Notify Toast.Success (tx.label <> " is confirmed on chain."))
         -- Dacă ecranul de scriere mai e montat, își schimbă cardul; dacă nu, notificarea a spus
         -- deja tot. Un `tell` către un slot demontat nu face nimic, și e exact ce trebuie.

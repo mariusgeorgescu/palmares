@@ -26,13 +26,14 @@ import Capabilities.Query.Gov.Http (ApiError, renderApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestations, getProfiles)
 import Capabilities.Query.Gov.Types (AttestationPage(..), AttestationRow(..), ProfilePage(..), ProfileRow(..))
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Refresh (subscribeRefresh)
 import Data.Array (length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Tuple (Tuple(..))
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
+import Data.Maybe (Maybe(..), isJust, isNothing)
 import Format (formatDay, formatInt, humanize, matchLine)
 import Halogen as H
 import AppEnv as AppEnv
@@ -42,6 +43,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
+import Halogen.Store.Monad (class MonadStore)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
 import Route (Route)
@@ -52,6 +54,7 @@ import Route.GovQueries
   , emptyRegistryFilters
   , writeHrefFor
   )
+import Store as Store
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -81,6 +84,7 @@ data Action
 component
   :: forall q m
    . MonadQueryGov m
+  => MonadStore Store.Action Store.Store m
   => MonadRouter Route m
   => H.Component q Input Output m
 component =
@@ -99,7 +103,11 @@ component =
     -- PĂRINTELUI, iar părintele e cel care pune titlul documentului. Măsurat pe deploy:
     -- `/activity` răspunde în 12 secunde pe baza vie, iar tab-ul scria titlul generic tot timpul
     -- ăla. Un ecran lent nu are voie să țină în loc cadrul aplicației.
-    Initialize -> void (H.fork load)
+    Initialize -> do
+      -- O scriere confirmată schimbă ce arată ecranul ăsta, iar proiecția vine ~45s după
+      -- tranzacție — deci nu se poate încărca o dată și gata.
+      subscribeRefresh Retry
+      void (H.fork load)
     Retry -> load
     Receive filters -> do
       st <- H.get

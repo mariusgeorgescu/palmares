@@ -652,7 +652,7 @@ component =
                   \offered for signing. Nothing has happened on chain."
               ]
           ]
-      Just sum -> summaryCard st tx sum
+      Just sum -> summaryCard tx sum
     Signing _ ->
       HH.div [ HP.class_ (HH.ClassName "alert alert-info text-sm") ]
         [ HH.span_ [ HH.text "Waiting for your wallet. Nothing has been submitted yet." ] ]
@@ -707,7 +707,7 @@ component =
               ]
       ]
 
-  summaryCard st tx sum =
+  summaryCard tx sum =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body gap-3") ]
           [ HH.h3 [ HP.class_ (HH.ClassName "card-title text-base") ]

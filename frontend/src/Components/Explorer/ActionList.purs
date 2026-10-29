@@ -24,7 +24,7 @@ import Data.Array (elem, length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
-import Format (formatAda, formatInt, humanize, matchLine, pluralize)
+import Format (formatAda, formatInt, humanize, matchLine)
 import Halogen as H
 import Components.Shared.Pager as Pager
 import Halogen.HTML as HH

@@ -40,12 +40,22 @@ unUsername (Username s) = s
 type Store =
   { wallet :: Maybe GateVerdict
   , user :: Maybe Username
+  -- Crește o dată per scriere CONFIRMATĂ pe lanț. Ecranele care arată ce schimbă o scriere se
+  -- abonează la ea și reinterogează.
+  --
+  -- De ce un contor și nu un eveniment per tip de obiect: o tranzacție poate atinge un profil, o
+  -- atestare ȘI o dispută (acceptarea unei atestări contestate), iar proiecțiile din spate se
+  -- actualizează împreună, cu ~45s de întârziere măsurată. Un ecran care ar reinteroga doar la
+  -- „s-a schimbat un profil" ar rata exact cazurile compuse, iar unul care ar reinteroga la fiecare
+  -- schimbare de `Store` ar bate la ușă și la conectarea wallet-ului.
+  , refreshKey :: Int
   }
 
 initialStore :: Store
 initialStore =
   { wallet: Nothing
   , user: Nothing
+  , refreshKey: 0
   }
 
 -- | Store actions. Add more cases as your dApp grows.
@@ -54,11 +64,14 @@ data Action
   | Disconnect
   | SetUser Username
   | ClearUser
+  -- | O scriere s-a confirmat pe lanț. Ridicat de înveliș, citit de ecrane.
+  | Refresh
 
 -- | Pure reducer for store actions.
 reduce :: Store -> Action -> Store
 reduce store = case _ of
   Connect verdict -> store { wallet = Just verdict }
+  Refresh -> store { refreshKey = store.refreshKey + 1 }
   Disconnect -> store { wallet = Nothing, user = Nothing }
   SetUser name -> store { user = Just name }
   ClearUser -> store { user = Nothing }

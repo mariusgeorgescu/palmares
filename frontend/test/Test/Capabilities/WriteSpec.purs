@@ -8,7 +8,7 @@ module Test.Capabilities.WriteSpec (spec) where
 import Prelude
 
 import AppEnv (NetworkMagic(..), mainnetMagic, preprodMagic, previewMagic)
-import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams(..), confirmPollDelayMs, confirmPollMax, encodeFlow, explainRefusal, flowPath, oracleGate, traceCodeMeaning)
+import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams, confirmPollDelayMs, confirmPollMax, encodeFlow, explainRefusal, flowPath, oracleGate, traceCodeMeaning)
 import Capabilities.Wallet.Governance (BlockReason(..), WalletCapabilities, blockMessage, impliedMagic, verdictOf)
 import Components.Shared.Toast as Toast
 import Components.Write.Flows (WriteGate(..), buildRequest, flowSpecs, missingFields, specFor, writeGate)
