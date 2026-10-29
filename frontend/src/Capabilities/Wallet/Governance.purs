@@ -37,7 +37,7 @@ module Capabilities.Wallet.Governance
 
 import Prelude
 
-import AppEnv (NetworkMagic(..), unNetworkMagic)
+import AppEnv (NetworkMagic(..), mainnetMagic, unNetworkMagic)
 import Cardano.Wallet.Cip30 (Api, Extension, WalletName)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (any, find)
@@ -98,10 +98,12 @@ data GateVerdict
 blockMessage :: BlockReason -> String
 blockMessage = case _ of
   NetworkUndetermined ->
-    "This wallet cannot tell us which network it is on. CIP-30 reports every testnet as the same \
-    \number, so preprod and preview are indistinguishable unless the wallet supports the CIP-142 \
-    \extension, or is one that only ever connects to preprod. Signing here could spend your key \
-    \on a chain you did not choose, so nothing will be built."
+    "This wallet cannot tell us which test network it is on. CIP-30 reports every testnet as the \
+    \same number, so preprod and preview are indistinguishable unless the wallet supports the \
+    \CIP-142 extension, or is one that only ever connects to preprod — Yoroi is the one we have \
+    \measured. Signing here could spend your key on a chain you did not choose, so none of the \
+    \nine actions will be built. A wallet on mainnet is not affected: there is only one mainnet, \
+    \so nothing has to be guessed."
   WrongNetwork expected actual ->
     "This wallet is on network " <> show (unNetworkMagic actual)
       <> ", and this deployment is on "
@@ -109,7 +111,8 @@ blockMessage = case _ of
       <> ". Switch the wallet's network and reconnect."
   NoGovernanceKeys ->
     "This wallet does not expose governance keys (CIP-95), so it cannot prove which DRep or \
-    \committee credential belongs to it. Reading works; claiming a credential does not."
+    \committee credential belongs to it. Reading the register works, but none of the nine actions \
+    \will be built from here — not only the credential ones."
   WalletDeclined detail ->
     "The wallet did not connect"
       <> (if detail == "" then "" else " (" <> detail <> ")")
@@ -141,10 +144,17 @@ singleTestnetWallets =
 
 -- | Rețeaua pe care o implică identitatea wallet-ului, dacă o implică.
 -- |
--- | `Nothing` pe orice altceva: un wallet necunoscut, sau unul pe mainnet (`networkId == 1`), nu
--- | spune nimic despre CARE testnet, iar presupunerea e exact ce R6 interzice.
+-- | **Mainnet e UNUL.** `networkId == 1` nu lasă nicio ambiguitate de rezolvat, deci aici nu se
+-- | ghicește nimic: `R6` interzice GHICITUL, nu deducția, iar întrebarea pe care CIP-142 o rezolvă
+-- | — „care testnet?" — pur și simplu nu există pe mainnet. Fără ramura asta un deploy de mainnet
+-- | ar refuza ORICE wallet, fiindcă lista de mai jos vorbește numai despre testnet-uri: toate cele
+-- | nouă fluxuri de scriere ar fi moarte pentru toată lumea, iar garanția n-ar fi protejat nimic.
+-- |
+-- | `Nothing` pe orice altceva: un wallet necunoscut pe un testnet nu spune nimic despre CARE
+-- | testnet, iar presupunerea e exact ce R6 interzice.
 impliedMagic :: WalletName -> Maybe Int -> Maybe NetworkMagic
 impliedMagic name = case _ of
+  Just 1 -> Just mainnetMagic
   Just 0 -> map _.magic (find (\w -> w.name == toLower name) singleTestnetWallets)
   _ -> Nothing
 

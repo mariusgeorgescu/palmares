@@ -6,7 +6,9 @@
 -- |
 -- |   * __acceptată sau nu__ — e alegerea SUBIECTULUI. O atestare neacceptată e afirmată, nu
 -- |     recunoscută, și asta nu spune nimic despre adevărul ei;
--- |   * __contestată__ — cineva a deschis o dispută și a pus un depozit la bătaie;
+-- |   * __contestată__ — cineva a deschis o dispută și a blocat un depozit. Blocat, nu pus la
+-- |     bătaie: depozitul se întoarce pe oricare verdict, deci o contestație costă taxe de rețea și
+-- |     nimic altceva;
 -- |   * __confirmată în dispută__ (`upheld`) — disputa s-a judecat și a căzut împotriva atestării.
 -- |
 -- | O atestare poate fi acceptată și contestată în același timp. De-aia sînt două coloane și nu o
@@ -135,8 +137,11 @@ component =
           , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
               [ HH.text
                   ( if isCredentialView st.filters then
-                      "Every governance credential whose controller has proved it by signature. A key \
-                      \and a multisig prove it the same way. Where two parties claim the same \
+                      "Every governance credential a profile has claimed, with the proof the validator \
+                      \required. For a key credential that is a signature on the claiming \
+                      \transaction; for a script credential it is only that the transaction spent an \
+                      \output at the script's address, which one member of a 1-of-N multisig — or \
+                      \anyone after a timelock — can do. Where two parties claim the same \
                       \credential, both are shown and neither is ranked — the registry does not decide \
                       \who is right."
                     else
@@ -203,7 +208,10 @@ component =
                           , HH.th_ [ HH.text "Subject" ]
                           , HH.th_ [ HH.text "Issuer" ]
                           , HH.th_ [ HH.text "Date" ]
-                          , HH.th_ [ HH.text "Accepted" ]
+                          -- Capul de coloană și celula din `row` se schimbă pe ACEEAȘI condiție.
+                          -- Dacă una se mută fără cealaltă, tabelul iese decalat cu o coloană.
+                          , HH.th_
+                              [ HH.text (if isCredentialView st.filters then "Credential proved" else "Accepted") ]
                           , HH.th_ [ HH.text "Challenges" ]
                           , HH.th_ [ HH.text "Act" ]
                           ]
@@ -258,27 +266,23 @@ component =
       , HH.td_ [ party st a.subject ]
       , HH.td_ [ party st a.issuer ]
       , HH.td [ HP.class_ (HH.ClassName "text-sm whitespace-nowrap"), HP.title a.date ] [ HH.text (formatDay a.date) ]
-      -- „Afirmată, nerecunoscută" și nu „respinsă": subiectul care n-a acceptat încă nu a negat.
-      -- `whitespace-nowrap`: „not yet accepted" se rupea pe două rînduri ÎN pastilă, iar conturul
-      -- tăia textul pe la mijloc. O pastilă e o etichetă, nu un paragraf.
-      , HH.td_
-          [ HH.span
-              [ HP.class_
-                  ( HH.ClassName
-                      ("badge badge-sm whitespace-nowrap " <> if a.accepted then "badge-success" else "badge-outline")
-                  )
-              , HP.title
-                  ( if a.accepted then "The subject countersigned this claim."
-                    else "Stated, but the subject has not countersigned it. That is not the same as denied."
-                  )
-              ]
-              [ HH.text (if a.accepted then "accepted" else "not yet") ]
-          ]
+      -- Pe vederea de revendicări de credențială coloana asta NU poate fi „Accepted": revendicarea
+      -- e AUTOEMISĂ — regula `Mc1` cere `subject == issuer`, iar `Mr` scutește felurile de
+      -- credențială de interdicția autoatestării — deci nu există a doua parte care să
+      -- contrasemneze și `accepted` e structural fals pe toate rândurile. O pastilă „not yet" pe
+      -- fiecare rând n-ar adăuga nicio informație și ar contrazice chiar titlul ecranului. Ce
+      -- lipsea în locul ei e credențiala însăși, adică singurul lucru pentru care se deschide
+      -- ecranul.
+      , HH.td_ [ if isCredentialView st.filters then credentialCell a else acceptedBadge a ]
       , HH.td_ [ disputeCell a ]
       -- Linkurile duc identificatorul CU ELE. Fără asta, „contestă atestarea asta" înseamnă că
       -- omul copiază de mână un identificator de şaizeci de caractere dintr-un tabel.
       , HH.td [ HP.class_ (HH.ClassName "whitespace-nowrap") ]
-          [ if a.accepted then HH.text ""
+          -- „Accept" dispare si pe vederea de credentiale, nu doar cand e deja acceptata: o
+          -- revendicare e auto-emisa (`Mc1` cere `subject == issuer`), deci nu exista a doua parte
+          -- care s-o contrasemneze. Un link care nu poate reusi niciodata e mai rau decit absenta
+          -- lui, fiindca trimite omul intr-un formular care va fi refuzat de lant.
+          [ if a.accepted || isCredentialView st.filters then HH.text ""
             else
               HH.a
                 [ HP.href (writeHrefFor { flow: Just "accept-attestation", subject: Just a.id })
@@ -292,6 +296,31 @@ component =
               [ HH.text "Challenge" ]
           ]
       ]
+
+  -- „Afirmată, nerecunoscută" și nu „respinsă": subiectul care n-a acceptat încă nu a negat.
+  -- `whitespace-nowrap`: „not yet accepted" se rupea pe două rînduri ÎN pastilă, iar conturul
+  -- tăia textul pe la mijloc. O pastilă e o etichetă, nu un paragraf.
+  acceptedBadge a =
+    HH.span
+      [ HP.class_
+          ( HH.ClassName
+              ("badge badge-sm whitespace-nowrap " <> if a.accepted then "badge-success" else "badge-outline")
+          )
+      , HP.title
+          ( if a.accepted then "The subject countersigned this claim."
+            else "Stated, but the subject has not countersigned it. That is not the same as denied."
+          )
+      ]
+      [ HH.text (if a.accepted then "accepted" else "not yet") ]
+
+  -- Credențiala e bech32 CIP-129, deci rolul se citește din prefix (`drep1…`, `cc_cold1…`,
+  -- `cc_hot1…`) și se vede în partea scurtată. Valoarea întreagă, linkul și copierea stau în chip,
+  -- la fel ca pe pagina de detaliu — ca cineva care nu ne crede pe cuvânt să poată verifica.
+  credentialCell a = case a.credential of
+    Nothing -> HH.span [ HP.class_ (HH.ClassName "text-xs opacity-70") ] [ HH.text "not named" ]
+    Just c ->
+      OnchainId.withChip
+        { value: c, shown: shortId c, kind: OnchainId.DRep, explorerBase: AppEnv.explorerBase }
 
   -- Zero dispute e cazul obișnuit și se scrie discret; o dispută deschisă e o întrebare în curs,
   -- iar una confirmată e un verdict împotriva atestării. Trei lucruri, trei culori.

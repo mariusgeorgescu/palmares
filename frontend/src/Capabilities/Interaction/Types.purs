@@ -142,8 +142,14 @@ attestationKinds :: Array String
 attestationKinds =
   [ "milestone_delivered", "audit_passed", "affiliation", "role_held", "endorsement" ]
 
+-- | Cele două verdicte pe care le poate alege un om, scrise ca pe sârmă — enumul serverului e
+-- | `upheld | rejected | expired`, iar opțiunea aleasă AICI e valoarea trimisă, deci un cuvânt
+-- | inventat nu dă o etichetă urâtă, dă o cerere respinsă.
+-- |
+-- | `expired` lipsește DELIBERAT: nu e decizia nimănui, e ce scrie `expire-dispute` când trece
+-- | termenul. A-l „completa" aici ar oferi ca alegere o închidere pe care fluxul ăsta nu o face.
 disputeVerdicts :: Array String
-disputeVerdicts = [ "upheld", "dismissed" ]
+disputeVerdicts = [ "upheld", "rejected" ]
 
 encodeAddresses :: UserAddresses -> Json
 encodeAddresses a =
@@ -237,7 +243,8 @@ encodeSubmit p =
     ~> jsonEmptyObject
 
 -- | Parametrii pe care oracolul îi impune acum. Depozitul de dispută e singurul număr pe care un om
--- | trebuie să-l vadă ÎNAINTE să deschidă o dispută — e ce riscă.
+-- | trebuie să-l vadă ÎNAINTE să deschidă o dispută — e ce i se blochează. NU e ce riscă: validatorul
+-- | cere plata depozitului la închidere pe orice verdict, deci nu există verdict care îl confiscă.
 -- |
 -- | Taxele sunt `Maybe` și sunt `null` pe preprod: protocolul permite taxe, deploymentul ăsta nu le
 -- | cere. „Fără taxă" și „nu știm taxa" nu sunt același lucru, deci nu se scriu la fel.

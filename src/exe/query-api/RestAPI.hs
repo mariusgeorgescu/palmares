@@ -1424,10 +1424,14 @@ type ProfilesAPI =
     :> Description
          "Every profile the registry has projected from chain: who it says it is, what kind of \
          \actor it stands for, and the governance credential it CLAIMS. \
-         \\n`credential` is a claim and not a proof -- nothing on chain checks that the claimant \
-         \controls the credential, and the same credential may be claimed by more than one \
-         \profile. `claimed=true` narrows to the profiles that claim one at all, which is the \
-         \subset a verification screen has anything to check. \
+         \\n`credential` is PROVED, not merely asserted. Rule `Mc3` refuses a credential claim \
+         \unless the named credential witnessed the claiming transaction: a signature on it for a \
+         \key credential, a spend from the script's own address for a script one. The script case \
+         \is the weaker of the two -- one member of a 1-of-N multisig, or anyone past a timelock, \
+         \satisfies it -- so a consumer that renders both with one badge overstates the script \
+         \half. The same credential may still be claimed by more than one profile, which the \
+         \registry reports rather than arbitrates. `claimed=true` narrows to the profiles that \
+         \claim one at all, which is the subset a verification screen has anything to check. \
          \\n`credential_is_script` travels beside the string and is DECODED from its CIP-129 \
          \header byte, never inferred: a key credential and a script credential can share a hash \
          \and are not the same actor. \
@@ -1996,7 +2000,13 @@ apiSwagger =
     -- credential, `null` when it claims none. `RL-6` — the ingest path reports a duplicate claim as
     -- contested rather than refusing it, and the contest was visible from the credential direction
     -- only. Measured on preprod: six profiles claim one DRep credential.
-    & info . Data.Swagger.version .~ "1.12.0"
+    -- 1.12.1 repară două descrieri care spuneau că `credential` e „a claim and not a proof --
+    -- nothing on chain checks that the claimant controls the credential". E fals de la ADR 0003:
+    -- `Mc3` refuză o revendicare dacă credențiala numită nu a martorizat tranzacția. Propoziția
+    -- fusese scrisă cu o zi înaintea ADR-ului care a făcut-o falsă, și a rămas în documentul
+    -- SERVIT — adică singurul lucru pe care îl citește un integrator terț îl informa că datele nu
+    -- valorează nimic, exact despre afirmația cea mai puternică a produsului.
+    & info . Data.Swagger.version .~ "1.12.1"
     & info . Data.Swagger.description
       ?~ "Read-only queries over the Cardano governance record: DReps, governance actions, votes, \
          \delegations, the constitutional committee and treasury withdrawals. Every row comes from \
@@ -2185,9 +2195,10 @@ apiSwagger =
          \epoch -- zero is a real reading and preprod epoch 311 has it."
     & definitions . at "AttestProfileRow" . mapped . description
       ?~ "One profile, as the attestation projections hold it. `credential` is the governance \
-         \credential this profile CLAIMS, in its CIP-129 rendering -- a claim, not a proof: \
-         \nothing on chain checks that the claimant controls it, and more than one profile may \
-         \claim the same one. `credential_is_script` is that identifier's header byte decoded, so \
+         \credential this profile CLAIMS, in its CIP-129 rendering -- and the claim is proved: \
+         \rule `Mc3` refuses it unless that credential witnessed the claiming transaction. More \
+         \than one profile may still claim the same one, which `claimant_count` reports rather \
+         \than arbitrates. `credential_is_script` is that identifier's header byte decoded, so \
          \a consumer never has to parse bech32 to tell a key credential from a script one. `slot` \
          \is the only time a projection row carries, published raw because this service holds no \
          \slot configuration."

@@ -443,8 +443,14 @@ component =
     else case st.oracle of
       Just (InteractionStatus s) -> case s.oracle of
         Just (OracleParams o) ->
+          -- `D4` plateste depozitul inapoi in definitia PARTAJATA de inchidere, deci se intoarce
+          -- pe toate cele trei verdicte. Textul de dinainte spunea ca il pierzi la `dismissed` —
+          -- un verdict care nici nu exista pe sirma — iar o minciuna care spune ca pierzi bani
+          -- descurajeaza exact contestatiile pentru care registrul exista.
           "Locks " <> formatAda o.disputeDepositLovelace
-            <> " from your wallet until the challenge resolves. You lose it if the challenge is dismissed."
+            <>
+              " from your wallet until the challenge closes. It comes back whatever the verdict — \
+              \contesting costs network fees and nothing else."
         Nothing -> spec.consequence
       Nothing -> spec.consequence
 

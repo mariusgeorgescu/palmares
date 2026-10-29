@@ -323,9 +323,9 @@ component =
     , { title: "The identity is already the chain's."
       , body:
           "No invented accounts. Proving you control a governance key is cryptographic, checked by \
-          \the ledger's own signature rule, and it works the same for a key and for a script, which \
-          \is what committees and organisations actually are. So the record sits next to what that \
-          \key did."
+          \the ledger's own signature rule. A script credential — which is what committees and \
+          \organisations actually are — is checked too, but more loosely: the transaction has to \
+          \spend from the script's own address. So the record sits next to what that key did."
       }
     , { title: "Challenging a false claim is not a contact form."
       , body:
@@ -366,7 +366,7 @@ component =
           attestationListPath
           "from-info to-accent"
           "80"
-      , figureCard "Challenges" (countOf st _.disputes) "Statements someone staked a deposit against."
+      , figureCard "Challenges" (countOf st _.disputes) "Statements someone locked a deposit to challenge."
           disputeListPath
           "from-accent to-warning"
           "160"
@@ -441,7 +441,7 @@ component =
           , HH.dl [ HP.class_ (HH.ClassName "grid gap-x-6 gap-y-2 sm:grid-cols-2 lg:grid-cols-4 text-sm") ]
               [ term "Profile" "An identity, held as a token. Whoever holds the token holds the profile."
               , term "Vouch" "A claim one profile makes about another. It is not binding until the subject accepts it."
-              , term "Challenge" "An objection to a claim, with a deposit at stake. Lose the challenge, lose the deposit."
+              , term "Challenge" "An objection to a claim. It locks a deposit until the challenge closes, and the deposit comes back whatever the outcome."
               , term "DRep" "A Cardano governance representative. A profile can prove it owns one — that is a credential claim."
               ]
           ]
@@ -766,7 +766,7 @@ registryGroups =
     , entries:
         [ { href: verifiedCredentialsPath
           , label: "Verified credentials"
-          , description: "Credentials whose controller proved it by signature. A key and a multisig prove it the same way."
+          , description: "Credentials whose controller proved it on chain. A key proves it by signature; a script, more loosely, by spending from its own address."
           }
         , { href: profileListPath
           , label: "Profiles"
@@ -778,7 +778,7 @@ registryGroups =
           }
         , { href: disputeListPath
           , label: "Challenges"
-          , description: "Claims someone challenged, with a deposit at stake on the outcome."
+          , description: "Claims someone challenged, with a deposit locked until the challenge closes."
           }
         ]
     }

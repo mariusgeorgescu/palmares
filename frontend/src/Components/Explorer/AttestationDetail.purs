@@ -45,7 +45,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Route (Route)
-import Route.GovQueries (emptyRegistryFilters, profileDetailHrefFor, writeHrefFor)
+import Route.GovQueries (disputeDetailHrefFor, emptyRegistryFilters, profileDetailHrefFor, writeHrefFor)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -260,8 +260,9 @@ component =
           [ HH.h2 [ HP.class_ (HH.ClassName "card-title text-lg") ] [ HH.text "Challenges" ]
           , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
               [ HH.text
-                  "An objection with a deposit at stake. A challenged claim is shown beside its \
-                  \challenge, not instead of it."
+                  "An objection with a deposit locked until it closes. The deposit comes back on \
+                  \every outcome, so contesting costs network fees and nothing else. A challenged \
+                  \claim is shown beside its challenge, not instead of it."
               ]
           , if null d.disputes then
               HH.p [ HP.class_ (HH.ClassName "text-sm") ]
@@ -274,7 +275,13 @@ component =
     HH.li [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline gap-2 text-sm") ]
       [ HH.span [ HP.class_ (HH.ClassName ("badge badge-sm " <> verdictClass c.verdict)) ]
           [ HH.text (fromMaybe "still open" c.verdict) ]
-      , HH.span [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text c.name ]
+      -- Numele duce la pagina provocării. Pînă acum provocarea se vedea aici dar nu se putea
+      -- deschide: ca să-i citești motivarea trebuia să te întorci în listă și să o cauți.
+      , HH.a
+          [ HP.href (disputeDetailHrefFor c.id)
+          , HP.class_ (HH.ClassName "link link-hover font-medium")
+          ]
+          [ HH.text c.name ]
       , HH.span [ HP.class_ (HH.ClassName "font-mono opacity-70") ] [ HH.text (formatAda c.deposit) ]
       , HH.span [ HP.class_ (HH.ClassName "opacity-60") ] [ HH.text ("opened " <> formatDay c.openedAt) ]
       , case c.verdict of

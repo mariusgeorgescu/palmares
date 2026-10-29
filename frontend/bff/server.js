@@ -95,10 +95,35 @@ for (const [serviceName, serviceConfig] of Object.entries(services)) {
   const authMethod = hasBasicAuth ? 'Basic Auth' : hasApiKey ? 'API Key' : 'No Auth';
   fastify.log.info(`[Proxy Config] Registering ${serviceName} with ${authMethod}`);
 
+  // Calea cerută, fără prefix și fără șirul de interogare — forma în care o compară lista albă.
+  const upstreamPath = (url) => {
+    const withoutPrefix = url.slice(`/api/${serviceName}`.length) || '/';
+    const q = withoutPrefix.indexOf('?');
+    return q === -1 ? withoutPrefix : withoutPrefix.slice(0, q);
+  };
+
+  const allow = serviceConfig.allow;
+  const isAllowed = (method, path) =>
+    !allow ||
+    allow.some(
+      (r) => r.method === method && (r.path !== undefined ? r.path === path : path.startsWith(r.prefix))
+    );
+
   await fastify.register(proxy, {
     upstream: target,
     prefix: `/api/${serviceName}`,
     rewritePrefix: '/',
+    // Refuzul se dă AICI, înainte ca `rewriteRequestHeaders` să atașeze credențiala operatorului.
+    // Un serviciu fără `allow` (query-api) trece nefiltrat, fiindcă e public prin contract.
+    preHandler: (request, reply, done) => {
+      const path = upstreamPath(request.url);
+      if (isAllowed(request.method, path)) return done();
+      fastify.log.warn(`[Proxy Deny] ${request.method} /api/${serviceName}${path} is not on the allowlist`);
+      reply.code(403).send({
+        code: 'forbidden',
+        message: `${request.method} ${path} is not proxied. This gateway forwards only the calls the interface makes.`,
+      });
+    },
     timeout: serviceConfig.streaming ? 0 : 60000,
     undici: undiciConfig,
     rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== '0',
@@ -137,51 +162,10 @@ fastify.get('/health', async (request, reply) => {
   return { status: 'ok', services: Object.keys(services) };
 });
 
-/**
- * Test endpoint to verify API routes are reachable
- */
-fastify.get('/api/test', async (request, reply) => {
-  fastify.log.info(`[API Test] GET /api/test reached the server`);
-  return {
-    status: 'ok',
-    message: 'API routes are working',
-    url: request.url,
-    method: request.method,
-    ip: request.ip
-  };
-});
-
-/**
- * Test connectivity to backend services
- */
-fastify.get('/test-connectivity', async (request, reply) => {
-  const results = {};
-
-  for (const [serviceName, serviceConfig] of Object.entries(services)) {
-    if (!serviceConfig.target) {
-      continue;
-    }
-    
-    const { target } = serviceConfig;
-    try {
-      const url = new URL(target);
-      results[serviceName] = {
-        target,
-        hostname: url.hostname,
-        port: url.port || (url.protocol === 'https:' ? 443 : 80),
-        protocol: url.protocol,
-        status: 'configured'
-      };
-    } catch (error) {
-      results[serviceName] = {
-        target,
-        error: error.message
-      };
-    }
-  }
-
-  return { connectivity: results };
-});
+// `/api/test` și `/test-connectivity` au fost șterse. A doua publica neautentificat numele DNS
+// din cluster și porturile ambelor servicii de backend, iar prima întorcea IP-ul apelantului așa
+// cum îl vede clusterul — amândouă măsurate live pe gov.cardano.vip. `/health` de mai sus răspunde
+// la întrebarea pe care o are un operator și numește doar cheile serviciilor, nu țintele lor.
 
 // Register static file serving for frontend
 await fastify.register(staticFiles, {

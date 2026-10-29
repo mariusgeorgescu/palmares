@@ -7,7 +7,7 @@ module Test.Capabilities.WriteSpec (spec) where
 
 import Prelude
 
-import AppEnv (NetworkMagic(..), preprodMagic, previewMagic)
+import AppEnv (NetworkMagic(..), mainnetMagic, preprodMagic, previewMagic)
 import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams(..), encodeFlow, flowPath, oracleGate)
 import Capabilities.Wallet.Governance (BlockReason(..), WalletCapabilities, blockMessage, impliedMagic, verdictOf)
 import Components.Write.Flows (buildRequest, flowSpecs, missingFields, specFor)
@@ -81,11 +81,25 @@ spec = do
         preprodMagic
         `shouldEqual` Just NetworkUndetermined
 
-    it "refuses a single-testnet wallet reporting mainnet" do
+    it "refuses a wallet reporting mainnet to a preprod deployment, and says which network" do
+      -- Era `NetworkUndetermined`, fiindcă `impliedMagic` nu avea ramură pentru mainnet. Refuzul e
+      -- același, dar motivul e acum cel exact: mainnet E determinat — e unul singur — deci greșeala
+      -- nu e „nu știm pe ce rețea ești", e „ești pe alta decît deployul". Omul are ce face cu a doua.
       verdictOf
         (baseCaps { walletName = "yoroi", cip142Present = false, networkMagic = Nothing, networkId = Just 1 })
         preprodMagic
-        `shouldEqual` Just NetworkUndetermined
+        `shouldEqual` Just (WrongNetwork preprodMagic mainnetMagic)
+
+    it "opens the gate for ANY wallet on mainnet, because mainnet is one network" do
+      -- Garanția lui R6 e că nu se ghicește. Pe mainnet nu e nimic de ghicit, deci lista de
+      -- testnet-uri nu are ce căuta în drum: fără asta, un deploy de mainnet refuza orice wallet și
+      -- toate cele nouă fluxuri erau moarte pentru toată lumea.
+      impliedMagic "somewallet" (Just 1) `shouldEqual` Just mainnetMagic
+      impliedMagic "lace" (Just 1) `shouldEqual` Just mainnetMagic
+      verdictOf
+        (baseCaps { walletName = "lace", cip142Present = false, networkMagic = Nothing, networkId = Just 1 })
+        mainnetMagic
+        `shouldEqual` Nothing
 
     it "prefers a confirmed magic over an implied one" do
       -- Masuratoarea bate deductia: daca CIP-142 spune mainnet, un nume de wallet nu schimba asta.
@@ -104,7 +118,11 @@ spec = do
       -- Un mesaj pe care nimeni nu-l poate actiona e acelasi lucru cu niciun mesaj.
       let m = blockMessage NetworkUndetermined
       String.contains (String.Pattern "CIP-142") m `shouldEqual` true
-      String.contains (String.Pattern "nothing will be built") m `shouldEqual` true
+      String.contains (String.Pattern "nine actions will be built") m `shouldEqual` true
+      -- Și mesajul pentru CIP-95 lipsă trebuie să spună că se blochează TOT, nu doar credențialele:
+      -- varianta de dinainte zicea „Reading works; claiming a credential does not", deși poarta e
+      -- aceeași pentru toate cele nouă fluxuri.
+      String.contains (String.Pattern "nine actions") (blockMessage NoGovernanceKeys) `shouldEqual` true
       String.contains (String.Pattern "preprod") (blockMessage (WrongNetwork preprodMagic (NetworkMagic 2)))
         `shouldEqual` false
 

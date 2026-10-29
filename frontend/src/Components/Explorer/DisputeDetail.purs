@@ -180,7 +180,9 @@ component =
                   ]
               ]
           , HH.div_
-              [ HH.dt [ HP.class_ (HH.ClassName "opacity-60") ] [ HH.text "Deposit at stake" ]
+              -- „At stake" promitea o pierdere posibilă; nu există una. Eticheta e aceeași cu
+              -- coloana din listă, iar ce se întîmplă cu el o spune `verdictMeaning`.
+              [ HH.dt [ HP.class_ (HH.ClassName "opacity-60") ] [ HH.text "Deposit" ]
               , HH.dd [ HP.class_ (HH.ClassName "font-mono") ] [ HH.text (formatAda d.deposit) ]
               ]
           , HH.div_
@@ -210,9 +212,12 @@ component =
       ]
 
   -- O insignă nu poate spune ce înseamnă un verdict, iar al treilea e cel care se interpretează
-  -- cel mai des greșit: o expirare NU e o constatare împotriva nimănui. Depozitul se întoarce,
-  -- iar nimeni nu a decis nimic — scris aici fiindcă registrul nu dă scoruri și nu lasă pe
-  -- altcineva să deducă.
+  -- cel mai des greșit: o expirare NU e o constatare împotriva nimănui. Nimeni nu a decis nimic —
+  -- scris aici fiindcă registrul nu dă scoruri și nu lasă pe altcineva să deducă.
+  --
+  -- Depozitul se întoarce pe TOATE cele trei verdicte: cererea validatorului stă în definiția
+  -- comună a închiderii, nu pe o ramură, deci niciun verdict nu îl confiscă. Textul de aici nu are
+  -- voie să sugereze altceva, fiindcă ar descuraja contestarea cu o pierdere care nu există.
   verdictMeaning d = case d.verdict of
     Nothing ->
       HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
@@ -226,9 +231,12 @@ component =
     Just "upheld" ->
       HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
         [ HH.text "Upheld: the vouch did not survive the objection, and the deposit goes back to whoever opened it." ]
-    Just "dismissed" ->
+    Just "rejected" ->
       HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-        [ HH.text "Dismissed: the claim stands, and the challenger forfeits the deposit." ]
+        [ HH.text
+            "Rejected: the claim stands, and the deposit went back to whoever opened the challenge \
+            \— as it does on every outcome. Contesting costs network fees and nothing else."
+        ]
     Just "expired" ->
       HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
         [ HH.text

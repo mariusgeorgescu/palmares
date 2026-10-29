@@ -116,8 +116,9 @@ flowSpecs =
   , { id: "open-dispute"
     , title: "Open a challenge"
     , summary:
-        "Contests a vouch and locks a deposit. The deposit is what separates a challenge \
-        \from an opinion, and you lose it if the challenge is dismissed."
+        "Contests a vouch and locks a deposit until the challenge closes. The deposit is what \
+        \separates a challenge from an opinion — it comes back whatever the outcome, so contesting \
+        \costs network fees and nothing else."
     , consequence: "Locks the oracle's current deposit from your wallet until the challenge resolves."
     , fields:
         [ txt "attestation_id" "Vouch" "The claim you are challenging. The Vouches page has a \"Challenge\" link that fills this in."
@@ -130,10 +131,13 @@ flowSpecs =
   , { id: "resolve-dispute"
     , title: "Resolve a challenge"
     , summary: "Records the verdict on a challenge. Only the oracle's authority can do this."
-    , consequence: "Settles the challenge and releases or forfeits the deposit accordingly."
+    , consequence: "Settles the challenge and returns the deposit to whoever opened it, whatever the verdict."
     , fields:
         [ txt "dispute_id" "Challenge" "Paste the challenge's identifier. The Challenges page has links that fill this in for you."
-        , sel "verdict" "Verdict" "Upheld means the vouch falls." disputeVerdicts
+        , sel "verdict" "Verdict"
+            "Upheld records that the vouch did not survive the objection; rejected records that it \
+            \stands. Either way the deposit goes back to whoever opened the challenge."
+            disputeVerdicts
         ]
     }
   , { id: "expire-dispute"

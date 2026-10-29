@@ -23,7 +23,8 @@ import Components.Shared.DRepIdentity (shortId)
 import Data.Array (length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.String (Pattern(..), stripPrefix)
 import Format (enumLabel, formatInt, humanize, matchLine, pluralize)
 import Halogen as H
 import AppEnv as AppEnv
@@ -64,6 +65,16 @@ data Action
   = Initialize
   | Retry
   | Receive Input
+
+-- | Dacă credențiala e a unui DRep, citit din prefixul CIP-129.
+-- |
+-- | Rolul e în prefix: `drep1…` pentru un DRep, `cc_cold1…`/`cc_hot1…` pentru o cheie de comitet,
+-- | revendicabilă de la ADR 0006. `drepDetailHrefFor` e o simplă concatenare, deci fără verificarea
+-- | asta o cheie de comitet ajungea la `/dreps/cc_cold1…` — pagina de DRep a ceva care nu e DRep.
+-- | Patru linii duplicate și în `ProfileDetail`: un modul nou pentru un `stripPrefix` ar fi o
+-- | abstracție înaintea celui de-al treilea apelant.
+isDRepCredential :: String -> Boolean
+isDRepCredential c = isJust (stripPrefix (Pattern "drep1") c)
 
 component
   :: forall q m
@@ -224,26 +235,39 @@ component =
       ]
 
   -- Un profil fără credențial nu e incomplet, și propoziția o spune. Cînd există, duce la pagina
-  -- DRep-ului — singura identitate de guvernanță care are una în produs.
+  -- DRep-ului — dar DOAR dacă e un DRep: vezi `isDRepCredential`. Și cînd serverul nu spune ce fel
+  -- de credențial e, cardul nu mai ghicește „cheie": o afirmație despre dovadă e exact ce n-ai
+  -- voie să deduci dintr-un cîmp lipsă.
   credentialLine r = case r.credential of
     Nothing ->
       HH.p [ HP.class_ (HH.ClassName "text-xs opacity-70") ]
         [ HH.text "Claims no on-chain governance credential." ]
     Just c ->
       HH.p [ HP.class_ (HH.ClassName "text-xs") ]
-        [ HH.text "Claims "
-        , HH.a [ HP.href (drepDetailHrefFor c), HP.class_ (HH.ClassName "link link-hover font-mono") ]
-            [ HH.text (shortId c) ]
-        -- Credențiala era scurtată fără nicio cale către valoarea întreagă. Chipul stă lîngă link,
-        -- nu în locul lui: linkul duce în registru, chipul duce pe lanț.
-        , OnchainId.chip
-            { value: c, kind: OnchainId.DRep, explorerBase: AppEnv.explorerBase }
-        , HH.text
-            ( if r.credentialIsScript == Just true then " (a script credential)"
-              else " (a key credential)"
-            )
-        , HH.text (maybe "" (\n -> " · " <> pluralize n "claimant") r.claimantCount)
-        ]
+        ( [ HH.text "Claims " ]
+            <> credentialIdent c
+            <>
+              [ HH.text
+                  ( case r.credentialIsScript of
+                      Just true -> " (a script credential)"
+                      Just false -> " (a key credential)"
+                      Nothing -> ""
+                  )
+              , HH.text (maybe "" (\n -> " · " <> pluralize n "claimant") r.claimantCount)
+              ]
+        )
+
+  -- Credențiala era scurtată fără nicio cale către valoarea întreagă. Chipul stă lîngă link, nu în
+  -- locul lui: linkul duce în registru, chipul duce pe lanț. Pentru o cheie de comitet nu există
+  -- niciunul din cele două: registrul n-are pagină de membru de comitet, iar `IdKind` n-are valoare
+  -- de comitet — `DRep` ar duce explorerul la `/drep/cc_cold1…`, tot o pagină greșită.
+  credentialIdent c =
+    if isDRepCredential c then
+      [ HH.a [ HP.href (drepDetailHrefFor c), HP.class_ (HH.ClassName "link link-hover font-mono") ]
+          [ HH.text (shortId c) ]
+      , OnchainId.chip { value: c, kind: OnchainId.DRep, explorerBase: AppEnv.explorerBase }
+      ]
+    else [ HH.span [ HP.class_ (HH.ClassName "font-mono") ] [ HH.text (shortId c) ] ]
 
   pager st (ProfilePage p) =
     let

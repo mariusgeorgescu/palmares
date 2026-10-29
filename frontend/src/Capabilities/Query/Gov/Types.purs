@@ -1595,11 +1595,18 @@ instance DecodeJson ProfilePage where
 -- |
 -- | `accepted` e al SUBIECTULUI: o atestare neacceptată e afirmată dar nerecunoscută, ceea ce nu e
 -- | același lucru cu una contestată. De-aia cele trei numere de dispute sunt separate.
+-- |
+-- | `credential` e credențiala de guvernanță numită de atestare — bech32 CIP-129, deci rolul se
+-- | citește din prefix (`drep1…`, `cc_cold1…`, `cc_hot1…`). Serverul o trimite pe FIECARE rând, iar
+-- | lista o citește: pe vederea de revendicări de credențială e singura coloană care răspunde la
+-- | întrebarea ecranului. `.:?` fiindcă lipsește la felurile de atestare care nu numesc o
+-- | credențială — și fiindcă fixturile de listă nu o au deloc.
 newtype AttestationRow = AttestationRow
   { id :: String
   , subject :: String
   , issuer :: String
   , kind :: String
+  , credential :: Maybe String
   , date :: String
   , accepted :: Boolean
   , name :: String
@@ -1618,6 +1625,7 @@ instance DecodeJson AttestationRow where
     subject <- o .: "subject"
     issuer <- o .: "issuer"
     kind <- o .: "kind"
+    credential <- o .:? "credential"
     date <- o .: "date"
     accepted <- o .: "accepted"
     name <- o .: "name"
@@ -1631,6 +1639,7 @@ instance DecodeJson AttestationRow where
           , subject
           , issuer
           , kind
+          , credential
           , date
           , accepted
           , name
@@ -1663,8 +1672,10 @@ instance DecodeJson AttestationPage where
 -- |
 -- | Serverul le trimite ÎMPREUNĂ, deci pagina unui vouch e o singură cerere. Partea comună se
 -- | decodează refolosind `AttestationRow`, iar peste ea se citesc câmpurile care există numai
--- | aici — adică cele pe care lista le primește și nu le citește: `tx_hash`, `credential`,
--- | `claimed_period`.
+-- | aici — adică cele pe care lista le primește și nu le citește: `tx_hash`, `claimed_period`.
+-- | (`credential` a trecut în `AttestationRow`, fiindcă vederea de revendicări îl randează pe
+-- | fiecare rând; rămâne citit și aici, ca pagina de detaliu să nu se schimbe pentru o mutare de
+-- | câmp.)
 -- |
 -- | `tx_hash` e dovada: identificatorul tranzacției care a scris atestarea. Fără el, pagina spune
 -- | că ceva e pe lanț fără să arate unde.
@@ -1703,8 +1714,10 @@ instance DecodeJson AttestationDetail where
 -- | O dispută deschisă împotriva unei atestări.
 -- |
 -- | `verdict` lipsește cât timp disputa e deschisă — e tocmai ce se așteaptă — iar `staleAfter` e
--- | momentul după care disputa nedecisă poate fi închisă de oricine. Depozitul e miza: cine
--- | deschide o dispută pune bani, și îi pierde dacă disputa cade.
+-- | momentul după care disputa nedecisă poate fi închisă de oricine. Depozitul NU e o miză care se
+-- | poate pierde: validatorul cere plata lui înapoi în definiția COMUNĂ de închidere
+-- | (`DisputesValidator.hs:273`, în afara tuturor ramurilor de verdict), deci se întoarce pe oricare
+-- | dintre cele trei verdicte. E o blocare de fonduri, nu o cauțiune.
 newtype DisputeRow = DisputeRow
   { id :: String
   , target :: String

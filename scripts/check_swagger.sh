@@ -41,7 +41,7 @@ echo "== swagger metadata"
 # field that makes its three registered counts sum to `total_dreps`. 1.10.0 adds
 # `/status.missing_indexes`, which names the index set a db-sync re-sync dropped. 1.11.0 adds the
 # three dispute counts to `AttestationRow` (`RL-3`).
-check "version is 1.12.0" '.info.version == "1.12.0"'
+check "version is 1.12.1" '.info.version == "1.12.1"'
 # `RL-6`: optional, so x-nullable — a profile that claims no credential has no claimant count, and
 # `0` or `1` there would both be a claim about a credential that does not exist.
 check "a profile row carries claimant_count, nullable" \

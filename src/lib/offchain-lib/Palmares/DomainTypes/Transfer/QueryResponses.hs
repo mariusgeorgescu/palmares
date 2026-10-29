@@ -1874,8 +1874,10 @@ instance FromJSON ActivityRow where
 -- | One row of @palmares_attest.profile_projection@.
 --
 -- @credential@ is the governance credential this profile CLAIMS, in the CIP-129 rendering the
--- datum carried. A claim is not a proof: nothing on chain checks that the claimant controls the
--- credential, and the same credential may be claimed by more than one profile — which
+-- datum carried. The claim IS proved: rule @Mc3@ refuses a credential claim unless the named
+-- credential witnessed the claiming transaction — a signature for a key credential, a spend from
+-- the script's own address for a script one, which is the weaker of the two. What is NOT proved is
+-- uniqueness: the same credential may be claimed by more than one profile — which
 -- @\/profiles\/by-credential\/{credential}@ reports as more than one row rather than picking a
 -- winner.
 --

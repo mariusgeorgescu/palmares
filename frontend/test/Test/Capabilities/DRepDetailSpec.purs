@@ -28,7 +28,7 @@ import Data.Tuple (fst)
 import Effect.Aff (Aff)
 import Route as R
 import Route.Codec (parseRoute, printRoute)
-import Route.GovQueries (drepDetailHrefFor, emptyDRepFilters)
+import Route.GovQueries (drepDetailHrefFor, emptyDRepFilters, emptyGovActionFilters, emptyRegistryFilters)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 
@@ -163,6 +163,18 @@ spec = do
     it "prints what it parses" do
       printRoute (R.DRepDetail "drep1abc") `shouldEqual` "/dreps/drep1abc"
       drepDetailHrefFor "drep1abc" `shouldEqual` "/dreps/drep1abc"
+
+    it "does not turn a trailing slash into a detail route with an empty id" do
+      -- `segment` din routing-duplex reușește pe un segment GOL, iar detaliul e declarat înaintea
+      -- listei — deci `/profiles/` se parsa ca `ProfileDetail ""`, ecranul cerea `/profiles/` de la
+      -- API, primea o pagină de listă și randa alerta de decodare. Garda e `nonEmptySegment`, într-un
+      -- singur loc pentru toate cele cinci rute cu segment; testul e aici fiindcă defectul nu se
+      -- vedea în niciuna din cele cinci suite.
+      parseRoute "/profiles/" `shouldEqual` R.ProfileList emptyRegistryFilters
+      parseRoute "/attestations/" `shouldEqual` R.AttestationList emptyRegistryFilters
+      parseRoute "/disputes/" `shouldEqual` R.DisputeList emptyRegistryFilters
+      parseRoute "/dreps/" `shouldEqual` R.DRepList emptyDRepFilters
+      parseRoute "/gov-actions/" `shouldEqual` R.ActionList emptyGovActionFilters
 
     it "percent-encodes an id that would otherwise cut the request short" do
       -- Un ID de acțiune de guvernanță conține `#` prin construcție; același codor îl deservește.

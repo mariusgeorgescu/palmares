@@ -1,8 +1,9 @@
 -- | Disputele: `GET /disputes`.
 -- |
--- | O dispută e o contestare a unei atestări, cu un DEPOZIT pus la bătaie: cine o deschide riscă
--- | bani, și de-aia depozitul e o coloană și nu o notă de subsol — e singurul lucru care
--- | deosebește o contestare de o părere.
+-- | O dispută e o contestare a unei atestări, cu un DEPOZIT blocat pînă la închidere: de-aia
+-- | depozitul e o coloană și nu o notă de subsol — e singurul lucru care deosebește o contestare de
+-- | o părere. Blocat, nu riscat: validatorul cere întoarcerea lui pe ORICE verdict, deci nu există
+-- | verdict care îl confiscă.
 -- |
 -- | `verdict` lipsește cît timp disputa e deschisă, iar `staleAfter` e momentul după care o
 -- | dispută nedecisă poate fi închisă de oricine. Amândouă descriu un proces în curs, nu date
@@ -72,14 +73,19 @@ data Action
   | Retry
   | Receive Input
 
--- | Verde pentru disputa care a căzut (atestarea rămîne), roșu pentru cea confirmată (atestarea
--- | cade). Culoarea urmărește ATESTAREA, nu disputa, pentru că ăsta e lucrul despre care cititorul
--- | vrea să afle.
+-- | Verde pentru disputa respinsă (atestarea rămîne), roșu pentru cea confirmată (atestarea cade).
+-- | Culoarea urmărește ATESTAREA, nu disputa, pentru că ăsta e lucrul despre care cititorul vrea să
+-- | afle.
+-- |
+-- | Enumul de pe sîrmă are exact trei valori — `upheld` | `rejected` | `expired` — iar `Nothing`
+-- | înseamnă „încă deschisă". Al patrulea cuvînt nu există, deci nu se inventează unul. `expired`
+-- | primește o insignă neutră fiindcă o expirare NU e o constatare împotriva nimănui: n-are voie să
+-- | arate nici ca un verdict, nici ca o dispută nedecisă.
 verdictClass :: Maybe String -> String
 verdictClass = case _ of
   Just "upheld" -> "badge-error"
-  Just "dismissed" -> "badge-success"
-  Just "stale" -> "badge-outline"
+  Just "rejected" -> "badge-success"
+  Just "expired" -> "badge-outline"
   _ -> "badge-warning"
 
 component
@@ -138,8 +144,9 @@ component =
           [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text "Challenges" ]
           , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ]
               [ HH.text
-                  "Challenges against vouches. Opening one costs a deposit, which is what \
-                  \separates a challenge from an opinion."
+                  "Challenges against vouches. Opening one locks a deposit until the challenge \
+                  \closes, which is what separates a challenge from an opinion. The deposit comes \
+                  \back on every outcome: contesting costs network fees and nothing else."
               ]
           ]
       , case st.page of

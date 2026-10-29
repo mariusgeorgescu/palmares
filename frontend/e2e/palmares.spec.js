@@ -226,6 +226,7 @@ test.describe('at phone width', () => {
     '/profiles',
     '/profiles/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043',
     '/attestations',
+    '/attestations?kind=credential_claim',
     '/attestations/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010708aa68abb20aa664efe2f68a46d4dc28c0ffe5f20b3dbd01b7ecc9df5',
     '/disputes',
     '/disputes/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e019fd9551ab85480b95ed2c9ddb7524c1c6e56cb76f4d2f98a12f33db',
@@ -347,6 +348,7 @@ for (const route of [
   '/profiles',
   '/profiles/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043',
   '/attestations',
+  '/attestations?kind=credential_claim',
   '/attestations/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000010708aa68abb20aa664efe2f68a46d4dc28c0ffe5f20b3dbd01b7ecc9df5',
   '/disputes',
   '/disputes/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000020e019fd9551ab85480b95ed2c9ddb7524c1c6e56cb76f4d2f98a12f33db',
@@ -742,7 +744,8 @@ test('a challenge page explains its verdict, because a badge cannot', async ({ p
   await expect(page.getByText('Against the vouch')).toBeVisible();
   await expect(page.getByText('Opened by')).toBeVisible();
 
-  // Miza, scrisă ca sumă.
-  await expect(page.getByText('Deposit at stake')).toBeVisible();
+  // Suma, scrisă ca sumă. Eticheta NU mai zice „at stake": nimic nu e în joc, `D4` plătește
+  // depozitul înapoi pe toate cele trei verdicte.
+  await expect(page.getByText('Deposit', { exact: true })).toBeVisible();
   await expect(page.getByText('5 ADA')).toBeVisible();
 });

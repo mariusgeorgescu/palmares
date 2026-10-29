@@ -92,5 +92,29 @@ export const services = {
     target: envVars.PALMARES_INTERACTION_API_URL,
     username: envVars.PALMARES_INTERACTION_API_USER,
     password: envVars.PALMARES_INTERACTION_API_PASS,
+    // Lista albă, și de ce există. Credențiala de mai sus se atașează la ORICE intră pe prefix,
+    // ceea ce era intenționat — altfel SPA-ul din browser n-ar putea chema API-ul deloc — dar
+    // efectul secundar era că poarta `BasicAuth` a interaction-api devenea decorativă: măsurat pe
+    // deploy, `GET /api/interaction/tx-status/0000…` răspundea 200 fără nicio credențială, iar
+    // `submit-tx` era la fel de deschis.
+    //
+    // Deci poarta e acum exact atât cât are nevoie SPA-ul, nu mai mult: cele nouă fluxuri plus
+    // `submit-tx` pe POST, `/status` și `/tx-status/{txId}` pe GET. Lista e derivată din
+    // `Capabilities/Interaction/{Types,Default}.purs` — dacă se adaugă un flux acolo, se adaugă și
+    // aici, altfel formularul primește 403 de la propriul BFF.
+    allow: [
+      { method: 'GET', path: '/status' },
+      { method: 'GET', prefix: '/tx-status/' },
+      { method: 'POST', path: '/submit-tx' },
+      { method: 'POST', path: '/claim-profile' },
+      { method: 'POST', path: '/update-profile' },
+      { method: 'POST', path: '/issue-attestation' },
+      { method: 'POST', path: '/accept-attestation' },
+      { method: 'POST', path: '/open-dispute' },
+      { method: 'POST', path: '/resolve-dispute' },
+      { method: 'POST', path: '/expire-dispute' },
+      { method: 'POST', path: '/claim-credential' },
+      { method: 'POST', path: '/withdraw-credential' },
+    ],
   },
 };
