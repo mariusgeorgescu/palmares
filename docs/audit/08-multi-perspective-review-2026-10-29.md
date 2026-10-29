@@ -53,14 +53,14 @@ every row in it was written by this project's own smoke scripts.
 | # | What | Cost | Note |
 |---|---|---|---|
 | 1 | **`/profiles/by-credential/{cip129}` has no screen.** The route the docs call "the verify direction", measured returning `total: 6`, with **zero** frontend call sites. `DRepDetail` — the screen a delegator actually lands on — never mentions a credential outside a raw hex label | half a day | Deferred by owner decision, to be taken separately. This is the single change that makes the relationship legible from both sides |
-| 2 | **Nothing resolves the connected wallet to its own profile.** `/profiles/by-user-token/{asset-class}` works and the project's own docs call it "the entry point to the entire wallet-side product"; zero call sites. So three write fields must be hand-pasted | days | Needs the policy id from `/status` plus a filter over the wallet's assets |
+| ~~2~~ | ✅ **FIXED.** Nothing resolved the connected wallet to its own profile, so three write fields were hand-pasted 60-character ids | days | `Wallet/Assets` filters the CIP-67 user label out of the wallet's balance; the route does the user→reference derivation. Verified in a browser both ways — no token and one token |
 | 3 | **The register is unfindable from the search box on every screen.** `Query/Gov.hs` returns a literal empty array for the `profiles` and `attestations` groups — four CTEs exist for the governance groups, none for the two object types the product is about | days | `?q=` on `/profiles` already returns 12; the client half is cheap, the `/search` CTEs are not |
 | ~~4~~ | ✅ **FIXED.** Validator refusals reached the user as a two-letter trace code and a path to a file the service does not serve | afternoon | The off-chain `subject /= issuer` check beside `SubjectProfileNotFound` is the cheapest half |
 | 5 | **The script half of the lead promise cannot be done from the UI** at all — the witness field does not exist in `claim-credential` | afternoon to qualify, days to build | The copy is now honest about it; the capability is still missing |
-| 6 | **`image_uri` is collected six times and rendered nowhere.** Required on `claim-profile`, costs min-ADA in every datum, appears in exactly one component file: the form that asks for it | afternoon | And it duplicates CIP-119's `image`, which carries a `sha256` where this carries none. See §CIP-119 below |
+| ~~6~~ | ✅ **FIXED.** `image_uri` was collected six times and rendered nowhere | afternoon | Rendered as an ADDRESS, not an image: there is no IPFS gateway in this stack, and loading from the host someone else wrote into a datum sends the visitor's IP there. Measured: 11 of 12 are not real CIDs and one is `"htt"` |
 | ~~7~~ | ✅ **FIXED on the two detail pages.** Four components reimplemented an id→name directory with `limit=200` into component-local state. The challenge page pulls both full registers to print two names, with a silent cap | afternoon | `getProfile`/`getAttestation` are already class members |
-| 8 | **The registry lists have no filter or sort controls** — zero `select`, zero `input`, no sortable header — while `order_by`/`sort_order`/`kind`/`subject`/`issuer` all travel through the codec | afternoon | Half-wired in four directions; none of it bites today |
-| 9 | **Eighteen byte-identical loading cards and twelve identical retry alerts**, three of each added by the detail-page block | days | Against the project's own precedent: `Shared/Pager.purs` exists because nine copies of one function were nine places to fix a sentence |
+| ~~8~~ | ✅ **FIXED.** The registry lists had no filter or sort controls | afternoon | Four on profiles (`q`, `kind`, `claimed`, sort), four on vouches, two on challenges — the missing sort there is the server's own decision. State lives in the URL, so a filtered list is an address |
+| ~~9~~ | ✅ **FIXED.** Eighteen byte-identical loading cards and twelve identical retry alerts | days | `Shared/Remote.purs`, −418 lines. The per-screen sentence stays per-screen |
 | ~~10~~ | ✅ **FIXED.** `sameSection` existed twice — `NavBar` maps routes to strings, `Sidebar` matches pairwise. Both had to be edited for each of the three new routes | afternoon | One `section :: Route -> String` in `Route.purs` serves both |
 | ~~11~~ | ✅ **FIXED.** Test debt sat on the half the detail-page block shipped. The mocks discard their filter arguments, so the fixture suite is structurally unable to catch a filter that does not reach the API — which is exactly the defect that shipped | afternoon | A unit assertion on the built href is the fix; the suite already does this for DRep filters |
 | ~~12~~ | ✅ **FIXED.** A sixth order-dependence: `all-flows-sign.spec.js:88` picks the attestation to challenge with `items[0]`, and `/attestations` is ordered by slot descending | afternoon | The guard for exactly this was added two commits earlier, elsewhere |
@@ -69,8 +69,8 @@ every row in it was written by this project's own smoke scripts.
 | ~~15~~ | ✅ **FIXED.** "Anyone can state… anyone can challenge" was false: the chain requires a minted profile and its user token | minutes | Eight words |
 | ~~16~~ | ✅ **FIXED.** Empty states asserted the whole register is empty from a filtered page | afternoon | They take no argument |
 | ~~17~~ | ✅ **FIXED for the two that were stale.** The frontend's own docs were the untouched scaffold template, titled "Cardano dApp Frontend Template" | afternoon | Deleting the stale sections beats rewriting them |
-| 18 | **No Prometheus `/metrics`**, and note the collision: `/metrics/formulas` already exists and is something else | days | Known before this review |
-| 19 | **No rate limiting.** By query-api's own design note it is the BFF's job, and the BFF now exists | days | Known before this review |
+| ~~18~~ | ✅ **FIXED.** No Prometheus `/metrics` | days | On the BFF, on port 9464, which HTTPRoute does not route. No collision with `/metrics/formulas`: that one is in query-api and is a catalog |
+| ~~19~~ | ✅ **FIXED.** No rate limiting | days | Two caps on `/api/*`: per client keyed on `x-forwarded-for` (the pod sees the node's address for every request — measured), and an overall one |
 
 ## CIP-119: what a Testatum profile adds to what a DRep already has
 
@@ -138,3 +138,26 @@ this raw.**" So that row was not a reviewer's opinion about polish — it was a 
 interface had never met. The dictionary now in `Capabilities/Interaction/Types.purs` is that table,
 not a fresh derivation: a first attempt derived from the validators' own comments got the *cause*
 wrong in two places, which the specification had already reasoned out.
+
+## Status, 2026-10-29 seara — a doua trecere
+
+Șaisprezece din nouăsprezece rânduri închise. Ce rămâne sunt exact cele trei care cer o decizie a
+ownerului, nu muncă:
+
+| # | Ce rămâne | De ce nu e o chestiune de muncă |
+|---|---|---|
+| 1 | ecranul `by-credential` | amânat explicit de owner, „to be taken separately" |
+| 3 | cele două CTE din `/search` | SQL în `Query/Gov.hs` plus o imagine de backend (68 de minute, dispatch manual). Jumătatea de client e ieftină și n-are rost singură |
+| 5 | jumătatea „script" a promisiunii | câmpul de martor nu există în `claim-credential`: schimbare în interaction-api plus redeploy coordonat |
+
+Plus un rând nou, găsit în timpul reparațiilor și care nu era în raport: **titlurile servite de API
+sunt singurul loc în care marca veche mai ajunge la un consumator.** `"Palmares Query API"` și
+`"Palmares Interaction API"` vin din `RestAPI.hs`; documentele le citează ca fapte măsurate, deci nu
+s-au schimbat în text — se schimbă odată cu următoarea imagine de backend, o linie per serviciu.
+
+Și o corectură a propriei numărători a raportului: rândul despre redenumirea documentelor spunea
+„243 de apariții". Numărătoarea era peste tot ce conține cuvântul, iar aproape tot sunt
+IDENTIFICATORI — scheme SQL, roluri, căi, module, nume de imagini, chei de metadate. Marca propriu-zisă
+era în cincisprezece locuri în documentele vii; rapoartele de audit (350 de apariții) rămân neatinse,
+fiindcă sunt înregistrări datate, iar rescrierea unui raport ca să folosească marca de azi l-ar face
+să afirme despre trecut ceva ce nu era adevărat atunci.
