@@ -3,7 +3,7 @@ module Main where
 import Prelude
 
 import App.CopyOnClick (installCopyOnClick)
-import App.SpaLinkInterceptor (installSpaLinkInterceptor)
+import App.SpaLinkInterceptor (installSpaLinkInterceptor, normaliseTrailingSlash)
 import AppEnv (defaultEnv)
 import AppM (runAppM)
 import Components.Home as Home
@@ -15,6 +15,8 @@ import Store (initialStore)
 -- | Production entry point: runs Halogen UI with AppM (real HTTP via affjax) and Home as root.
 main :: Effect Unit
 main = do
+  -- Înaintea tuturor: routerul citește adresa la pornire, deci slash-ul se taie înainte de el.
+  normaliseTrailingSlash
   installSpaLinkInterceptor
   installCopyOnClick
   HA.runHalogenAff do

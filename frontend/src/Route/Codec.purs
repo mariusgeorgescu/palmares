@@ -74,6 +74,11 @@ parseRoute p = case parse routeCodec (withoutTrailingSlash p) of
 
 -- | Un slash final nu e o adresă diferită, deci nu are voie să fie o rută diferită.
 -- |
+-- | ⚠️ Normalizarea de aici NU e pe drumul de rulare. `AppBase.purs` cheamă `mkRouter routeCodec`,
+-- | adică parsează cu codecul direct; `parseRoute` e folosit numai de teste. Reparația care chiar
+-- | se vede în browser e `normaliseTrailingSlash`, din `App.SpaLinkInterceptor`, chemată din
+-- | `Main` înaintea pornirii. Asta rămâne ca să parseze la fel ca aplicația.
+-- |
 -- | `nonEmptySegment` oprește `/profiles/` să se parseze ca un detaliu cu id gol — care cerea
 -- | `/profiles/` de la API și randa alerta de decodare — dar codecul de listă nu consumă nici el
 -- | segmentul gol, deci fără normalizarea asta adresa ar cădea pe `NotFound`: o pagină lipsă pentru
