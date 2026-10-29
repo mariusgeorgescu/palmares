@@ -280,6 +280,7 @@ Open questions the reviewers could not settle offline (each is marked VERIFY in 
 | [`05-tests-ci-and-delivery.md`](05-tests-ci-and-delivery.md) | 709 | trace-code coverage map, CI, images, compose, scripts, secrets |
 | [`06-docs-spec-and-product-gaps.md`](06-docs-spec-and-product-gaps.md) | 425 | claim-by-claim doc check, read-layer obligations, product gaps, ADR hygiene, licensing |
 | [`07-reconciliation-2026-10-23.md`](07-reconciliation-2026-10-23.md) | 1032 | every finding re-judged against `2bf5bde`, with a toolchain, a database and web access the original pass did not have |
+| [`08-multi-perspective-review-2026-10-29.md`](08-multi-perspective-review-2026-10-29.md) | 120 | fourteen perspectives at `7aaa144`, each fact-checked by a skeptic; eleven findings fixed in `7749d16`, the rest is the current backlog, plus the CIP-119 overlap measured on mainnet |
 
 Architecture documentation written alongside these reports: [`../architecture/README.md`](../architecture/README.md).
 
