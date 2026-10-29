@@ -16,6 +16,7 @@ import Test.Capabilities.StatusSpec as StatusSpec
 import Test.FormatSpec as FormatSpec
 import Test.Capabilities.SearchSpec as SearchSpec
 import Test.Capabilities.SpoCommitteeSpec as SpoCommitteeSpec
+import Test.Capabilities.WalletAssetsSpec as WalletAssetsSpec
 import Test.Capabilities.WriteSpec as WriteSpec
 import Test.Capabilities.VoteSpec as VoteSpec
 import Test.Query.PageSpec as PageSpec
@@ -36,4 +37,5 @@ main = launchAff_ $ runSpec [ consoleReporter ] do
   SearchSpec.spec
   EarlyChainSpec.spec
   SpoCommitteeSpec.spec
+  WalletAssetsSpec.spec
   WriteSpec.spec

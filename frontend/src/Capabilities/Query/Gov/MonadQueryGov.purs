@@ -23,6 +23,7 @@ module Capabilities.Query.Gov.MonadQueryGov
   , getDelegations
   , getActivity
   , getProfile
+  , getProfileByUserToken
   , getProfiles
   , getAttestation
   , getAttestations
@@ -129,6 +130,14 @@ class Monad m <= MonadQueryGov m where
 
   -- | `GET /profiles` — registrul de profiluri. Un profil e un TOKEN: cine îl deține, îl deține.
   getProfile :: String -> m (Either ApiError ProfileRow)
+
+  -- | `GET /profiles/by-user-token/{asset-class}` — singura întrebare pe care un portofel conectat
+  -- | o poate pune de unul singur: „al cui e tokenul ăsta pe care îl țin în mînă".
+  -- |
+  -- | Argumentul e clasa de activ a jumătății de UTILIZATOR, exact cum vine din portofel.
+  -- | Derivarea către tokenul de referință o face serverul, și documentația rutei spune de ce:
+  -- | „protocol knowledge no frontend should carry".
+  getProfileByUserToken :: String -> m (Either ApiError ProfileRow)
   getProfiles :: RegistryFilters -> m (Either ApiError ProfilePage)
 
   -- | `GET /attestations` — cine ce a afirmat despre cine, și dacă subiectul a recunoscut.
@@ -161,6 +170,7 @@ instance monadQueryGovHalogenM ::
   getDelegations = lift <<< getDelegations
   getActivity = lift <<< getActivity
   getProfile = lift <<< getProfile
+  getProfileByUserToken = lift <<< getProfileByUserToken
   getProfiles = lift <<< getProfiles
   getAttestation = lift <<< getAttestation
   getAttestations = lift <<< getAttestations

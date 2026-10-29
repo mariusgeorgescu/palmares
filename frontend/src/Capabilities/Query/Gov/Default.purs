@@ -18,6 +18,7 @@ module Capabilities.Query.Gov.Default
   , getDelegationsDefault
   , getActivityDefault
   , getProfileDefault
+  , getProfileByUserTokenDefault
   , getProfilesDefault
   , getAttestationDefault
   , getAttestationsDefault
@@ -221,6 +222,16 @@ getProfileDefault
   -> String
   -> m (Either ApiError ProfileRow)
 getProfileDefault env pid = getJson (env.queryBaseUrl <> "/profiles/" <> pid)
+
+-- | Ruta face singură saltul user→referință. Clasa de activ merge în cale ca atare: e
+-- | `<policy>.<name>`, iar punctul nu se codifică — aceeași formă pe care o folosește și explorerul.
+getProfileByUserTokenDefault
+  :: forall m r
+   . MonadAff m
+  => Record (HasGovEnv r)
+  -> String
+  -> m (Either ApiError ProfileRow)
+getProfileByUserTokenDefault env ac = getJson (env.queryBaseUrl <> "/profiles/by-user-token/" <> ac)
 
 getAttestationsDefault
   :: forall m r

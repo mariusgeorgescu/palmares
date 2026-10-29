@@ -21,6 +21,7 @@ module Capabilities.Query.Gov.Mock
   , getDelegationsMock
   , getActivityMock
   , getProfileMock
+  , getProfileByUserTokenMock
   , getProfilesMock
   , getAttestationMock
   , getAttestationsMock
@@ -81,6 +82,7 @@ import Capabilities.Query.Gov.Types
   )
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
 import Data.Array (any, drop, filter, find, length, null, take)
+import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (all)
@@ -220,6 +222,16 @@ getActivityMock _ = pure (decodeFixture activityFixture)
 getProfileMock :: forall m. Applicative m => String -> m (Either ApiError ProfileRow)
 getProfileMock pid = pure case decodeFixture profileListFixture of
   Right (ProfilePage p) -> case find (\(ProfileRow r) -> r.id == pid) p.items of
+    Just row -> Right row
+    Nothing -> decodeFixture profileDetailFixture
+  Left _ -> decodeFixture profileDetailFixture
+
+-- | În demo, portofelul nu există, deci nimeni nu ajunge aici prin ecran. Mock-ul întoarce totuși
+-- | PRIMUL profil din fixtură, și nu o eroare: un `Left` ar face ca o eventuală folosire viitoare
+-- | să arate ca un defect de server, cînd de fapt e un bundle fără portofel.
+getProfileByUserTokenMock :: forall m. Applicative m => String -> m (Either ApiError ProfileRow)
+getProfileByUserTokenMock _ = pure case decodeFixture profileListFixture of
+  Right (ProfilePage p) -> case Array.head p.items of
     Just row -> Right row
     Nothing -> decodeFixture profileDetailFixture
   Left _ -> decodeFixture profileDetailFixture
