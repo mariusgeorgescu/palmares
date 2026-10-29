@@ -22,10 +22,12 @@ module Components.Explorer.AttestationList
 
 import Prelude
 
+import Capabilities.Interaction.Types (attestationKinds)
 import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestations, getProfiles)
 import Capabilities.Query.Gov.Types (AttestationPage(..), AttestationRow(..), ProfilePage(..), ProfileRow(..))
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Filters as Filters
 import Components.Shared.Remote as Remote
 import Components.Shared.Refresh (subscribeRefresh)
 import Data.Array (length, null)
@@ -35,20 +37,21 @@ import Data.Tuple (Tuple(..))
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), isJust, isNothing)
-import Format (formatDay, formatInt, humanize, matchLine)
+import Format (enumLabel, formatDay, formatInt, humanize, matchLine)
 import Halogen as H
 import AppEnv as AppEnv
 import Components.Shared.OnchainId as OnchainId
 import Components.Shared.Pager as Pager
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Router.Class (class MonadRouter)
+import Halogen.Router.Class (class MonadRouter, navigate)
 import Halogen.Store.Monad (class MonadStore)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
-import Route (Route)
+import Route (Route(..))
 import Route.GovQueries
-  ( RegistryFilters
+  ( anyRegistryFilter
+  , RegistryFilters
   , attestationDetailHrefFor
   , attestationListHrefFor
   , emptyRegistryFilters
@@ -80,6 +83,8 @@ data Action
   = Initialize
   | Retry
   | Receive Input
+  -- | Filtrele trăiesc în URL, deci o schimbare e o navigare — iar lista filtrată e o adresă.
+  | ChangeFilters RegistryFilters
 
 component
   :: forall q m
@@ -109,6 +114,7 @@ component =
       subscribeRefresh Retry
       void (H.fork load)
     Retry -> load
+    ChangeFilters f -> navigate (AttestationList f)
     Receive filters -> do
       st <- H.get
       when (filters /= st.filters) do
@@ -161,12 +167,56 @@ component =
                   )
               ]
           ]
+      , controls st
       , case st.page of
           NotAsked -> loading
           Loading -> loading
           Failure e -> failure e
           Success p -> body st p
       ]
+
+  -- Ce poate cere cineva de la lista de vouches. `kind` e felul afirmației, `accepted` e alegerea
+  -- subiectului — cele două coloane ale ecranului, acum și două întrebări — iar sortarea are cinci
+  -- chei pe server. `subject` și `issuer` NU sînt controale: ele vin din palmaresul unui profil, și
+  -- se păstrează neatinse cînd se schimbă altceva.
+  controls st =
+    Filters.bar
+      [ Filters.selectControl
+          { label: "Kind"
+          , value: st.filters.kind
+          , options: map (\k -> Tuple k (enumLabel k)) attestationKinds
+          , onChange: \v -> ChangeFilters (resetPage st.filters { kind = Filters.chosen v })
+          }
+      , Filters.boolControl
+          { label: "Countersigned"
+          , value: st.filters.accepted
+          , yes: "Accepted"
+          , no: "Not yet"
+          , onChange: \v -> ChangeFilters (resetPage st.filters { accepted = Filters.chosen v })
+          }
+      , Filters.selectControl
+          { label: "Sort by"
+          , value: st.filters.order_by
+          , options:
+              [ Tuple "date" "Date"
+              , Tuple "name" "Name"
+              , Tuple "issued_to" "Subject"
+              , Tuple "issued_by" "Issuer"
+              , Tuple "id" "Id"
+              ]
+          , onChange: \v -> ChangeFilters (resetPage st.filters { order_by = Filters.chosen v })
+          }
+      , Filters.selectControl
+          { label: "Order"
+          , value: st.filters.sort_order
+          , options: [ Tuple "desc" "Newest first", Tuple "asc" "Oldest first" ]
+          , onChange: \v -> ChangeFilters (resetPage st.filters { sort_order = Filters.chosen v })
+          }
+      ]
+
+  -- Orice schimbare de filtru duce înapoi la prima pagină: altfel filtrezi de pe pagina a treia și
+  -- primești pagina a treia a unei alte întrebări.
+  resetPage f = f { offset = Nothing }
 
   loading = Remote.loadingCard "Loading vouches…"
 
@@ -199,7 +249,7 @@ component =
               [ HH.p_ [ HH.text "No profile has claimed a governance credential yet." ]
               , wayOut "See all vouches"
               ]
-            else if hasAnyFilter st.filters then
+            else if anyRegistryFilter st.filters then
               [ HH.p_ [ HH.text "No vouches match these filters." ]
               , wayOut "Clear the filters"
               ]
@@ -219,7 +269,6 @@ component =
   -- „Filtrat" înseamnă `kind`, `subject` sau `issuer` — singurele care schimbă CE se potrivește.
   -- `order_by`/`sort_order` doar reordonează, iar `limit`/`offset` sînt o fereastră peste
   -- potriviri: o pagină goală de la capătul listei nu e un filtru care n-a prins nimic.
-  hasAnyFilter f = isJust f.kind || isJust f.subject || isJust f.issuer
 
   table st items =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]

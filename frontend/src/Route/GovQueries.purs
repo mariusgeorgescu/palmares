@@ -76,6 +76,7 @@ module Route.GovQueries
   , graphPath
   , graphHrefFor
   , RegistryFilters
+  , anyRegistryFilter
   , emptyRegistryFilters
   , registryFiltersCodec
   , profileListPath
@@ -102,7 +103,7 @@ import Prelude
 
 import Data.Array (delete, elem, filter, reverse, snoc)
 import Data.Foldable (foldMap)
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.String (joinWith)
 import Data.Tuple (Tuple(..), snd)
 import JSURI (encodeURIComponent)
@@ -377,6 +378,15 @@ type RegistryFilters =
   -- decit una pe o ruta speciala.
   , subject :: Maybe String
   , issuer :: Maybe String
+  -- Căutarea pe text a registrului de profiluri. Serverul o acceptă de mult (`?q=`) și nimic nu o
+  -- cerea: registrul era negăsibil din ecranul care îl arată.
+  , q :: Maybe String
+  -- Cele trei întrebări de tip da/nu pe care fiecare listă le primește de la server și pe care
+  -- niciun control nu le putea pune. „true"/„false" ca text, nu `Boolean`: ce traversează URL-ul e
+  -- text, iar un `Boolean` aici ar însemna trei conversii pe drum și o a patra la parsare.
+  , claimed :: Maybe String
+  , accepted :: Maybe String
+  , resolved :: Maybe String
   }
 
 emptyRegistryFilters :: RegistryFilters
@@ -388,7 +398,30 @@ emptyRegistryFilters =
   , kind: Nothing
   , subject: Nothing
   , issuer: Nothing
+  , q: Nothing
+  , claimed: Nothing
+  , accepted: Nothing
+  , resolved: Nothing
   }
+
+-- | Dacă vederea asta e îngustată de ceva.
+-- |
+-- | Stă AICI, lîngă tip, și nu în fiecare ecran: era copiată în trei, iar cele trei copii enumerau
+-- | trei cîmpuri din unsprezece. Golul are două înțelesuri — „registrul e gol" și „selecția asta
+-- | n-a prins nimic" — și o copie care nu știe de un filtru nou spune prima cînd ar trebui s-o
+-- | spună pe a doua. Exact asta s-a reparat o dată deja, pentru `kind`.
+-- |
+-- | Paginarea NU e un filtru: pagina a treia a unei liste întregi nu e o vedere îngustată, iar un
+-- | gol de la capătul paginării e altă propoziție.
+anyRegistryFilter :: RegistryFilters -> Boolean
+anyRegistryFilter f =
+  isJust f.kind
+    || isJust f.subject
+    || isJust f.issuer
+    || isJust f.q
+    || isJust f.claimed
+    || isJust f.accepted
+    || isJust f.resolved
 
 registryFiltersCodec :: RouteDuplex' RegistryFilters
 registryFiltersCodec =
@@ -400,6 +433,10 @@ registryFiltersCodec =
     # prop (Proxy :: Proxy "kind") (optional (param "kind"))
     # prop (Proxy :: Proxy "subject") (optional (param "subject"))
     # prop (Proxy :: Proxy "issuer") (optional (param "issuer"))
+    # prop (Proxy :: Proxy "q") (optional (param "q"))
+    # prop (Proxy :: Proxy "claimed") (optional (param "claimed"))
+    # prop (Proxy :: Proxy "accepted") (optional (param "accepted"))
+    # prop (Proxy :: Proxy "resolved") (optional (param "resolved"))
 
 profileListPath :: String
 profileListPath = "/profiles"
@@ -561,8 +598,26 @@ sortPairs f = order <> optPair "limit" f.limit <> optPair "offset" f.offset
 -- | schimba corect -- si cererea catre API pleca nefiltrata, cu toate rindurile. Un filtru care se
 -- | vede in bara de adrese dar nu se aplica e mai rau decit unul care lipseste.
 registryPairs :: RegistryFilters -> Array (Tuple String String)
-registryPairs f = sortPairs f <> optPair "kind" f.kind <> optPair "subject" f.subject
-  <> optPair "issuer" f.issuer
+registryPairs f =
+  sort
+    <> optPair "limit" f.limit
+    <> optPair "offset" f.offset
+    <> optPair "kind" f.kind
+    <> optPair "subject" f.subject
+    <> optPair "issuer" f.issuer
+    <> optPair "q" f.q
+    <> optPair "claimed" f.claimed
+    <> optPair "accepted" f.accepted
+    <> optPair "resolved" f.resolved
+  where
+  -- NU `sortPairs`, și diferența e un caz real: `/disputes` acceptă `sort_order` și NU acceptă
+  -- `order_by` — „the list has one chronology, and a second ordering would be a control with no
+  -- screen behind it", scrie în propria lui documentație. `sortPairs` emite `sort_order` doar
+  -- împreună cu `order_by`, deci acolo controlul de asc/desc n-ar fi ajuns niciodată la server.
+  sort = case f.order_by, f.sort_order of
+    Nothing, Nothing -> []
+    Just ob, so -> [ Tuple "order_by" ob, Tuple "sort_order" (fromMaybe "desc" so) ]
+    Nothing, Just so -> [ Tuple "sort_order" so ]
 
 optPair :: String -> Maybe String -> Array (Tuple String String)
 optPair k = maybe [] \v -> [ Tuple k v ]

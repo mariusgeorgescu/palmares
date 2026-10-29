@@ -119,6 +119,10 @@ spec = do
           , kind = Just "credential_claim"
           , subject = Just "abc.def"
           , issuer = Just "ghi.jkl"
+          , q = Just "atala"
+          , claimed = Just "true"
+          , accepted = Just "false"
+          , resolved = Just "true"
           }
 
     it "the route codec and the query builder agree on every field" do
@@ -126,18 +130,35 @@ spec = do
       paramsOf (printRoute (ProfileList allSet)) `shouldEqual` paramsOf (profileListHrefFor allSet)
       paramsOf (printRoute (DisputeList allSet)) `shouldEqual` paramsOf (disputeListHrefFor allSet)
 
-    it "and what they agree on is all seven fields, not an agreed silence" do
+    it "and what they agree on is all eleven fields, not an agreed silence" do
       -- Fără asta, două constructori care amândoi uită un câmp ar trece testul de deasupra.
       paramsOf (attestationListHrefFor allSet)
         `shouldEqual`
-          [ "issuer=ghi.jkl"
+          [ "accepted=false"
+          , "claimed=true"
+          , "issuer=ghi.jkl"
           , "kind=credential_claim"
           , "limit=25"
           , "offset=50"
           , "order_by=date"
+          , "q=atala"
+          , "resolved=true"
           , "sort_order=desc"
           , "subject=abc.def"
           ]
+
+    -- Cazul pe care `sortPairs` nu-l putea exprima, și e un caz REAL: `/disputes` acceptă
+    -- `sort_order` și refuză `order_by` — „the list has one chronology", scrie în documentația
+    -- rutei. `sortPairs` emite `sort_order` doar împreună cu `order_by`, deci controlul de
+    -- asc/desc al provocărilor n-ar fi ajuns niciodată la server. Testul ăsta e singurul loc din
+    -- care se vede diferența.
+    it "sends sort_order on its own, for the list that has no order_by" do
+      disputeListHrefFor (emptyRegistryFilters { sort_order = Just "asc" })
+        `shouldEqual` "/disputes?sort_order=asc"
+      -- Și invers: `order_by` singur aduce cu el `desc`, fiindcă implicitul serverului nu e al
+      -- ecranului.
+      profileListHrefFor (emptyRegistryFilters { order_by = Just "name" })
+        `shouldEqual` "/profiles?order_by=name&sort_order=desc"
 
     it "emits nothing when nothing is set" do
       attestationListHrefFor emptyRegistryFilters `shouldEqual` "/attestations"

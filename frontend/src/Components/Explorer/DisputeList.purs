@@ -22,6 +22,7 @@ import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestations, getDisputes)
 import Capabilities.Query.Gov.Types (AttestationPage(..), AttestationRow(..), DisputePage(..), DisputeRow(..))
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Filters as Filters
 import Components.Shared.Remote as Remote
 import Components.Shared.Refresh (subscribeRefresh)
 import Data.Array (length, null)
@@ -38,13 +39,14 @@ import Components.Shared.OnchainId as OnchainId
 import Components.Shared.Pager as Pager
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Router.Class (class MonadRouter)
+import Halogen.Router.Class (class MonadRouter, navigate)
 import Halogen.Store.Monad (class MonadStore)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
-import Route (Route)
+import Route (Route(..))
 import Route.GovQueries
-  ( RegistryFilters
+  ( anyRegistryFilter
+  , RegistryFilters
   , disputeDetailHrefFor
   , disputeListHrefFor
   , emptyRegistryFilters
@@ -75,6 +77,8 @@ data Action
   = Initialize
   | Retry
   | Receive Input
+  -- | Filtrele trăiesc în URL, deci o schimbare e o navigare — iar lista filtrată e o adresă.
+  | ChangeFilters RegistryFilters
 
 -- | Verde pentru disputa respinsă (atestarea rămîne), roșu pentru cea confirmată (atestarea cade).
 -- | Culoarea urmărește ATESTAREA, nu disputa, pentru că ăsta e lucrul despre care cititorul vrea să
@@ -119,6 +123,7 @@ component =
       subscribeRefresh Retry
       void (H.fork load)
     Retry -> load
+    ChangeFilters f -> navigate (DisputeList f)
     Receive filters -> do
       st <- H.get
       when (filters /= st.filters) do
@@ -157,12 +162,36 @@ component =
                   \back on every outcome: contesting costs network fees and nothing else."
               ]
           ]
+      , controls st
       , case st.page of
           NotAsked -> loading
           Loading -> loading
           Failure e -> failure e
           Success p -> body st p
       ]
+
+  -- DOUĂ controale, nu patru, și lipsa celui de sortare e o decizie a serverului, nu o scăpare:
+  -- `/disputes` nu acceptă `order_by` — „the list has one chronology, and a second ordering would
+  -- be a control with no screen behind it", scrie în documentația rutei. Deci se oferă exact ce
+  -- există: deschise sau judecate, și în ce ordine.
+  controls st =
+    Filters.bar
+      [ Filters.boolControl
+          { label: "State"
+          , value: st.filters.resolved
+          , yes: "Decided"
+          , no: "Still open"
+          , onChange: \v -> ChangeFilters (resetPage st.filters { resolved = Filters.chosen v })
+          }
+      , Filters.selectControl
+          { label: "Order"
+          , value: st.filters.sort_order
+          , options: [ Tuple "desc" "Newest first", Tuple "asc" "Oldest first" ]
+          , onChange: \v -> ChangeFilters (resetPage st.filters { sort_order = Filters.chosen v })
+          }
+      ]
+
+  resetPage f = f { offset = Nothing }
 
   loading = Remote.loadingCard "Loading challenges…"
 
@@ -187,7 +216,7 @@ component =
   emptyState st =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
       [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
-          ( if hasAnyFilter st.filters then
+          ( if anyRegistryFilter st.filters then
               [ HH.p_ [ HH.text "No challenges match these filters." ]
               , HH.a
                   [ HP.href (disputeListHrefFor emptyRegistryFilters)
@@ -206,7 +235,6 @@ component =
   -- „Filtrat" înseamnă `kind`, `subject` sau `issuer` — singurele care schimbă CE se potrivește.
   -- `order_by`/`sort_order` doar reordonează, iar `limit`/`offset` sînt o fereastră peste
   -- potriviri: o pagină goală de la capătul listei nu e un filtru care n-a prins nimic.
-  hasAnyFilter f = isJust f.kind || isJust f.subject || isJust f.issuer
 
   table st items =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]

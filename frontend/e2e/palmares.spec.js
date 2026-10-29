@@ -706,6 +706,80 @@ test('a filter that does not reach the request is now visible, because the mocks
   await expect(page.getByRole('columnheader', { name: 'Accepted' })).toBeVisible();
 });
 
+test('the registry lists can be filtered and sorted from the screen', async ({ page }) => {
+  // Rândul 8 al recenziei: zero `select`, zero `input` pe cele trei liste ale registrului, în timp
+  // ce `order_by`, `sort_order`, `kind`, `subject` și `issuer` traversau deja codecul — iar serverul
+  // accepta pe deasupra `q`, `claimed`, `accepted` și `resolved`. Jumătate cablat în patru
+  // direcții, și nimic de apăsat.
+  //
+  // Numărătoarea e aserțiunea, ca în testul de mai sus: mock-urile respectă acum și filtrele noi,
+  // deci un control care nu ajunge în cerere se vede ca o cifră care nu se schimbă. Fixture-ul are
+  // șase profiluri — trei `person_d_rep` și trei `auditor` — și exact trei revendică o credențială.
+  await page.goto('/profiles');
+  // „Filters" ca grup cu nume: „Kind" apare și pe cardul fiecărui profil, iar un locator global ar
+  // fi ambiguu — pentru un test ca pentru un cititor de ecran.
+  //
+  // `combobox`, nu `getByLabel`: Playwright socotește ca etichetă și textul unui `<option>`, iar
+  // lista de sortare are o opțiune care se numește tot „Kind". Rolul deosebește controlul de
+  // opțiunile lui.
+  const filters = () => page.getByRole('group', { name: 'Filters' });
+  const control = (name) => filters().getByRole('combobox', { name });
+  // 12 e totalul ÎNREGISTRAT al registrului, 6 sunt rândurile din fixtură: fără filtru, mock-ul
+  // întoarce totalul serverului, exact ca serverul.
+  await expect(page.getByText('12 profiles match, showing 1–6')).toBeVisible();
+
+  await control('Kind').selectOption('person_d_rep');
+  await expect(page).toHaveURL(/kind=person_d_rep/);
+  await expect(page.getByText('3 profiles match, showing 1–3')).toBeVisible();
+
+  // Filtrele se COMPUN, ca pe server: cele trei individuale sunt și cele trei cu credențială, deci
+  // intersecția rămâne trei — iar inversul o golește, ceea ce e proba că al doilea filtru chiar a
+  // plecat.
+  await control('Credential').selectOption('true');
+  await expect(page).toHaveURL(/claimed=true/);
+  await expect(page).toHaveURL(/kind=person_d_rep/);
+  await expect(page.getByText('3 profiles match, showing 1–3')).toBeVisible();
+
+  await control('Credential').selectOption('false');
+  // Regexul cere si „, showing": propozitia de gol conține tot „profiles match", iar fara asta
+  // aserțiunea ar fi prins exact mesajul pe care îl verificăm mai jos.
+  await expect(page.getByText(/profiles match, showing/)).toHaveCount(0);
+  // Și golul spune care gol e: al FILTRELOR, nu al registrului.
+  await expect(page.getByText('No profiles match these filters.')).toBeVisible();
+
+  // Căutarea pe text pleacă la trimitere, nu la fiecare tastă: o navigare per literă ar umple
+  // istoricul browserului. Cele trei nume de emitent conțin „issuer".
+  await page.goto('/profiles');
+  await filters().getByPlaceholder('name or description').fill('issuer');
+  await filters().getByRole('button', { name: 'Search' }).click();
+  await expect(page).toHaveURL(/q=issuer/);
+  await expect(page.getByText('3 profiles match, showing 1–3')).toBeVisible();
+
+  // Vouches: un singur rând din șase e contrasemnat.
+  await page.goto('/attestations');
+  await expect(page.locator('tbody tr')).toHaveCount(6);
+  await control('Countersigned').selectOption('true');
+  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await control('Countersigned').selectOption('false');
+  await expect(page.locator('tbody tr')).toHaveCount(5);
+
+  // Provocări: toate cinci din fixture sunt judecate, deci „Still open" e gol. Și NU are control de
+  // sortare, fiindcă ruta nu acceptă `order_by` — „the list has one chronology", scrie serverul.
+  await page.goto('/disputes');
+  await expect(page.locator('tbody tr')).toHaveCount(5);
+  await expect(control('Sort by')).toHaveCount(0);
+  await control('State').selectOption('false');
+  await expect(page).toHaveURL(/resolved=false/);
+  await expect(page.locator('tbody tr')).toHaveCount(0);
+  await control('State').selectOption('true');
+  await expect(page.locator('tbody tr')).toHaveCount(5);
+
+  // Iar asc/desc ajunge la server pe lista care n-are `order_by`: `sortPairs` emitea `sort_order`
+  // doar împreună cu `order_by`, deci controlul ăsta ar fi fost mut.
+  await control('Order').selectOption('asc');
+  await expect(page).toHaveURL(/sort_order=asc/);
+});
+
 test('a profile page shows the two halves of a track record, not just the identity', async ({ page }) => {
   // Pînă acum registrul avea doar liste, iar palmaresul unei identități — teza produsului — nu se
   // vedea nicăieri per persoană. Cele DOUĂ jumătăți sînt tot rostul paginii: ruta dedicată

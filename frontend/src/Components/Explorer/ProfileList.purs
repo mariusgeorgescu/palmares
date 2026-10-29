@@ -18,15 +18,19 @@ import Prelude
 
 import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getProfiles)
+import Capabilities.DomEvent (class MonadDomEvent, preventDefaultEvent)
+import Capabilities.Interaction.Types (profileKinds)
 import Capabilities.Query.Gov.Types (ProfilePage(..), ProfileRow(..))
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Filters as Filters
 import Components.Shared.Remote as Remote
 import Components.Shared.Refresh (subscribeRefresh)
 import Data.Array (length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.String (Pattern(..), stripPrefix)
+import Data.Tuple (Tuple(..))
 import Format (enumLabel, matchLine, pluralize)
 import Halogen as H
 import AppEnv as AppEnv
@@ -34,13 +38,14 @@ import Components.Shared.OnchainId as OnchainId
 import Components.Shared.Pager as Pager
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Router.Class (class MonadRouter)
+import Halogen.Router.Class (class MonadRouter, navigate)
 import Halogen.Store.Monad (class MonadStore)
 import Network.RemoteData (RemoteData(..))
 import Query.Page (clampLimit, listLimitMax, nextOffset, offsetCeiling, prevOffset)
-import Route (Route)
+import Route (Route(..))
 import Route.GovQueries
-  ( RegistryFilters
+  ( anyRegistryFilter
+  , RegistryFilters
   , drepDetailHrefFor
   , emptyRegistryFilters
   , profileDetailHrefFor
@@ -48,6 +53,7 @@ import Route.GovQueries
   , writeHrefFor
   )
 import Store as Store
+import Web.Event.Internal.Types (Event)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -63,12 +69,21 @@ type State =
   { filters :: RegistryFilters
   , refreshing :: Boolean
   , page :: RemoteData ApiError ProfilePage
+  -- Ce s-a tastat în caseta de căutare și încă nu s-a trimis. Singura stare locală a ecranului:
+  -- restul filtrelor stau în URL, dar un `q` trimis la fiecare tastă ar fi o navigare și o cerere
+  -- per literă.
+  , draft :: String
   }
 
 data Action
   = Initialize
   | Retry
   | Receive Input
+  -- | Un control s-a schimbat. Filtrele trăiesc în URL, deci schimbarea e o NAVIGARE: ecranul
+  -- | reinteroghează din `Receive`, iar lista filtrată devine o adresă pe care o poți da cuiva.
+  | ChangeFilters RegistryFilters
+  | SetDraft String
+  | SubmitSearch Event
 
 -- | Dacă credențiala e a unui DRep, citit din prefixul CIP-129.
 -- |
@@ -82,13 +97,14 @@ isDRepCredential c = isJust (stripPrefix (Pattern "drep1") c)
 
 component
   :: forall q m
-   . MonadQueryGov m
+   . MonadDomEvent m
+  => MonadQueryGov m
   => MonadStore Store.Action Store.Store m
   => MonadRouter Route m
   => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: \filters -> { filters, page: NotAsked, refreshing: false }
+    { initialState: \filters -> { filters, page: NotAsked, refreshing: false, draft: fromMaybe "" filters.q }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -111,8 +127,16 @@ component =
     Receive filters -> do
       st <- H.get
       when (filters /= st.filters) do
-        H.modify_ _ { filters = filters }
+        H.modify_ _ { filters = filters, draft = fromMaybe "" filters.q }
         load
+    ChangeFilters f -> navigate (ProfileList f)
+    SetDraft v -> H.modify_ _ { draft = v }
+    SubmitSearch ev -> do
+      -- Fără asta, browserul trimite formularul nativ: reîncărcare completă pe `/profiles`, fără
+      -- niciun parametru. Căutarea pleacă prin router, ca orice altă schimbare de filtru.
+      preventDefaultEvent ev
+      st <- H.get
+      navigate (ProfileList (resetPage st.filters { q = Filters.chosen st.draft }))
 
   load = do
     st <- H.get
@@ -143,12 +167,57 @@ component =
               ]
               [ HH.text "Claim a profile" ]
           ]
+      , controls st
       , case st.page of
           NotAsked -> loading
           Loading -> loading
           Failure e -> failure e
           Success p -> body st p
       ]
+
+  -- Ce poate cere cineva de la registrul de profiluri. Toate patru existau deja pe server: `q`
+  -- caută în nume și descriere, `kind` e tipul de actor, `claimed` îngustează la profilurile care
+  -- revendică o credențială — subsetul pe care un ecran de verificare are ce să verifice — iar
+  -- sortarea are patru chei.
+  controls st =
+    Filters.bar
+      [ Filters.searchControl
+          { label: "Search", draft: st.draft, onInput: SetDraft, onSubmit: SubmitSearch }
+      , Filters.selectControl
+          { label: "Kind"
+          , value: st.filters.kind
+          , options: map (\k -> Tuple k (enumLabel k)) profileKinds
+          , onChange: \v -> ChangeFilters (resetPage st.filters { kind = Filters.chosen v })
+          }
+      , Filters.boolControl
+          { label: "Credential"
+          , value: st.filters.claimed
+          , yes: "Claims one"
+          , no: "Claims none"
+          , onChange: \v -> ChangeFilters (resetPage st.filters { claimed = Filters.chosen v })
+          }
+      , Filters.selectControl
+          { label: "Sort by"
+          , value: st.filters.order_by
+          , options:
+              [ Tuple "registered_at" "Registered"
+              , Tuple "name" "Name"
+              , Tuple "type" "Kind"
+              , Tuple "id" "Id"
+              ]
+          , onChange: \v -> ChangeFilters (resetPage st.filters { order_by = Filters.chosen v })
+          }
+      , Filters.selectControl
+          { label: "Order"
+          , value: st.filters.sort_order
+          , options: [ Tuple "desc" "Newest first", Tuple "asc" "Oldest first" ]
+          , onChange: \v -> ChangeFilters (resetPage st.filters { sort_order = Filters.chosen v })
+          }
+      ]
+
+  -- Orice schimbare de filtru duce înapoi la prima pagină. Fără asta, cineva care filtrează de pe
+  -- pagina a treia primește pagina a treia a unei alte întrebări — de obicei goală.
+  resetPage f = f { offset = Nothing }
 
   loading = Remote.loadingCard "Loading profiles…"
 
@@ -175,11 +244,11 @@ component =
       [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
           [ HH.p_
               [ HH.text
-                  ( if hasAnyFilter st.filters then "No profiles match these filters."
+                  ( if anyRegistryFilter st.filters then "No profiles match these filters."
                     else "No profiles have been registered yet."
                   )
               ]
-          , if hasAnyFilter st.filters then
+          , if anyRegistryFilter st.filters then
               HH.a
                 [ HP.href (profileListHrefFor emptyRegistryFilters)
                 , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
@@ -192,7 +261,6 @@ component =
   -- „Filtrat" înseamnă `kind`, `subject` sau `issuer` — singurele care schimbă CE se potrivește.
   -- `order_by`/`sort_order` doar reordonează, iar `limit`/`offset` sînt o fereastră peste
   -- potriviri: o pagină goală de la capătul listei nu e un filtru care n-a prins nimic.
-  hasAnyFilter f = isJust f.kind || isJust f.subject || isJust f.issuer
 
   -- Carduri, nu tabel: descrierea e text liber de lungime necontrolată, iar într-o coloană ar
   -- împinge totul la dreapta sau s-ar tăia exact unde începe informația.

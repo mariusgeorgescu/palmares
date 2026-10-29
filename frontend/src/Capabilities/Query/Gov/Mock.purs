@@ -76,16 +76,17 @@ import Capabilities.Query.Gov.Types
   , AttestationPage(..)
   , AttestationRow(..)
   , DisputePage(..)
-  , DisputeRow
+  , DisputeRow(..)
   , RegistrySummary
   )
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
-import Data.Array (drop, filter, find, length, null, take)
+import Data.Array (any, drop, filter, find, length, null, take)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (all)
 import Data.Int as Int
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
+import Data.String as String
 import Route.GovQueries
   ( ActivityFilters
   , DRepFilters
@@ -147,6 +148,20 @@ narrowPage matchers f p =
 -- | e tocmai ce deosebește o pagină cerută nefiltrat de una care n-a potrivit nimic.
 matchOn :: forall a. (a -> String) -> Maybe String -> Array (a -> Boolean)
 matchOn field = maybe [] \v -> [ \row -> field row == v ]
+
+-- | Un filtru de tip da/nu. Vine din URL ca text, deci orice altceva decît „true"/„false" nu
+-- | filtrează nimic — exact ce face și serverul cu un `Bool` pe care nu-l poate parsa.
+matchBool :: forall a. (a -> Boolean) -> Maybe String -> Array (a -> Boolean)
+matchBool field = case _ of
+  Just "true" -> [ field ]
+  Just "false" -> [ not <<< field ]
+  _ -> []
+
+-- | Căutarea pe text, ca a serverului: potrivire parțială, fără majuscule, peste cîmpurile date.
+-- | `%` și `_` sînt literale aici, fiindcă `?q=` le tratează literal și nu ca metacaractere.
+matchText :: forall a. Array (a -> String) -> Maybe String -> Array (a -> Boolean)
+matchText fields = maybe [] \v ->
+  [ \row -> any (\field -> String.contains (String.Pattern (String.toLower v)) (String.toLower (field row))) fields ]
 
 getStatusMock :: forall m. Applicative m => m (Either ApiError GovStatus)
 getStatusMock = pure (decodeFixture statusFixture)
@@ -214,7 +229,17 @@ getProfileMock pid = pure case decodeFixture profileListFixture of
 getProfilesMock :: forall m. Applicative m => RegistryFilters -> m (Either ApiError ProfilePage)
 getProfilesMock f = pure (map narrow (decodeFixture profileListFixture))
   where
-  narrow (ProfilePage p) = ProfilePage (narrowPage (matchOn (\(ProfileRow r) -> r.kind) f.kind) f p)
+  narrow (ProfilePage p) =
+    ProfilePage
+      ( narrowPage
+          ( matchOn (\(ProfileRow r) -> r.kind) f.kind
+              -- `claimed` nu e un cîmp, e o întrebare despre unul: „revendică vreo credențială".
+              <> matchBool (\(ProfileRow r) -> isJust r.credential) f.claimed
+              <> matchText [ \(ProfileRow r) -> r.name, \(ProfileRow r) -> r.description ] f.q
+          )
+          f
+          p
+      )
 
 getAttestationMock :: forall m. Applicative m => String -> m (Either ApiError AttestationDetail)
 getAttestationMock _ = pure (decodeFixture attestationDetailFixture)
@@ -230,6 +255,7 @@ getAttestationsMock f = pure (map narrow (decodeFixture attestationListFixture))
           ( matchOn (\(AttestationRow a) -> a.kind) f.kind
               <> matchOn (\(AttestationRow a) -> a.subject) f.subject
               <> matchOn (\(AttestationRow a) -> a.issuer) f.issuer
+              <> matchBool (\(AttestationRow a) -> a.accepted) f.accepted
           )
           f
           p
@@ -238,13 +264,13 @@ getAttestationsMock f = pure (map narrow (decodeFixture attestationListFixture))
 getDisputeMock :: forall m. Applicative m => String -> m (Either ApiError DisputeRow)
 getDisputeMock _ = pure (decodeFixture disputeDetailFixture)
 
--- | Disputele n-au niciun filtru de rând: `DisputeRow` nu poartă nici `kind`, nici `subject`,
--- | nici `issuer` — ruta se îngustează prin `target`, care nu există în `RegistryFilters`. Rămâne
--- | deci doar fereastra de paginare, iar `total` rămâne cel înregistrat.
+-- | Disputele au UN filtru de rând: `resolved`, care e „are verdict". `kind`, `subject` și
+-- | `issuer` nu există pe `DisputeRow`, iar `target` nu există în `RegistryFilters`.
 getDisputesMock :: forall m. Applicative m => RegistryFilters -> m (Either ApiError DisputePage)
 getDisputesMock f = pure (map narrow (decodeFixture disputeListFixture))
   where
-  narrow (DisputePage p) = DisputePage (narrowPage [] f p)
+  narrow (DisputePage p) =
+    DisputePage (narrowPage (matchBool (\(DisputeRow d) -> isJust d.verdict) f.resolved) f p)
 
 -- | Numerele măsurate pe preprod, ca și fixturile din care ar fi putut fi citite.
 getRegistrySummaryMock :: forall m. Applicative m => m (Either ApiError RegistrySummary)
