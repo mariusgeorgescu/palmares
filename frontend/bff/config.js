@@ -40,6 +40,9 @@ function rateFromEnv(name, fallback) {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
+// Portul metricilor. Separat de cel public dinadins — vezi `bff/metrics.js`.
+export const metricsPort = rateFromEnv('PALMARES_METRICS_PORT', 9464);
+
 export const rateLimits = {
   // Generos pentru un om: o încărcare de ecran face între două și șase cereri, iar graful face mai
   // multe. Strâns pentru un scraper, care face mii.

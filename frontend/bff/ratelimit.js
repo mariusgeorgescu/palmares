@@ -22,6 +22,8 @@
  * Fără dependență nouă: `@fastify/rate-limit` ar aduce un plugin întreg pentru patruzeci de linii.
  */
 
+import { recordRateLimited } from './metrics.js';
+
 const WINDOW_MS = 60_000;
 
 /** Cheia unui client. Primul salt din XFF e cel mai apropiat de el; restul sunt proxy-uri. */
@@ -87,6 +89,7 @@ export function registerRateLimit(fastify, { perClient, global: globalLimit }) {
     // Cheia se logheaza: e singurul loc din care se vede dacă gateway-ul pune `x-forwarded-for`
     // sau dacă pragul per client s-a comportat, de fapt, global.
     fastify.log.warn(`[Rate limit] ${verdict.scope} cap hit by ${key} on ${request.method} ${request.url}`);
+    recordRateLimited(verdict.scope);
     reply
       .code(429)
       .header('retry-after', String(verdict.retryAfter))

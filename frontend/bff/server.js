@@ -4,7 +4,8 @@ import staticFiles from '@fastify/static';
 import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { rateLimits, services } from './config.js';
+import { metricsPort, rateLimits, services } from './config.js';
+import { registerMetrics } from './metrics.js';
 import { registerRateLimit } from './ratelimit.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +20,9 @@ await fastify.register(import('@fastify/cors'), {
   origin: true,
   credentials: true
 });
+
+// Măsurarea întîi, ca să numere și cererile pe care limitatorul le refuză.
+await registerMetrics(fastify, { port: metricsPort });
 
 // Limitarea debitului, înaintea oricărui proxy: ce apără e baza din spate, nu BFF-ul.
 registerRateLimit(fastify, rateLimits);
