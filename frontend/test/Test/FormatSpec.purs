@@ -9,7 +9,7 @@ import Components.Shared.OnchainId (IdKind(..), explorerUrl)
 import Data.Array (replicate)
 import Data.Maybe (Maybe(..))
 import Data.String as String
-import Format (formatAda, formatInt, formatLag, formatPercent, groupDigits, humanize, matchLine, pluralize, roleLabel)
+import Format (formatAda, formatInt, formatLag, formatPercent, groupDigits, humanize, imageRef, matchLine, pluralize, roleLabel)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
@@ -168,3 +168,27 @@ spec = do
     it "a policy goes to /policy" do
       explorerUrl "https://preprod.cexplorer.io" Policy "aa"
         `shouldEqual` "https://preprod.cexplorer.io/policy/aa"
+
+  -- `image_uri` e obligatoriu la revendicarea unui profil, intră în datum, costă min-ADA în fiecare
+  -- UTxO — și nu se randa nicăieri. Cele patru forme de aici sînt cele MĂSURATE pe registrul viu la
+  -- 2026-10-29, nu cazuri imaginate.
+  describe "the image a profile claims" do
+    it "says nothing when nothing is claimed" do
+      imageRef "" `shouldEqual` Nothing
+      imageRef "   " `shouldEqual` Nothing
+
+    it "shows an ipfs address without pretending to fetch it" do
+      -- Unsprezece din douăsprezece profiluri au exact forma asta, și niciunul nu e un CID real.
+      (_.href <$> imageRef "ipfs://palmares-smoke-placeholder") `shouldEqual` Just Nothing
+      (_.shown <$> imageRef "ipfs://palmares-smoke-placeholder")
+        `shouldEqual` Just "ipfs://palmares-smoke-placeholder"
+
+    it "links an http address, and says who loads it" do
+      (_.href <$> imageRef "https://example.org/a.png")
+        `shouldEqual` Just (Just "https://example.org/a.png")
+
+    it "refuses to link something that is not an address" do
+      -- Al doisprezecelea profil are literalmente „htt" în `image_uri`. Un `<a href="htt">` ar fi
+      -- un link relativ către o pagină care nu există.
+      (_.href <$> imageRef "htt") `shouldEqual` Just Nothing
+      (_.note <$> imageRef "htt") `shouldEqual` Just "Not a usable address, so nothing can be shown from it."

@@ -18,6 +18,7 @@ module Format
   , groupDigits
   , enumLabel
   , humanize
+  , imageRef
   , matchLine
   , pluralize
   , roleLabel
@@ -26,7 +27,7 @@ module Format
 import Prelude
 
 import Capabilities.Query.Gov.Types (Lovelace)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Int (toNumber)
 import Data.Number.Format (fixed, toStringWith)
 import Data.String as String
@@ -166,3 +167,44 @@ humanize s = fixAcronyms capitalised
     String.replaceAll (String.Pattern "Drep") (String.Replacement "DRep")
       <<< String.replaceAll (String.Pattern "drep") (String.Replacement "DRep")
       <<< String.replaceAll (String.Pattern "Spo ") (String.Replacement "SPO ")
+
+-- | Ce se poate spune despre `image_uri`-ul unui profil.
+-- |
+-- | Cîmpul e OBLIGATORIU la revendicarea unui profil, intră în datum și costă min-ADA în fiecare
+-- | UTxO — iar pînă acum nu se randa nicăieri, în niciun ecran. Era colectat de șase ori și arătat
+-- | de zero ori.
+-- |
+-- | __Ce se randează e adresa, nu imaginea__, și asta e o decizie, nu un pas intermediar:
+-- |
+-- |   * nu există nicio poartă IPFS în stiva asta. BFF-ul are un exemplu comentat și nimic
+-- |     cablat, deci un `<img src="ipfs://…">` n-ar încărca nimic;
+-- |   * iar a încărca o imagine DIRECT de pe gazda pe care a scris-o altcineva în datum trimite
+-- |     adresa IP a vizitatorului la gazda aceea, la fiecare rînd. `bjj-frontend` proxează prin
+-- |     BFF exact pentru asta, și proxy-ul acela aici nu există încă.
+-- |
+-- | Măsurat pe registrul viu, 2026-10-29: din douăsprezece profiluri, unsprezece au un `ipfs://`
+-- | care nu e un CID real (`ipfs://palmares-smoke-placeholder`), iar al doisprezecelea are
+-- | literalmente `"htt"`. Deci și cu o poartă, ce s-ar vedea azi ar fi douăsprezece imagini rupte.
+-- |
+-- | `Nothing` înseamnă „profilul nu pretinde nicio imagine" — gol sau numai spații.
+imageRef :: String -> Maybe { shown :: String, href :: Maybe String, note :: String }
+imageRef raw =
+  case String.trim raw of
+    "" -> Nothing
+    uri
+      | isJust (String.stripPrefix (String.Pattern "ipfs://") uri) -> Just
+          { shown: uri
+          , href: Nothing
+          , note: "IPFS, which this registry does not fetch."
+          }
+      | isJust (String.stripPrefix (String.Pattern "https://") uri)
+          || isJust (String.stripPrefix (String.Pattern "http://") uri) -> Just
+          { shown: uri
+          , href: Just uri
+          , note: "Opens on the host the profile chose; this registry does not load it for you."
+          }
+      | otherwise -> Just
+          { shown: uri
+          , note: "Not a usable address, so nothing can be shown from it."
+          , href: Nothing
+          }

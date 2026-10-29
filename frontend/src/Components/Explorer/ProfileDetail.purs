@@ -32,7 +32,7 @@ import Data.Const (Const)
 import Data.Either (either)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.String (Pattern(..), stripPrefix)
-import Format (enumLabel, formatDay, humanize, pluralize)
+import Format (enumLabel, imageRef, formatDay, humanize, pluralize)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -188,6 +188,7 @@ component =
               }
           ]
       , credentialLine r
+      , imageLine r
       , HH.div [ HP.class_ (HH.ClassName "flex flex-wrap gap-3 pt-1") ]
           [ HH.a
               [ HP.href (writeHrefFor { flow: Just "issue-attestation", subject: Just st.profileId })
@@ -232,6 +233,29 @@ component =
                   )
               , HH.text (maybe "" (\n -> " " <> pluralize n "claimant" <> " in all.") r.claimantCount)
               ]
+        )
+
+  -- Imaginea profilului, ca ADRESĂ și nu ca imagine. Motivul întreg e la `Format.imageRef`: n-avem
+  -- poartă IPFS, iar încărcarea directă de pe gazda altcuiva ar trimite IP-ul vizitatorului acolo
+  -- la fiecare rînd. Pînă acum cîmpul nu se vedea nicăieri, deși e obligatoriu și costă min-ADA în
+  -- fiecare datum — deci nici nu se putea observa că registrul e plin de adrese care nu duc nicăieri.
+  imageLine r = case imageRef r.imageUri of
+    Nothing -> HH.text ""
+    Just img ->
+      HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
+        ( [ HH.text "Image: " ]
+            <> case img.href of
+              Just href ->
+                [ HH.a
+                    [ HP.href href
+                    , HP.target "_blank"
+                    , HP.rel "noopener noreferrer"
+                    , HP.class_ (HH.ClassName "link link-hover font-mono break-all")
+                    ]
+                    [ HH.text img.shown ]
+                ]
+              Nothing -> [ HH.span [ HP.class_ (HH.ClassName "font-mono break-all") ] [ HH.text img.shown ] ]
+            <> [ HH.text (" " <> img.note) ]
         )
 
   -- Link doar cînd rolul din prefix are unde să ducă. Registrul n-are pagină de membru de comitet,

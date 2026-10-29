@@ -802,6 +802,21 @@ test('a profile page shows the two halves of a track record, not just the identi
   await expect(page.getByRole('link', { name: /See (all|these)/ }).first()).toBeVisible();
 });
 
+test('a profile says what image it claims, and does not pretend to fetch it', async ({ page }) => {
+  // `image_uri` era colectat de șase ori — e obligatoriu la revendicarea unui profil și costă
+  // min-ADA în fiecare datum — și randat de zero ori. Acum se vede ca ADRESĂ, nu ca imagine: nu
+  // există poartă IPFS în stiva asta, iar încărcarea directă de pe gazda altcuiva ar trimite IP-ul
+  // vizitatorului acolo la fiecare rând.
+  await page.goto(
+    '/profiles/648c6a732aa55efec29815bdd25cf65c565cf92619aadde1d31496d3.000643b0f4eff1d656b5121ca32657f23a4295986f0d9bea7391655b9c020043'
+  );
+  await expect(page.getByText('ipfs://palmares-smoke-placeholder')).toBeVisible();
+  await expect(page.getByText('IPFS, which this registry does not fetch.')).toBeVisible();
+  // Și NU un `<img>`: nimic de încărcat, deci nimic rupt. Un `img` aici ar fi fost douăsprezece
+  // imagini rupte pe registrul viu, unde unsprezece adrese din douăsprezece nu sunt CID-uri reale.
+  await expect(page.locator('img[src*="ipfs"]')).toHaveCount(0);
+});
+
 test('a vouch page puts the challenge under the claim it attacks, with the proof beside it', async ({ page }) => {
   // În listă, provocările sînt un contor într-o celulă: ca să vezi CE s-a contestat trebuia să
   // treci pe alt ecran și să filtrezi după un id de șaizeci de caractere. Serverul le trimite
