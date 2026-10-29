@@ -32,7 +32,7 @@ import Data.Either (Either(..))
 import Data.Tuple (Tuple(..))
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing)
 import Format (formatDay, formatInt, humanize, matchLine)
 import Halogen as H
 import AppEnv as AppEnv
@@ -187,15 +187,46 @@ component =
               HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-xs ml-2") ] []
             else HH.text ""
           ]
-      , if null p.items then emptyState else table st p.items
+      , if null p.items then emptyState st else table st p.items
       , if null p.items then HH.text "" else pager st page
       ]
 
-  emptyState =
+  -- Trei goluri, pentru că înseamnă trei lucruri diferite — și scrierea unuia în locul altuia era
+  -- defectul: „No vouches have been issued yet" e o afirmație despre REGISTRU, iar arătată pe o
+  -- vedere îngustată era falsă.
+  --
+  -- Vederea de credențiale își primește propoziția ei: ecranul pune o singură întrebare („cine
+  -- controlează credențiala asta?"), deci golul lui e un fapt despre revendicări, nu despre
+  -- vouch-uri în general. Dar DOAR cînd `kind` e singurul filtru: cu `subject` sau `issuer` pe
+  -- lîngă el, propoziția ar vorbi iar despre tot registrul uitîndu-se la o felie din el.
+  emptyState st =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.p_ [ HH.text "No vouches have been issued yet." ] ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
+          ( if isCredentialView st.filters && isNothing st.filters.subject && isNothing st.filters.issuer then
+              [ HH.p_ [ HH.text "No profile has claimed a governance credential yet." ]
+              , wayOut "See all vouches"
+              ]
+            else if hasAnyFilter st.filters then
+              [ HH.p_ [ HH.text "No vouches match these filters." ]
+              , wayOut "Clear the filters"
+              ]
+            else [ HH.p_ [ HH.text "No vouches have been issued yet." ] ]
+          )
       ]
+
+  -- Drumul înapoi e același pentru amîndouă golurile filtrate — lista nefiltrată a ACESTUI ecran —
+  -- deci adresa stă într-un singur loc, chiar dacă eticheta diferă.
+  wayOut label =
+    HH.a
+      [ HP.href (attestationListHrefFor emptyRegistryFilters)
+      , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+      ]
+      [ HH.text label ]
+
+  -- „Filtrat" înseamnă `kind`, `subject` sau `issuer` — singurele care schimbă CE se potrivește.
+  -- `order_by`/`sort_order` doar reordonează, iar `limit`/`offset` sînt o fereastră peste
+  -- potriviri: o pagină goală de la capătul listei nu e un filtru care n-a prins nimic.
+  hasAnyFilter f = isJust f.kind || isJust f.subject || isJust f.issuer
 
   table st items =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]

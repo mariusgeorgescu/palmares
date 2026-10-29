@@ -19,12 +19,11 @@ import Prelude
 
 import AppEnv as AppEnv
 import Capabilities.Query.Gov.Http (ApiError, renderApiError)
-import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestation, getProfiles)
+import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestation, getProfile)
 import Capabilities.Query.Gov.Types
   ( AttestationDetail(..)
   , AttestationRow(..)
   , DisputeRow(..)
-  , ProfilePage(..)
   , ProfileRow(..)
   )
 import Components.Explorer.DisputeList (verdictClass)
@@ -33,10 +32,7 @@ import Components.Shared.OnchainId as OnchainId
 import Data.Array (null)
 import Data.Const (Const)
 import Data.Either (Either(..), either)
-import Data.Map (Map)
-import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
-import Data.Tuple (Tuple(..))
 import Format (formatAda, formatDay, humanize)
 import Halogen as H
 import Halogen.HTML as HH
@@ -45,7 +41,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Route (Route)
-import Route.GovQueries (disputeDetailHrefFor, emptyRegistryFilters, profileDetailHrefFor, writeHrefFor)
+import Route.GovQueries (disputeDetailHrefFor, profileDetailHrefFor, writeHrefFor)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -60,7 +56,8 @@ type Input = String
 type State =
   { attestationId :: String
   , detail :: RemoteData ApiError AttestationDetail
-  , names :: Map String String
+  , subjectName :: Maybe String
+  , issuerName :: Maybe String
   }
 
 data Action
@@ -75,7 +72,8 @@ component
   => H.Component q Input Output m
 component =
   H.mkComponent
-    { initialState: \attestationId -> { attestationId, detail: NotAsked, names: Map.empty }
+    { initialState: \attestationId ->
+        { attestationId, detail: NotAsked, subjectName: Nothing, issuerName: Nothing }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -95,17 +93,28 @@ component =
 
   load = do
     st <- H.get
-    H.modify_ _ { detail = Loading }
+    H.modify_ _ { detail = Loading, subjectName = Nothing, issuerName = Nothing }
     res <- getAttestation st.attestationId
     H.modify_ _ { detail = either Failure Success res }
-    -- Aceeași regulă ca în liste: numele se cer o dată, iar eșecul lor NU strică ecranul — fără
-    -- ele se arată identificatorii, care sînt oricum lucrul verificabil.
-    when (Map.isEmpty st.names) do
-      profiles <- getProfiles (emptyRegistryFilters { limit = Just "200" })
-      case profiles of
-        Left _ -> pure unit
-        Right (ProfilePage pp) ->
-          H.modify_ _ { names = Map.fromFoldable (map (\(ProfileRow r) -> Tuple r.id r.name) pp.items) }
+    -- Două nume, deci două cereri de un rând — nu un registru întreg îndoit într-o hartă. Varianta
+    -- de dinainte descărca două sute de profiluri ca să scrie două șiruri, iar peste două sute un
+    -- nume redevenea TĂCUT un id, fără nimic care să spună de ce.
+    --
+    -- Regula veche se păstrează: eșecul unui nume NU strică ecranul — fără el se arată
+    -- identificatorul scurtat, care e oricum lucrul verificabil. Cererile vin DUPĂ ce atestarea e
+    -- deja în stare, deci conținutul principal e randat înainte de ele.
+    case res of
+      Left _ -> pure unit
+      Right (AttestationDetail d) -> case d.attestation of
+        AttestationRow a -> do
+          subject <- getProfile a.subject
+          H.modify_ _ { subjectName = profileName subject }
+          issuer <- getProfile a.issuer
+          H.modify_ _ { issuerName = profileName issuer }
+
+  profileName = case _ of
+    Left _ -> Nothing
+    Right (ProfileRow r) -> Just r.name
 
   render st =
     HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-4") ]
@@ -173,8 +182,8 @@ component =
               ]
           else HH.text ""
         , HH.dl [ HP.class_ (HH.ClassName "grid gap-x-6 gap-y-1 sm:grid-cols-2 text-sm pt-1") ]
-            ( [ party st "About" a.subject
-              , party st "Stated by" a.issuer
+            ( [ party "About" st.subjectName a.subject
+              , party "Stated by" st.issuerName a.issuer
               , field "On" (formatDay a.date)
               , HH.div_
                   [ HH.dt [ HP.class_ (HH.ClassName "opacity-60") ] [ HH.text "Written by transaction" ]
@@ -212,13 +221,13 @@ component =
 
   -- Partea e un LINK către profil. În listă e un id trunchiat cu elipsă, deci ca să ajungi la
   -- cineva trebuia să copiezi șaizeci de caractere dintr-un chip.
-  party st label pid =
+  party label name pid =
     HH.div_
       [ HH.dt [ HP.class_ (HH.ClassName "opacity-60") ] [ HH.text label ]
       , HH.dd_
           [ HH.a
               [ HP.href (profileDetailHrefFor pid), HP.class_ (HH.ClassName "link link-hover") ]
-              [ HH.text (fromMaybe (shortId pid) (Map.lookup pid st.names)) ]
+              [ HH.text (fromMaybe (shortId pid) name) ]
           ]
       ]
 

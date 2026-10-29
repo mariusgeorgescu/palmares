@@ -1,6 +1,6 @@
 -- | Production application monad: AppM = RouterT Route (ReaderT Env (StoreT Store Aff)).
 -- | RouterT provides navigation and route subscription; ReaderT provides Env;
--- | StoreT provides global mutable state; the `MonadQueryApi` instance delegates
+-- | StoreT provides global mutable state; the `MonadQueryGov` instance delegates
 -- | to the HTTP `Default` implementation.
 module AppM
   ( AppM

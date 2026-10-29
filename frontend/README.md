@@ -1,85 +1,79 @@
-# Cardano dApp Frontend Template
+# Testatum — frontend
 
-A starting point for Cardano dApp frontends using **PureScript + Halogen**, with **CIP-30 wallet connect**, **Fastify BFF**, **Vite**, and **multi-stage Docker**. Derived from a production dApp; opinionated, not minimal.
+The interface and the BFF for **Testatum**, a governance track-record registry on Cardano. PureScript
+0.15.16 + Halogen 7, Tailwind v4 + daisyUI 5 (theme `dim`), bundled by Vite, served together with a
+Fastify BFF that proxies both backend APIs from one origin.
 
-Out of the box you get:
+Deployed at [gov.cardano.vip](https://gov.cardano.vip). The repository root holds the backend; this
+directory is self-contained apart from the APIs it reads.
 
-- The ReaderT + StoreT + RouterT architecture from [Real World Halogen](https://thomashoneyman.com/guides/real-world-halogen/).
-- Path-based routing with SPA fallback.
-- A worked **page-shaped capability** (`MonadQueryApi`) with `Default` (HTTP via `affjax-web`), `Mock`, and `AppM`/`DemoM` wiring.
-- A working CIP-30 wallet connect via `halogen-cardano-wallet-connect-component`.
-- DaisyUI + Tailwind v4 styling.
-- A Fastify **BFF** that serves the SPA and proxies `/api/<service>/*` with credential injection.
-- A multi-stage **Dockerfile** that ships only the BFF + built assets, plus a `docker-compose.yml` skeleton.
-- Cursor `.cursor/rules` (architecture, conventions, effect-capability narrowing) and `.cursor/skills` (add-explorer-page, add-interaction, capability-layer, effect-capability-refactor, implementation-workflow, post-plan-review).
+## What is in here
 
-## Quickstart
+Nineteen explorer screens — the governance read surface (DReps, proposals, votes, SPOs, the
+committee, treasury withdrawals, delegations, activity) and the registry itself (profiles, vouches,
+challenges, with a detail page for each). Nine write flows behind a wallet gate, each one showing
+what the transaction does, decoded from the transaction rather than echoed from the form. A Cytoscape
+delegation graph and an embeddable card.
+
+Two bundles from one source tree: `Main` (real HTTP, `AppM`) and `MainDemo` (recorded fixtures,
+`DemoM`). The second is what the Playwright fixture suite runs against, which is why the mocks
+honour their filter arguments — a mock that ignores them makes that suite blind to a filter that
+never reaches the API, and exactly that defect once shipped.
+
+## Running it
 
 ```sh
-git clone <this-repo> my-dapp
-cd my-dapp
 npm install
 npx spago install
-npm run dev          # vite dev on http://localhost:5173 — runs MainDemo (mocked data)
+
+npm run dev            # MainDemo on vite dev — recorded fixtures, no backend needed
+npm run test           # 201 PureScript unit tests
+npm run test:e2e       # builds the demo bundle, runs 76 Playwright tests against it
 ```
 
-For the BFF locally:
+Against real APIs you need the BFF, and it is **fail-closed**: it refuses to start without every
+variable, rather than silently proxying nowhere.
 
 ```sh
-PORT=8080 npm run bff   # builds, then serves dist/ + /api/* on http://localhost:8080
+npm run build:prod
+PALMARES_QUERY_API_URL=http://127.0.0.1:8083 \
+PALMARES_INTERACTION_API_URL=http://127.0.0.1:8082 \
+PALMARES_INTERACTION_API_USER=<operator> \
+PALMARES_INTERACTION_API_PASS=<secret> \
+PORT=4176 node bff/server.js
 ```
 
-For Docker:
+The write routes sit behind HTTP Basic that the operator issues; those credentials live in the BFF,
+server-side, and never reach the bundle. The BFF forwards only the calls the interface makes — see
+the allowlist in `bff/config.js` and why it exists.
+
+No backend at hand? The deployed read API answers from any origin, so a local production bundle can
+read it directly:
 
 ```sh
-docker build -t cardano-dapp-frontend-template:dev .
-docker compose up frontend
+VITE_PALMARES_QUERY_BASE_URL=https://gov.cardano.vip/api/query npm run build:prod
+npx vite preview --port 4178
 ```
 
-## Project layout
+That is how the screens were last verified against real data without a local chain.
 
-```
-.
-├── .cursor/                Halogen + project rules, skills, hooks, commands
-├── bff/                    Fastify BFF (proxy + static + SPA fallback)
-├── scripts/build-image.sh  Docker buildx wrapper
-├── src/
-│   ├── Main.purs           Production entry (AppM)
-│   ├── MainDemo.purs       Demo entry (DemoM with mock data) — default bundle
-│   ├── AppM.purs           RouterT + ReaderT + StoreT + Aff
-│   ├── DemoM.purs          Mock interpreter
-│   ├── AppEnv.purs         apiBaseUrl, allowedNetworkId
-│   ├── Store.purs          walletApi, user (Connect/Disconnect actions)
-│   ├── Route.purs          Home | Items | NotFound
-│   ├── Route/Codec.purs    routing-duplex codec
-│   ├── Capabilities/
-│   │   ├── LogMessages.purs
-│   │   ├── Delay.purs           MonadDelay (debounce, timeouts)
-│   │   ├── DomEvent.purs        MonadDomEvent (preventDefault)
-│   │   └── Query/Api/           Example page-shaped query capability
-│   └── Components/
-│       ├── Home.purs            Router host
-│       ├── Layout/NavBar.purs   NavBar + WalletConnect slot
-│       └── Explorer/Items.purs  Worked explorer page (RemoteData + debounce)
-├── index.html
-├── vite.config.js          Cardano-flavored Vite (libsodium fix, polyfills, wasm)
-├── spago.yaml              CIP-30 stack
-├── package.json
-├── Dockerfile              Multi-stage (Node 23 → Alpine)
-├── docker-compose.yml      Frontend service + commented backend placeholder
-├── .env.example
-└── CLAUDE.md               Project guide for Claude Code / Cursor
-```
+## Layout
 
-## Customizing for your dApp
+| Path | What |
+| --- | --- |
+| `src/Components/Explorer/` | the nineteen screens |
+| `src/Components/Write/` | the nine flows, the wallet gate, the signing summary |
+| `src/Components/Shared/` | `Pager`, `OnchainId`, `StatusChip`, `DRepIdentity`, `MetricInfo`, `Anchor` |
+| `src/Capabilities/Query/Gov/` | `MonadQueryGov` (the class), `Default` (HTTP), `Mock` + `Fixtures` (demo), `Types` (decoders) |
+| `src/Capabilities/Interaction/` | the write capability: flow paths, request bodies, oracle status |
+| `src/Capabilities/Wallet/` | the CIP-30/CIP-95 gate |
+| `src/Route.purs`, `src/Route/` | routes, their codec, and the one place URLs are built |
+| `bff/` | the Fastify server, its service config and the proxy allowlist |
+| `e2e/`, `e2e-live/`, `e2e-wallet/`, `test/` | the four suites — see `e2e-wallet/README.md` for the two gates |
 
-1. **Domain types**: rename `MonadQueryApi`, `Item`, `ItemId`, `ItemsQuery`, `ItemsPage` to your domain (e.g. `MonadQueryGov`, `Proposal`, `ProposalId`, ...). The four-file pattern (`MonadQueryApi.purs`, `Types.purs`, `Default.purs`, `Mock.purs`) and the `getItemsPage` shape are the templates to copy.
-2. **BFF services**: edit `bff/config.js` and add env vars to `.env.example`. The `api` service name is a placeholder — rename and add more (`ipfs`, `tx`, etc.) following the same shape.
-3. **Build-time config**: when you need `VITE_*` env vars in PureScript (e.g. to switch network), add an `AppEnv.js` FFI module that reads `import.meta.env.VITE_*`.
-4. **Image names**: search-and-replace `your-org/cardano-dapp-frontend` across `Dockerfile`, `docker-compose.yml`, `scripts/build-image.sh`, and the `deploy-dev`/`deploy-prod` scripts in `package.json`.
-5. **Production bundle**: `npm run build:prod` bundles `Main` (AppM with real HTTP) instead of `MainDemo`.
-6. **Tailwind theme**: edit `data-theme="dim"` in `index.html` and `src/style.css` — DaisyUI ships many themes.
+## The documents that matter
 
-## Conventions
-
-See [CLAUDE.md](./CLAUDE.md) for the full project guide and `.cursor/rules/` for the granular architecture rules used by Cursor and Claude Code.
+- [`CLAUDE.md`](./CLAUDE.md) — the architecture, and the traps this repository has actually hit
+- [`e2e-wallet/README.md`](./e2e-wallet/README.md) — the wallet suite, its gates, and what it cannot cover
+- `../docs/usecases/api-screen-map.md` — the wire contract, API route by API route
+- `../docs/audit/README.md` §3 and `../docs/audit/08-multi-perspective-review-2026-10-29.md` — the current backlog

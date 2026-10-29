@@ -1,6 +1,7 @@
 -- | Top-level route ADT for the application.
 module Route
   ( Route(..)
+  , section
   ) where
 
 import Data.Generic.Rep (class Generic)
@@ -89,3 +90,42 @@ instance Show Route where
     Write f -> "Write " <> fromMaybe "" f.flow
     Methodology f -> "Methodology " <> fromMaybe "" f.focus
     NotFound -> "NotFound"
+
+-- | Secțiunea din care face parte ruta — numele sub care barele de navigare o marchează.
+-- |
+-- | Stă aici, lângă tipul `Route`, și nu în bare: „în ce secțiune e ruta asta?" e o proprietate a
+-- | rutei și a nimic altceva. Trăise în două exemplare, una în `NavBar` și una în `Sidebar`, iar
+-- | fiecare rută de detaliu adăugată săptămâna asta a trebuit scrisă în amândouă — a doua copie e
+-- | locul unde se uită.
+-- |
+-- | Două reguli pe care le ține, fiindcă altfel bara luminează altceva decât ecranul deschis:
+-- | filtrele NU schimbă secțiunea (un `Eq` pe `Route` le-ar compara, deci `/profiles?kind=auditor`
+-- | n-ar mai lumina „Profiles"), iar o rută de detaliu stă în secțiunea listei ei.
+section :: Route -> String
+section = case _ of
+  Home -> "home"
+  DRepList _ -> "dreps"
+  DRepDetail _ -> "dreps"
+  ActionList _ -> "actions"
+  ActionDetail _ -> "actions"
+  VoteList _ -> "votes"
+  SpoList _ -> "spos"
+  Committee -> "committee"
+  TreasuryList _ -> "treasury"
+  DelegationList _ -> "delegations"
+  Activity _ -> "activity"
+  ProfileDetail _ -> "profiles"
+  ProfileList _ -> "profiles"
+  AttestationDetail _ -> "attestations"
+  AttestationList _ -> "attestations"
+  DisputeDetail _ -> "disputes"
+  DisputeList _ -> "disputes"
+  Graph _ -> "graph"
+  -- Fișa de încorporat nu apare în nicio bară, pentru că nu se navighează la ea: se pune în
+  -- `iframe`. Are totuși o secțiune proprie, ca să nu se lipească accidental de alta.
+  Embed _ -> "embed"
+  Write _ -> "write"
+  Methodology _ -> "methodology"
+  -- Nicio bară nu are o destinație „none", deci pe NotFound nu se marchează nimic — exact ce
+  -- trebuie: ecranul acela nu e într-o secțiune.
+  NotFound -> "none"

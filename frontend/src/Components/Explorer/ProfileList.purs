@@ -40,6 +40,7 @@ import Route (Route)
 import Route.GovQueries
   ( RegistryFilters
   , drepDetailHrefFor
+  , emptyRegistryFilters
   , profileDetailHrefFor
   , profileListHrefFor
   , writeHrefFor
@@ -168,15 +169,37 @@ component =
               HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-xs ml-2") ] []
             else HH.text ""
           ]
-      , if null p.items then emptyState else cards p.items
+      , if null p.items then emptyState st else cards p.items
       , if null p.items then HH.text "" else pager st page
       ]
 
-  emptyState =
+  -- Golul are DOUĂ înțelesuri, și confundarea lor era defectul: fără filtre, propoziția spune ceva
+  -- adevărat despre REGISTRU; cu filtre, spune doar că selecția asta n-a prins nimic. Înainte se
+  -- scria mereu prima, deci o vedere filtrată anunța că registrul e gol — un ecran care arată rupt,
+  -- nu filtrat.
+  emptyState st =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.p_ [ HH.text "No profiles have been registered yet." ] ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
+          [ HH.p_
+              [ HH.text
+                  ( if hasAnyFilter st.filters then "No profiles match these filters."
+                    else "No profiles have been registered yet."
+                  )
+              ]
+          , if hasAnyFilter st.filters then
+              HH.a
+                [ HP.href (profileListHrefFor emptyRegistryFilters)
+                , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+                ]
+                [ HH.text "Clear the filters" ]
+            else HH.text ""
+          ]
       ]
+
+  -- „Filtrat" înseamnă `kind`, `subject` sau `issuer` — singurele care schimbă CE se potrivește.
+  -- `order_by`/`sort_order` doar reordonează, iar `limit`/`offset` sînt o fereastră peste
+  -- potriviri: o pagină goală de la capătul listei nu e un filtru care n-a prins nimic.
+  hasAnyFilter f = isJust f.kind || isJust f.subject || isJust f.issuer
 
   -- Carduri, nu tabel: descrierea e text liber de lungime necontrolată, iar într-o coloană ar
   -- împinge totul la dreapta sau s-ar tăia exact unde începe informația.

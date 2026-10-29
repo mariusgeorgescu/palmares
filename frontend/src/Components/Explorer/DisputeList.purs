@@ -27,7 +27,7 @@ import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Tuple (Tuple(..))
 import Format (formatAda, formatDay, formatInt, humanize, matchLine)
 import Halogen as H
@@ -183,18 +183,37 @@ component =
               HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-xs ml-2") ] []
             else HH.text ""
           ]
-      , if null p.items then emptyState else table st p.items
+      , if null p.items then emptyState st else table st p.items
       , if null p.items then HH.text "" else pager st page
       ]
 
-  emptyState =
+  -- Propoziția despre „cazul liniștit" e o afirmație despre REGISTRUL ÎNTREG — „every vouch so far
+  -- stands unchallenged" — deci are voie să apară doar cînd lista n-a fost îngustată. Arătată cuiva
+  -- care a filtrat și n-a găsit nimic, era pur și simplu falsă, și făcea ecranul să pară rupt în loc
+  -- de filtrat.
+  emptyState st =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.p_ [ HH.text "No challenges have been opened yet." ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
-              [ HH.text "That is the quiet case, not an empty one: every vouch so far stands unchallenged." ]
-          ]
+      [ HH.div [ HP.class_ (HH.ClassName "card-body items-start gap-2") ]
+          ( if hasAnyFilter st.filters then
+              [ HH.p_ [ HH.text "No challenges match these filters." ]
+              , HH.a
+                  [ HP.href (disputeListHrefFor emptyRegistryFilters)
+                  , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+                  ]
+                  [ HH.text "Clear the filters" ]
+              ]
+            else
+              [ HH.p_ [ HH.text "No challenges have been opened yet." ]
+              , HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
+                  [ HH.text "That is the quiet case, not an empty one: every vouch so far stands unchallenged." ]
+              ]
+          )
       ]
+
+  -- „Filtrat" înseamnă `kind`, `subject` sau `issuer` — singurele care schimbă CE se potrivește.
+  -- `order_by`/`sort_order` doar reordonează, iar `limit`/`offset` sînt o fereastră peste
+  -- potriviri: o pagină goală de la capătul listei nu e un filtru care n-a prins nimic.
+  hasAnyFilter f = isJust f.kind || isJust f.subject || isJust f.issuer
 
   table st items =
     HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]

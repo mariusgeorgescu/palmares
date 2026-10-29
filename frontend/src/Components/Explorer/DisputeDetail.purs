@@ -19,25 +19,21 @@ import Prelude
 import Capabilities.Query.Gov.Http (ApiError, renderApiError)
 import Capabilities.Query.Gov.MonadQueryGov
   ( class MonadQueryGov
-  , getAttestations
+  , getAttestation
   , getDispute
-  , getProfiles
+  , getProfile
   )
 import Capabilities.Query.Gov.Types
-  ( AttestationPage(..)
+  ( AttestationDetail(..)
   , AttestationRow(..)
   , DisputeRow(..)
-  , ProfilePage(..)
   , ProfileRow(..)
   )
 import Components.Explorer.DisputeList (verdictClass)
 import Components.Shared.DRepIdentity (shortId)
 import Data.Const (Const)
 import Data.Either (Either(..), either)
-import Data.Map (Map)
-import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Tuple (Tuple(..))
 import Format (formatAda, formatDay)
 import Halogen as H
 import Halogen.HTML as HH
@@ -46,12 +42,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
 import Route (Route)
-import Route.GovQueries
-  ( attestationDetailHrefFor
-  , emptyRegistryFilters
-  , profileDetailHrefFor
-  , writeHrefFor
-  )
+import Route.GovQueries (attestationDetailHrefFor, profileDetailHrefFor, writeHrefFor)
 import Type.Proxy (Proxy(..))
 
 type Slot = H.Slot (Const Void) Output Unit
@@ -66,8 +57,8 @@ type Input = String
 type State =
   { disputeId :: String
   , dispute :: RemoteData ApiError DisputeRow
-  , profiles :: Map String String
-  , vouches :: Map String String
+  , targetName :: Maybe String
+  , openerName :: Maybe String
   }
 
 data Action
@@ -83,7 +74,7 @@ component
 component =
   H.mkComponent
     { initialState: \disputeId ->
-        { disputeId, dispute: NotAsked, profiles: Map.empty, vouches: Map.empty }
+        { disputeId, dispute: NotAsked, targetName: Nothing, openerName: Nothing }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -103,23 +94,34 @@ component =
 
   load = do
     st <- H.get
-    H.modify_ _ { dispute = Loading }
+    H.modify_ _ { dispute = Loading, targetName = Nothing, openerName = Nothing }
     res <- getDispute st.disputeId
     H.modify_ _ { dispute = either Failure Success res }
-    -- Numele se cer o dată și eșecul lor nu strică ecranul: fără ele se arată identificatorii,
-    -- care sînt oricum lucrul verificabil pe lanț.
-    when (Map.isEmpty st.profiles) do
-      profiles <- getProfiles (emptyRegistryFilters { limit = Just "200" })
-      case profiles of
-        Left _ -> pure unit
-        Right (ProfilePage pp) ->
-          H.modify_ _ { profiles = Map.fromFoldable (map (\(ProfileRow r) -> Tuple r.id r.name) pp.items) }
-    when (Map.isEmpty st.vouches) do
-      atts <- getAttestations (emptyRegistryFilters { limit = Just "200" })
-      case atts of
-        Left _ -> pure unit
-        Right (AttestationPage ap) ->
-          H.modify_ _ { vouches = Map.fromFoldable (map (\(AttestationRow a) -> Tuple a.id a.name) ap.items) }
+    -- Ecranul scrie DOUĂ nume, deci cere două obiecte, nu două registre. Varianta de dinainte
+    -- descărca două sute de atestări ȘI două sute de profiluri pentru atît, iar peste două sute un
+    -- nume redevenea TĂCUT un id.
+    --
+    -- Regula veche se păstrează: eșecul unui nume nu strică ecranul — fără el se arată
+    -- identificatorul scurtat, care e oricum lucrul verificabil pe lanț. Cererile vin DUPĂ ce
+    -- provocarea e în stare, deci conținutul principal e randat înainte de ele.
+    case res of
+      Left _ -> pure unit
+      Right (DisputeRow d) -> do
+        target <- getAttestation d.target
+        H.modify_ _ { targetName = vouchName target }
+        opener <- getProfile d.openedBy
+        H.modify_ _ { openerName = profileName opener }
+
+  -- `getAttestation` întoarce atestarea ÎMPREUNĂ cu disputele ei; de aici se ia numai numele, ca
+  -- să nu apară o capabilitate nouă pentru un singur șir.
+  vouchName = case _ of
+    Left _ -> Nothing
+    Right (AttestationDetail ad) -> case ad.attestation of
+      AttestationRow a -> Just a.name
+
+  profileName = case _ of
+    Left _ -> Nothing
+    Right (ProfileRow r) -> Just r.name
 
   render st =
     HH.div [ HP.class_ (HH.ClassName "explorer-page container mx-auto px-6 py-6 space-y-4") ]
@@ -166,7 +168,7 @@ component =
                       [ HP.href (attestationDetailHrefFor d.target)
                       , HP.class_ (HH.ClassName "link link-hover")
                       ]
-                      [ HH.text (fromMaybe (shortId d.target) (Map.lookup d.target st.vouches)) ]
+                      [ HH.text (fromMaybe (shortId d.target) st.targetName) ]
                   ]
               ]
           , HH.div_
@@ -176,7 +178,7 @@ component =
                       [ HP.href (profileDetailHrefFor d.openedBy)
                       , HP.class_ (HH.ClassName "link link-hover")
                       ]
-                      [ HH.text (fromMaybe (shortId d.openedBy) (Map.lookup d.openedBy st.profiles)) ]
+                      [ HH.text (fromMaybe (shortId d.openedBy) st.openerName) ]
                   ]
               ]
           , HH.div_

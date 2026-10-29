@@ -23,7 +23,7 @@ module Components.Layout.Sidebar
 
 import Prelude
 
-import Data.Array (take)
+import Data.Array (elem, take)
 import Route.GovQueries
   ( emptyActivityFilters
   , emptyDRepFilters
@@ -34,7 +34,7 @@ import Route.GovQueries
   )
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Route (Route(..))
+import Route (Route(..), section)
 import Route.Codec (printRoute)
 
 type Entry =
@@ -85,34 +85,26 @@ entries =
 dockEntries :: Array Entry
 dockEntries = take 5 entries
 
--- | Secțiunea curentă, pe constructor. Un `Eq` pe `Route` ar compara și filtrele, iar atunci
+-- | Secțiunile pe care le acoperă tilul „Governance".
+-- |
+-- | Șina are un singur tile pentru tot explorerul de guvernanță, în timp ce bara de sus are câte un
+-- | link pentru fiecare: cineva care s-a dus la propuneri sau la voturi e tot în secțiunea aia, iar
+-- | o șină care nu luminează nimic îl lasă fără reper. Gruparea e deci o decizie a ȘINEI, nu a
+-- | rutei, și de-aia stă aici și nu în `Route.section`.
+-- |
+-- | Lista e de secțiuni, nu de constructori: o rută nouă de detaliu cade în secțiunea listei ei
+-- | prin `Route.section` și nu cere nicio atingere aici. Doar o secțiune nouă în explorer o cere —
+-- | și atunci oricum trebuie decis dacă primește tile propriu.
+governanceSections :: Array String
+governanceSections =
+  [ "dreps", "actions", "votes", "spos", "committee", "treasury", "delegations" ]
+
+-- | Secțiunea curentă, prin `Route.section`. Un `Eq` pe `Route` ar compara și filtrele, iar atunci
 -- | `/profiles?kind=auditor` n-ar mai lumina „Profiles" — ceea ce e exact pe dos.
 sameSection :: Route -> Route -> Boolean
-sameSection current target = case current, target of
-  Home, Home -> true
-  ProfileList _, ProfileList _ -> true
-  ProfileDetail _, ProfileList _ -> true
-  AttestationList _, AttestationList _ -> true
-  AttestationDetail _, AttestationList _ -> true
-  DisputeList _, DisputeList _ -> true
-  DisputeDetail _, DisputeList _ -> true
-  Write _, Write _ -> true
-  Activity _, Activity _ -> true
-  Graph _, Graph _ -> true
-  Methodology _, Methodology _ -> true
-  -- „Governance" acoperă tot explorerul, nu doar lista de reprezentanți: cineva care s-a dus la
-  -- propuneri sau la voturi e tot în secțiunea aia, iar o șină care nu luminează nimic îl lasă fără
-  -- reper.
-  DRepList _, DRepList _ -> true
-  DRepDetail _, DRepList _ -> true
-  ActionList _, DRepList _ -> true
-  ActionDetail _, DRepList _ -> true
-  VoteList _, DRepList _ -> true
-  SpoList _, DRepList _ -> true
-  Committee, DRepList _ -> true
-  TreasuryList _, DRepList _ -> true
-  DelegationList _, DRepList _ -> true
-  _, _ -> false
+sameSection current target =
+  section current == section target
+    || (section target == "dreps" && elem (section current) governanceSections)
 
 -- | Iconița, colorată prin mască peste un fundal de culoare.
 -- |

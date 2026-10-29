@@ -1,4 +1,4 @@
--- | Demo application monad: same stack as AppM but `MonadQueryApi` uses Mock
+-- | Demo application monad: same stack as AppM but `MonadQueryGov` uses Mock
 -- | (no real API). Use for demo builds and tests.
 module DemoM
   ( DemoM

@@ -80,12 +80,12 @@ import Capabilities.Query.Gov.Types
   , RegistrySummary
   )
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, printJsonDecodeError)
-import Data.Array (drop, filter, length, null, take)
+import Data.Array (drop, filter, find, length, null, take)
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.Foldable (all)
 import Data.Int as Int
-import Data.Maybe (Maybe, fromMaybe, maybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Route.GovQueries
   ( ActivityFilters
   , DRepFilters
@@ -195,8 +195,19 @@ getDelegationsMock _ = pure (decodeFixture delegationListFixture)
 getActivityMock :: forall m. Applicative m => ActivityFilters -> m (Either ApiError ActivityPage)
 getActivityMock _ = pure (decodeFixture activityFixture)
 
+-- | Caută id-ul CERUT în lista înregistrată, și cade pe fixture-ul de detaliu doar dacă nu e acolo.
+-- |
+-- | Varianta de dinainte ignora id-ul, iar asta a devenit o minciună în momentul în care paginile de
+-- | detaliu au trecut de la un director de nume la căutări per id: pe pagina unui vouch, subiectul
+-- | și emitentul afișau AMBELE același nume, deși href-urile duceau la profiluri diferite. Prins de
+-- | suita de fixtures, care e singura ce randează ecrane — și e exact motivul pentru care un mock nu
+-- | are voie să-și ignore argumentul.
 getProfileMock :: forall m. Applicative m => String -> m (Either ApiError ProfileRow)
-getProfileMock _ = pure (decodeFixture profileDetailFixture)
+getProfileMock pid = pure case decodeFixture profileListFixture of
+  Right (ProfilePage p) -> case find (\(ProfileRow r) -> r.id == pid) p.items of
+    Just row -> Right row
+    Nothing -> decodeFixture profileDetailFixture
+  Left _ -> decodeFixture profileDetailFixture
 
 -- | Singurul filtru de rând pe care îl poartă un profil e `kind`; `subject`/`issuer` sunt întrebări
 -- | despre atestări, iar `ProfileRow` nu are câmpurile.

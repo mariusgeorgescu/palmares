@@ -27,6 +27,7 @@ import Data.String as String
 import Data.Tuple (fst)
 import Effect.Aff (Aff)
 import Route as R
+import Route (section)
 import Route.Codec (parseRoute, printRoute, routeCodec)
 import Routing.Duplex (parse)
 import Route.GovQueries (drepDetailHrefFor, emptyDRepFilters, emptyGovActionFilters, emptyRegistryFilters)
@@ -188,6 +189,25 @@ spec = do
       case parse routeCodec "/profiles/" of
         Left _ -> pure unit
         Right _ -> fail "the codec accepted a trailing slash, so Main's normalisation is now dead code"
+
+    it "puts every detail route in its list's section, and ignores the filters" do
+      -- `sameSection` exista în DOUĂ locuri — `NavBar` pe șiruri, `Sidebar` pe perechi — și
+      -- amândouă au trebuit editate pentru fiecare din cele trei rute de detaliu adăugate
+      -- săptămâna asta. Acum există un singur `Route.section`, iar astea sunt cele două invariante
+      -- pe care barele se sprijină. Testul cade dacă următoarea rută de detaliu primește o secțiune
+      -- proprie — adică exact cazul în care o bară ar lumina și cealaltă nu.
+      section (R.DRepDetail "x") `shouldEqual` section (R.DRepList emptyDRepFilters)
+      section (R.ActionDetail "x") `shouldEqual` section (R.ActionList emptyGovActionFilters)
+      section (R.ProfileDetail "x") `shouldEqual` section (R.ProfileList emptyRegistryFilters)
+      section (R.AttestationDetail "x") `shouldEqual` section (R.AttestationList emptyRegistryFilters)
+      section (R.DisputeDetail "x") `shouldEqual` section (R.DisputeList emptyRegistryFilters)
+
+      -- Filtrele nu schimbă secțiunea: altfel `/profiles?kind=auditor` ar stinge „Profiles", ceea
+      -- ce comentariul din `Sidebar` numea „exact pe dos".
+      section (R.ProfileList (emptyRegistryFilters { kind = Just "auditor" }))
+        `shouldEqual` section (R.ProfileList emptyRegistryFilters)
+      section (R.AttestationList (emptyRegistryFilters { kind = Just "credential_claim" }))
+        `shouldEqual` section (R.AttestationList emptyRegistryFilters)
 
     it "percent-encodes an id that would otherwise cut the request short" do
       -- Un ID de acțiune de guvernanță conține `#` prin construcție; același codor îl deservește.

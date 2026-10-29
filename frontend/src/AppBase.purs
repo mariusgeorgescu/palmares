@@ -1,6 +1,6 @@
 -- | Shared monad stack infrastructure for AppM and DemoM.
 -- | Both application monads wrap the same RouterT/ReaderT/StoreT/Aff stack;
--- | the only difference is the `MonadQueryApi` instance (Default vs Mock).
+-- | the only difference is the `MonadQueryGov` instance (Default vs Mock).
 module AppBase
   ( AppMBase
   , appBaseNavigate

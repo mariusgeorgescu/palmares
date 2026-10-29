@@ -32,7 +32,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter, navigate)
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import Route (Route(..))
+import Route (Route(..), section)
 import Route.Codec (printRoute)
 import Route.GovQueries
   ( defaultVoteFilters
@@ -305,31 +305,6 @@ component =
     HandleWalletConnect _ -> pure unit
 
 -- | Două rute sunt în aceeași secțiune dacă bara de navigare trebuie să le marcheze la fel.
--- | Detaliul unui DRep aparține secțiunii „DReps", iar filtrele nu schimbă secțiunea.
+-- | Maparea e `Route.section`, singurul loc unde se scrie în ce secțiune cade o rută.
 sameSection :: Route -> Route -> Boolean
 sameSection a b = section a == section b
-  where
-  section = case _ of
-    Home -> "home"
-    DRepList _ -> "dreps"
-    DRepDetail _ -> "dreps"
-    ActionList _ -> "actions"
-    ActionDetail _ -> "actions"
-    VoteList _ -> "votes"
-    SpoList _ -> "spos"
-    Committee -> "committee"
-    TreasuryList _ -> "treasury"
-    DelegationList _ -> "delegations"
-    Activity _ -> "activity"
-    ProfileDetail _ -> "profiles"
-    ProfileList _ -> "profiles"
-    AttestationDetail _ -> "attestations"
-    AttestationList _ -> "attestations"
-    DisputeDetail _ -> "disputes"
-    DisputeList _ -> "disputes"
-    Graph _ -> "graph"
-    -- Fișa de încorporat nu apare în bară, pentru că nu se navighează la ea: se pune în `iframe`.
-    Embed _ -> "embed"
-    Write _ -> "write"
-    Methodology _ -> "methodology"
-    NotFound -> "none"
