@@ -25,6 +25,13 @@ import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Components.Layout.SearchBox as SearchBox
 import Components.WalletConnectComponent as WC
 import Components.WalletConnectComponent (FiatOnrampBehavior(..), RenderMode(..))
+import Components.Shared.DRepIdentity (shortId)
+import Format (enumLabel)
+import Halogen.Store.Monad (class MonadStore, emitSelected, getStore)
+import Halogen.Store.Select (selectAll)
+import Capabilities.Query.Gov.Types (ProfileRow(..))
+import Network.RemoteData (RemoteData(..))
+import Store as Store
 import Cardano.Wallet.Cip30 (WalletName)
 import Data.Const (Const)
 import Data.Maybe (Maybe(..))
@@ -66,6 +73,11 @@ data Output
   -- | Cheia CIP-30 a wallet-ului conectat — `lace`, `eternl` —, nu numele afișat.
   = WalletConnected WalletName
   | WalletDisconnected
+  -- | S-a ales un profil din comutator. Identitatea cu care lucrezi e a sesiunii, nu a unui
+  -- | formular — învelișul o pune în `Store` și toate ecranele o citesc de acolo.
+  | ProfileSelected String
+  | CreateProfileRequested
+  | MyProfileRequested
   -- | `enable` a eșuat, cel mai des pentru că omul a închis prompt-ul wallet-ului. E un
   -- | rezultat, nu o eroare, și trebuie SPUS: altfel butonul arată ca unul mort.
   | WalletConnectFailed String
@@ -77,6 +89,10 @@ type Slots =
 
 type State =
   { route :: Route
+  -- Oglinda a ce deține portofelul și cu ce profil lucrezi. `render` nu poate citi din `Store`
+  -- (e pur), deci oglinda stă în stare — aceeași cusătură ca în ecranul de scriere.
+  , owned :: Array ProfileRow
+  , active :: Maybe ProfileRow
   -- Meniul de pe telefon e controlat din stare, nu din `<details>`: un `details` necontrolat rămâne
   -- deschis după ce navighezi, pentru că nodul DOM supraviețuiește schimbării de rută.
   , menuOpen :: Boolean
@@ -87,6 +103,7 @@ data Action
   | NavLinkClicked Route MouseEvent
   | Receive Input
   | ToggleMenu
+  | StoreChanged Store.Store
   | HandleWalletConnect WC.Output
 
 component
@@ -97,10 +114,11 @@ component
   => MonadDelay m
   => MonadQueryGov m
   => MonadRouter Route m
+  => MonadStore Store.Action Store.Store m
   => H.Component Query Input Output m
 component =
   H.mkComponent
-    { initialState: \route -> { route, menuOpen: false }
+    { initialState: \route -> { route, owned: [], active: Nothing, menuOpen: false }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -135,7 +153,7 @@ component =
           [ menuButton st
           , HH.ul [ HP.class_ (HH.ClassName "menu menu-horizontal px-1 hidden lg:flex") ] desktopItems
           , HH.slot_ SearchBox._searchBox unit SearchBox.component unit
-          , HH.slot WC._walletConnect unit WC.component walletConnectInput HandleWalletConnect
+          , HH.slot WC._walletConnect unit WC.component (walletConnectInput st) HandleWalletConnect
           ]
       , if st.menuOpen then
           HH.ul
@@ -252,8 +270,8 @@ component =
   -- have brand assets in `public/`.
   -- RenderMode.Standalone keeps the connect button independent of any profile
   -- system; FiatOnrampDefault Nothing hides the fiat-on-ramp item.
-  walletConnectInput :: WC.Input
-  walletConnectInput =
+  walletConnectInput :: State -> WC.Input
+  walletConnectInput st =
     { buttons: []
     -- Cele patru erau string-uri goale, adică patru sloturi goale pe deploy. Fișierele vin din
     -- `bjj-frontend/public/images`, care le avea de mult — lipsea doar copierea lor.
@@ -263,9 +281,37 @@ component =
         , onrampIcon: "/images/onramp.svg"
         , copyIcon: "/images/copy-icon.svg"
         }
-    , renderMode: Standalone
+    -- `Unified`, nu `Standalone`: widget-ul devine și comutatorul de profil, iar asta e tot rostul —
+    -- „cu ce identitate lucrez" se alege o dată, sus, și o știe toată aplicația. Cît timp nu e
+    -- niciun portofel conectat, biblioteca randează oricum butonul de conectare (`Standalone`).
+    --
+    -- `thumbnailUri` e o iconiță LOCALĂ, nu imaginea pe care profilul o pretinde: n-avem poartă
+    -- IPFS, iar o imagine încărcată de pe gazda altcuiva ar trimite IP-ul vizitatorului acolo —
+    -- vezi `Format.imageRef`. Ce pretinde profilul se vede pe pagina lui, ca adresă.
+    , renderMode: Unified
+        { profiles: map profileInfo st.owned
+        , activeProfile: map profileInfo st.active
+        , actions:
+            [ { id: myProfileAction
+              , label: "My profile"
+              , iconSrc: "/images/sidebar/practitioners.svg"
+              , classes: []
+              }
+            ]
+        , pendingCount: 0
+        , createProfileLabel: "Claim a profile"
+        }
     , utxosConfig: Nothing
     , fiatOnramp: FiatOnrampDefault Nothing
+    }
+
+  -- Ce arată widget-ul despre un profil. Subtitlul e felul de actor plus id-ul scurtat: două
+  -- profiluri pot avea același nume, iar id-ul e singurul lucru care le deosebește.
+  profileInfo (ProfileRow r) =
+    { id: r.id
+    , name: r.name
+    , subtitle: enumLabel r.kind <> " · " <> shortId r.id
+    , thumbnailUri: "/images/fingerprint.svg"
     }
 
   handleAction = case _ of
@@ -283,7 +329,15 @@ component =
     --
     -- `Nothing`: la montare nu există încă nicio conexiune. Interogarea nu e despre API, e despre
     -- efectul ei secundar — enumerarea.
-    Initialize -> void (H.tell WC._walletConnect unit (WC.SetWalletApi Nothing))
+    Initialize -> do
+      store <- getStore
+      H.modify_ _ { owned = ownedRows store.owned, active = store.active }
+      emitter <- emitSelected selectAll
+      void (H.subscribe (StoreChanged <$> emitter))
+      void (H.tell WC._walletConnect unit (WC.SetWalletApi Nothing))
+
+    StoreChanged store ->
+      H.modify_ _ { owned = ownedRows store.owned, active = store.active }
 
     NavLinkClicked route ev -> do
       preventDefaultEvent (toEvent ev)
@@ -302,6 +356,11 @@ component =
         Just key -> H.raise (WalletConnected key)
         Nothing -> pure unit
     HandleWalletConnect WC.WalletDisconnectedEvent -> H.raise WalletDisconnected
+    HandleWalletConnect (WC.ProfileSelectedEvent pid) -> H.raise (ProfileSelected pid)
+    HandleWalletConnect WC.CreateProfileEvent -> H.raise CreateProfileRequested
+    HandleWalletConnect (WC.ActionItemEvent aid)
+      | aid == myProfileAction -> H.raise MyProfileRequested
+      | otherwise -> pure unit
     HandleWalletConnect (WC.WalletConnectFailedEvent detail) -> H.raise (WalletConnectFailed detail)
     -- Other WC outputs (custom buttons, profile/action events, fiat on-ramp,
     -- copy address) are no-ops in the template — extend as your dApp grows.
@@ -311,3 +370,15 @@ component =
 -- | Maparea e `Route.section`, singurul loc unde se scrie în ce secțiune cade o rută.
 sameSection :: Route -> Route -> Boolean
 sameSection a b = section a == section b
+
+-- | Id-ul singurei acțiuni din comutator. Un șir, fiindcă așa îl cere biblioteca; o constantă,
+-- | fiindcă altfel ar fi scris de două ori și comparat o dată.
+myProfileAction :: String
+myProfileAction = "my-profile"
+
+-- | Rîndurile deținute, din starea lor de încărcare. Cît timp se citesc sau n-au putut fi citite,
+-- | comutatorul n-are ce arăta — iar un comutator gol e mai onest decît unul care clipește.
+ownedRows :: RemoteData String (Array ProfileRow) -> Array ProfileRow
+ownedRows = case _ of
+  Success rows -> rows
+  _ -> []

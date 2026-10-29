@@ -30,7 +30,7 @@ import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Format (formatAda, formatDay, humanize, matchLine)
 import Halogen as H

@@ -19,7 +19,12 @@ import Capabilities.Delay (class MonadDelay, delayMs)
 import Capabilities.DomEvent (class MonadDomEvent)
 import AppEnv (Env)
 import Capabilities.Interaction.MonadInteract (class MonadInteract, txStatus)
-import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
+import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getProfileByUserToken, getStatus)
+import Capabilities.Query.Gov.Http (renderApiError)
+import Capabilities.Query.Gov.Types (AttestSync(..), GovStatus(..), ProfileRow(..))
+import Capabilities.Wallet.Assets (userTokenAssetClasses)
+import Capabilities.Wallet.AssetsDecode (balanceJson)
+import Cardano.Wallet.Cip30 (getBalance)
 import Capabilities.Wallet.Governance (class MonadGovWallet, BlockReason(..), GateVerdict(..), blockMessage, connectGovernance)
 import Control.Monad.Reader (class MonadAsk)
 import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
@@ -52,20 +57,23 @@ import Components.Shared.DRepIdentity (shortId)
 import Components.Shared.StatusChip as StatusChip
 import Components.Shared.Toast as Toast
 import Format (pluralize)
-import Data.Array (cons, filter, null)
+import Data.Array (cons, filter, find, null)
 import Data.Array as Array
+import Data.Traversable (traverse)
+import Effect.Aff (Milliseconds(..), attempt)
+import Network.RemoteData (RemoteData(..))
 import Data.Const (Const)
-import Data.Either (Either(..))
+import Data.Either (Either(..), hush)
 import Data.Maybe (Maybe(..))
-import Effect.Aff (Milliseconds(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Router.Class (class MonadRouter, current, emitMatched)
-import Halogen.Store.Monad (class MonadStore, updateStore)
+import Halogen.Router.Class (class MonadRouter, current, emitMatched, navigate)
+import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Route (Route(..))
+import Route.GovQueries (emptyWriteFilters)
 import Route.Codec (printRoute)
 import Store as Store
 import Web.HTML (window)
@@ -168,6 +176,11 @@ component =
     HandleNavBar (NavBar.WalletConnected key) -> do
       verdict <- connectGovernance key
       updateStore (Store.Connect verdict)
+      -- Ce profiluri deține portofelul se citește O DATĂ, aici, nu în fiecare ecran care are nevoie
+      -- de ele: „cu ce identitate lucrez" e o proprietate a sesiunii, nu a unui formular.
+      case verdict of
+        Allowed w -> void (H.fork (loadOwned w.api))
+        Blocked _ _ -> pure unit
       -- Refuzul se spune ACUM, nu cînd cineva ajunge pe „Actions" și găsește un formular care nu
       -- se desenează. Motivul ÎNTREG stă în matricea de pe „Actions", nu aici: un mesaj care trece pe lîngă om
       -- în șase secunde nu e locul unde se explică de ce o extensie lipsește. Aici se spune doar
@@ -190,6 +203,25 @@ component =
 
     HandleNavBar NavBar.WalletDisconnected -> updateStore Store.Disconnect
 
+    -- Alegerea din bara de sus. Rîndul se caută în ce deține portofelul: id-ul venit din widget e
+    -- un șir, iar `Store` ține rîndul întreg, fiindcă ecranele au nevoie de nume, nu de id.
+    HandleNavBar (NavBar.ProfileSelected pid) -> do
+      store <- getStore
+      case store.owned of
+        Success rows -> case find (\(ProfileRow r) -> r.id == pid) rows of
+          Just row -> updateStore (Store.SetActive row)
+          Nothing -> pure unit
+        _ -> pure unit
+
+    HandleNavBar NavBar.CreateProfileRequested ->
+      navigate (Write (emptyWriteFilters { flow = Just "claim-profile" }))
+
+    HandleNavBar NavBar.MyProfileRequested -> do
+      store <- getStore
+      case store.active of
+        Just (ProfileRow r) -> navigate (ProfileDetail r.id)
+        Nothing -> navigate (Write (emptyWriteFilters { flow = Just "claim-profile" }))
+
     Notify level message -> do
       ts <- H.gets _.toasts
       H.modify_ _ { toasts = Toast.toast level message `cons` ts }
@@ -209,6 +241,33 @@ component =
   setRoute route = do
     H.modify_ _ { route = route }
     liftEffect (window >>= document >>= setTitle (documentTitle route))
+
+  -- Ce profiluri deține portofelul. Patru verigi, fiecare putînd să cadă separat — de aceea starea
+  -- e `RemoteData`: „încă se citește", „n-am putut citi" și „nu deține niciunul" sînt trei lucruri
+  -- diferite, iar al treilea e o informație utilă (înseamnă „revendică unul întîi").
+  --
+  -- Politica vine din `/status` al query-api, nu din configurația clientului: ea e a INDEXULUI, iar
+  -- un client care ar purta-o separat ar putea căuta sub o politică pe care serverul nu proiectează.
+  loadOwned api = do
+    updateStore (Store.SetOwned Loading)
+    st <- getStatus
+    case st of
+      Left e -> updateStore (Store.SetOwned (Failure (renderApiError e)))
+      Right (GovStatus g) -> case g.attestation of
+        Nothing ->
+          updateStore
+            (Store.SetOwned (Failure "The registry index is not reporting its policy, so your own profiles cannot be looked up."))
+        Just (AttestSync a) -> do
+          balance <- H.liftAff (attempt (getBalance api))
+          case balanceJson =<< hush balance of
+            Nothing ->
+              updateStore
+                (Store.SetOwned (Failure "This wallet did not return a readable balance, so its profiles cannot be listed."))
+            Just json -> do
+              -- Un apel per token de profil. Sînt puține prin construcție — un profil per token — și
+              -- ruta face singură saltul user→referință.
+              rows <- traverse getProfileByUserToken (userTokenAssetClasses a.policyId json)
+              updateStore (Store.SetOwned (Success (Array.mapMaybe hush rows)))
 
   -- Ceasul notificărilor: un tic pe secundă cît timp e ceva de arătat, și se oprește singur.
   toastLoop = do
@@ -232,6 +291,12 @@ component =
         -- Ecranele montate reinterogheaza. Pînă acum nimeni nu știa CÎND se confirmă o scriere,
         -- deci registrul rămînea cel dinaintea ei pe ecranul la care omul se uita.
         updateStore Store.Refresh
+        -- Și lista proprie se recitește: o revendicare de profil CREEAZĂ un profil, iar fără asta
+        -- comutatorul din bara de sus n-ar ști de el pînă la o reconectare.
+        store <- getStore
+        case store.wallet of
+          Just (Allowed w) -> void (H.fork (loadOwned w.api))
+          _ -> pure unit
         handleAction (Notify Toast.Success (tx.label <> " is confirmed on chain."))
         -- Dacă ecranul de scriere mai e montat, își schimbă cardul; dacă nu, notificarea a spus
         -- deja tot. Un `tell` către un slot demontat nu face nimic, și e exact ce trebuie.

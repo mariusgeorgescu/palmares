@@ -37,7 +37,8 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, emitSelected, getStore)
+import Halogen.Store.Select (selectAll)
 import Network.RemoteData (RemoteData(..))
 import Route (Route)
 import Route.GovQueries
@@ -65,10 +66,16 @@ type State =
   , profile :: RemoteData ApiError ProfileRow
   , about :: RemoteData ApiError AttestationPage
   , by :: RemoteData ApiError AttestationPage
+  -- Identitatea activă, oglindită din `Store`. Pagina trebuie să știe dacă profilul ăsta e AL TĂU:
+  -- altfel oferă un buton care duce la un refuz garantat — regula `Mr` interzice auto-girarea, iar
+  -- refuzul vine după ce ai semnat.
+  , mine :: Maybe String
+  , ownedCount :: Int
   }
 
 data Action
   = Initialize
+  | StoreChanged Store.Store
   | Retry
   | Receive Input
 
@@ -98,6 +105,17 @@ dropSelfIssued pid (AttestationPage p) =
   where
   kept = filter (\(AttestationRow a) -> a.issuer /= pid) p.items
 
+-- | Id-ul identității active, dacă există una.
+activeId :: Store.Store -> Maybe String
+activeId store = map (\(ProfileRow r) -> r.id) store.active
+
+-- | Cîte profiluri deține portofelul. Contează pentru mesaj: cu mai multe, auto-girarea se rezolvă
+-- | comutînd identitatea; cu unul singur, nu se rezolvă deloc.
+ownedCount' :: Store.Store -> Int
+ownedCount' store = case store.owned of
+  Success rows -> length rows
+  _ -> 0
+
 component
   :: forall q m
    . MonadQueryGov m
@@ -107,7 +125,7 @@ component
 component =
   H.mkComponent
     { initialState: \profileId ->
-        { profileId, profile: NotAsked, about: NotAsked, by: NotAsked }
+        { profileId, profile: NotAsked, about: NotAsked, by: NotAsked, mine: Nothing, ownedCount: 0 }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -123,7 +141,13 @@ component =
       -- O scriere confirmată schimbă ce arată ecranul ăsta, iar proiecția vine ~45s după
       -- tranzacție — deci nu se poate încărca o dată și gata.
       subscribeRefresh Retry
+      store <- getStore
+      H.modify_ _ { mine = activeId store, ownedCount = ownedCount' store }
+      emitter <- emitSelected selectAll
+      void (H.subscribe (StoreChanged <$> emitter))
       void (H.fork load)
+    StoreChanged store ->
+      H.modify_ _ { mine = activeId store, ownedCount = ownedCount' store }
     Retry -> load
     Receive pid -> do
       st <- H.get
@@ -177,6 +201,10 @@ component =
       [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-baseline gap-2") ]
           [ HH.h1 [ HP.class_ (HH.ClassName "text-3xl font-bold") ] [ HH.text r.name ]
           , HH.span [ HP.class_ (HH.ClassName "badge badge-outline") ] [ HH.text (enumLabel r.kind) ]
+          -- Că e al tău se vede, fiindcă schimbă ce poți face aici.
+          , if st.mine == Just st.profileId then
+              HH.span [ HP.class_ (HH.ClassName "badge badge-sm badge-primary") ] [ HH.text "this is you" ]
+            else HH.text ""
           ]
       , HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl") ] [ HH.text r.description ]
       , HH.div [ HP.class_ (HH.ClassName "opacity-70") ]
@@ -190,11 +218,7 @@ component =
       , credentialLine r
       , imageLine r
       , HH.div [ HP.class_ (HH.ClassName "flex flex-wrap gap-3 pt-1") ]
-          [ HH.a
-              [ HP.href (writeHrefFor { flow: Just "issue-attestation", subject: Just st.profileId })
-              , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
-              ]
-              [ HH.text "Vouch for this profile" ]
+          [ vouchAction st
           , HH.a
               [ HP.href (writeHrefFor { flow: Just "update-profile", subject: Just st.profileId })
               , HP.class_ (HH.ClassName "link link-hover text-sm self-center")
@@ -234,6 +258,31 @@ component =
               , HH.text (maybe "" (\n -> " " <> pluralize n "claimant" <> " in all.") r.claimantCount)
               ]
         )
+
+  -- Girarea, sau motivul pentru care n-are rost.
+  --
+  -- Regula `Mr` a validatorului interzice auto-girarea: subiectul și emitentul nu pot fi același
+  -- profil. Pînă acum butonul se oferea oricum, iar refuzul venea DUPĂ ce omul completase
+  -- formularul și semnase — exact drumul închis pe care traducerea refuzurilor îl făcea lizibil,
+  -- în loc să-l prevină. Cu o identitate a sesiunii se poate preveni.
+  vouchAction st =
+    if st.mine == Just st.profileId then
+      HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
+        [ HH.text
+            ( if st.ownedCount > 1 then
+                "This is the profile you are acting as, and nobody can vouch for themselves — the \
+                \chain refuses it. Switch identity with the avatar in the top bar to vouch for it."
+              else
+                "This is your profile, and nobody can vouch for themselves — the chain refuses it. \
+                \Someone else's vouch is what counts here."
+            )
+        ]
+    else
+      HH.a
+        [ HP.href (writeHrefFor { flow: Just "issue-attestation", subject: Just st.profileId })
+        , HP.class_ (HH.ClassName "btn btn-sm btn-primary")
+        ]
+        [ HH.text "Vouch for this profile" ]
 
   -- Imaginea profilului, ca ADRESĂ și nu ca imagine. Motivul întreg e la `Format.imageRef`: n-avem
   -- poartă IPFS, iar încărcarea directă de pe gazda altcuiva ar trimite IP-ul vizitatorului acolo

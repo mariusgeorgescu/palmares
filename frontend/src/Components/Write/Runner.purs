@@ -20,10 +20,8 @@ import Prelude
 
 import AppEnv (Env)
 import Capabilities.Interaction.MonadInteract (class MonadInteract, buildFlow, interactionStatus, submitSigned)
-import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getProfileByUserToken, getStatus)
-import Capabilities.Query.Gov.Types (AttestSync(..), GovStatus(..), ProfileRow(..))
-import Capabilities.Wallet.Assets (userTokenAssetClasses)
-import Capabilities.Wallet.AssetsDecode (balanceJson)
+import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov)
+import Capabilities.Query.Gov.Types (ProfileRow(..))
 import Capabilities.Query.Gov.Http (ApiError(..), renderApiError)
 import Capabilities.Wallet.Governance (class MonadGovWallet, GateVerdict(..), blockMessage, capabilitiesOf, connectGovernance, hasExtension)
 import AppEnv as AppEnv
@@ -34,12 +32,11 @@ import Components.Write.Flows (FieldKind(..), WriteGate(..), buildRequest, flowS
 import Components.Write.TxSummaryDecode (summarise)
 import Format (enumLabel, formatAda, pluralize)
 import Control.Monad.Reader (class MonadAsk)
-import Cardano.Wallet.Cip30 (Api, getAvailableWallets, getBalance, getChangeAddress, getUsedAddresses, signTx)
+import Cardano.Wallet.Cip30 (Api, getAvailableWallets, getChangeAddress, getUsedAddresses, signTx)
 import Data.Array (length, null)
 import Data.Array as Array
-import Data.Traversable (traverse)
 import Network.RemoteData (RemoteData(..))
-import Data.Either (Either(..), hush)
+import Data.Either (Either(..))
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -117,11 +114,11 @@ type State =
   -- din bara de sus" sînt două situații diferite, iar un singur mesaj pentru amîndouă ar trimite pe
   -- cineva să caute un buton care n-are ce să deschidă.
   , wallets :: Array String
-  -- Profilurile pe care le deține portofelul conectat, citite din propriile lui active. Pînă acum
-  -- nimic nu lega portofelul de profilul lui, deși ruta există și documentele proiectului o numesc
-  -- „the entry point to the entire wallet-side product" — deci trei cîmpuri se lipeau de mînă,
-  -- identificatori de șaizeci de caractere.
+  -- Oglinda identității cu care lucrezi, din `Store`. Se alege o dată, în bara de sus, și o știe
+  -- toată aplicația — nu e o stare a formularului ăsta. Ce se face aici cu ea e singurul lucru
+  -- specific: cîmpurile care înseamnă „profilul tău" se completează singure.
   , owned :: RemoteData String (Array ProfileRow)
+  , active :: Maybe ProfileRow
   , step :: Step
   }
 
@@ -131,7 +128,6 @@ data Action
   | StoreChanged Store.Store
   | Retry
   | SetField String String
-  | UseProfile String
   | Submit
   | SignAndSubmit String
 
@@ -187,7 +183,7 @@ component
   => H.Component Query Input Output m
 component =
   H.mkComponent
-    { initialState: \filters -> { filters, values: seedFrom filters, gate: Nothing, oracle: Nothing, oracleAsked: false, wallets: [], owned: NotAsked, step: Idle }
+    { initialState: \filters -> { filters, values: seedFrom filters, gate: Nothing, oracle: Nothing, oracleAsked: false, wallets: [], owned: NotAsked, active: Nothing, step: Idle }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -212,10 +208,8 @@ component =
       -- s-ar pierde, iar conectarea din bara de sus e exact lucrul care se întîmplă în acele
       -- secunde.
       store <- getStore
-      H.modify_ _ { gate = store.wallet }
-      case store.wallet of
-        Just (Allowed w) -> void (H.fork (loadOwned w.api))
-        _ -> pure unit
+      H.modify_ _ { gate = store.wallet, owned = store.owned, active = store.active }
+      prefillOwn
       emitter <- emitSelected selectAll
       void (H.subscribe (StoreChanged <$> emitter))
       names <- liftEffect getAvailableWallets
@@ -231,14 +225,18 @@ component =
       st <- H.get
       when (filters /= st.filters) do
         H.modify_ _ { filters = filters, values = seedFrom filters, step = Idle }
+        prefillOwn
     -- Conectarea și deconectarea se întîmplă în bara de sus, pentru toată aplicația. Aici se
     -- citește doar rezultatul. Pasul NU se resetează: o tranzacție trimisă rămîne un fapt pe ecran
     -- chiar dacă wallet-ul s-a deconectat după.
     StoreChanged store -> do
-      H.modify_ _ { gate = store.wallet }
-      case store.wallet of
-        Just (Allowed w) -> void (H.fork (loadOwned w.api))
-        _ -> H.modify_ _ { owned = NotAsked }
+      st <- H.get
+      let switched = idOf store.active /= idOf st.active
+      H.modify_ _ { gate = store.wallet, owned = store.owned, active = store.active }
+      -- O SCHIMBARE de identitate suprascrie cîmpurile care înseamnă „profilul tău": comutarea e o
+      -- acțiune deliberată a omului, iar un cîmp care ar rămîne pe identitatea de dinainte ar face
+      -- comutatorul o minciună. În rest se completează doar golurile.
+      if switched then overwriteOwn else prefillOwn
 
     -- Un refuz fără cale de întoarcere e un fund de sac: cineva care a apăsat „Decline" din
     -- greșeală, sau care tocmai a schimbat rețeaua în wallet, trebuie să poată reîncerca fără să
@@ -254,14 +252,6 @@ component =
           updateStore (Store.Connect again)
           H.modify_ _ { step = Idle }
     SetField k v -> H.modify_ \st -> st { values = Map.insert k v st.values }
-
-    -- Un clic în locul unui identificator de șaizeci de caractere lipit de mînă. Se completează
-    -- TOATE cîmpurile fluxului care înseamnă „profilul tău" — la o vouchuire sînt și emitentul și,
-    -- la o provocare, cel care pune depozitul.
-    UseProfile pid -> H.modify_ \st -> st
-      { values = Array.foldl (\m k -> Map.insert k pid m) st.values
-          (ownProfileKeysFor (fromMaybe "" st.filters.flow))
-      }
     Submit -> do
       st <- H.get
       case st.gate of
@@ -298,30 +288,26 @@ component =
                   H.raise (TxSubmitted { txId, label: labelFor st })
         _ -> pure unit
 
-  -- Ce profiluri deține portofelul. Trei pași, și fiecare poate eșua separat — de aceea starea e
-  -- `RemoteData` și nu o listă: „încă se citește", „n-am putut citi" și „nu deține niciunul" sînt
-  -- trei lucruri diferite, iar al treilea e o informație utilă (înseamnă „revendică unul întîi").
+  -- Cîmpurile care înseamnă „profilul tău" se completează din identitatea activă — și NUMAI dacă
+  -- sînt goale. Un formular pe care omul a început să-l schimbe nu se rescrie sub mînă, iar un
+  -- identificator venit din URL (`?subject=`) a fost pus de cineva dinadins.
   --
-  -- Politica vine din `/status` al query-api, nu din configurația clientului: ea e a INDEXULUI, iar
-  -- un client care ar purta-o separat ar putea căuta sub o politică pe care serverul nu proiectează.
-  loadOwned api = do
-    H.modify_ _ { owned = Loading }
-    st <- getStatus
-    case st of
-      Left e -> H.modify_ _ { owned = Failure (renderApiError e) }
-      Right (GovStatus g) -> case g.attestation of
-        Nothing ->
-          H.modify_ _ { owned = Failure "The registry index is not reporting its policy, so your own profiles cannot be looked up." }
-        Just (AttestSync a) -> do
-          balance <- H.liftAff (attempt (getBalance api))
-          case balanceJson =<< hush balance of
-            Nothing ->
-              H.modify_ _ { owned = Failure "This wallet did not return a readable balance, so its profiles cannot be listed." }
-            Just json -> do
-              -- Un apel per token de profil. Sînt puține prin construcție — un profil per token — și
-              -- ruta face singură saltul user→referință.
-              rows <- traverse getProfileByUserToken (userTokenAssetClasses a.policyId json)
-              H.modify_ _ { owned = Success (Array.mapMaybe hush rows) }
+  -- Asta înlocuiește lista cu butoane de dinainte: cu o identitate a sesiunii, un clic per formular
+  -- era un clic cerut degeaba.
+  prefillOwn = fillOwn false
+  overwriteOwn = fillOwn true
+
+  fillOwn force = do
+    st <- H.get
+    case st.active of
+      Nothing -> pure unit
+      Just (ProfileRow r) ->
+        H.modify_ \s -> s
+          { values = Array.foldl
+              (\m k -> if force || not (Map.member k m) then Map.insert k r.id m else m)
+              s.values
+              (ownProfileKeysFor (fromMaybe "" s.filters.flow))
+          }
 
   -- Se construiește cu adresele wallet-ului. Nu se semnează aici: semnătura e a wallet-ului, iar
   -- trimiterea e pasul pe care produsul îl ține deliberat separat.
@@ -467,65 +453,66 @@ component =
             ]
         ]
 
-  -- Profilurile pe care le ține portofelul conectat.
+  -- Cu ce identitate scrii. Se alege o dată, în bara de sus, și se vede pe fiecare formular — plus
+  -- ce lipsește cînd nu e nimic de ales.
   --
-  -- Era cea mai scumpă lipsă din ecranul ăsta: ruta există, documentele proiectului o numesc „the
-  -- entry point to the entire wallet-side product", și n-avea NICIUN apelant — deci cine voia să
-  -- vouchuiască trebuia să-și lipească propriul identificator de șaizeci de caractere, găsit pe
-  -- altă pagină.
-  ownedCard st = case st.owned of
-    NotAsked -> HH.text ""
-    Loading ->
+  -- Era cea mai scumpă lipsă din ecranul ăsta: ruta `/profiles/by-user-token/` există, documentele
+  -- proiectului o numesc „the entry point to the entire wallet-side product", și n-avea NICIUN
+  -- apelant — deci cine voia să vouchuiască își lipea propriul identificator de șaizeci de
+  -- caractere, găsit pe altă pagină.
+  ownedCard st = case st.owned, st.active of
+    NotAsked, _ -> HH.text ""
+    Loading, _ ->
       HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
         [ HH.text "Reading this wallet's profiles…" ]
     -- Un eșec aici nu blochează nimic: cîmpurile se pot completa de mînă, ca înainte. Deci e o
     -- notă, nu o alertă.
-    Failure why ->
+    Failure why, _ ->
       HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text why ]
-    Success rows
-      | null rows ->
-          HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-            [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
-                [ HH.p [ HP.class_ (HH.ClassName "text-sm") ]
-                    [ HH.text
-                        "This wallet holds no profile of this registry. A profile is a token: the \
-                        \one in your wallet is what proves a write is yours."
-                    ]
+    Success rows, _ | null rows ->
+      HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
+        [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
+            [ HH.p [ HP.class_ (HH.ClassName "text-sm") ]
+                [ HH.text
+                    "This wallet holds no profile of this registry. A profile is a token: the one \
+                    \in your wallet is what proves a write is yours."
+                ]
+            , HH.a
+                [ HP.href (writeHrefFor { flow: Just "claim-profile", subject: Nothing })
+                , HP.class_ (HH.ClassName "btn btn-sm btn-primary self-start")
+                ]
+                [ HH.text "Claim a profile" ]
+            ]
+        ]
+    Success rows, Just (ProfileRow a) ->
+      HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
+        [ HH.div [ HP.class_ (HH.ClassName "card-body gap-1") ]
+            [ HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-center gap-2") ]
+                [ HH.span [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text "Acting as" ]
                 , HH.a
-                    [ HP.href (writeHrefFor { flow: Just "claim-profile", subject: Nothing })
-                    , HP.class_ (HH.ClassName "btn btn-sm btn-primary self-start")
+                    [ HP.href (profileDetailHrefFor a.id)
+                    , HP.class_ (HH.ClassName "link link-hover font-medium")
                     ]
-                    [ HH.text "Claim a profile" ]
+                    [ HH.text a.name ]
+                , HH.span [ HP.class_ (HH.ClassName "font-mono text-xs opacity-60") ] [ HH.text (shortId a.id) ]
                 ]
+            , if length rows > 1 then
+                HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+                  [ HH.text
+                      ( "This wallet holds " <> pluralize (length rows) "profile"
+                          <> "; switch with the avatar in the top bar."
+                      )
+                  ]
+              else HH.text ""
+            , if null (ownProfileKeysFor (fromMaybe "" st.filters.flow)) then HH.text ""
+              else
+                HH.p [ HP.class_ (HH.ClassName "text-xs opacity-60") ]
+                  [ HH.text "The fields that mean \"your own profile\" are filled from it." ]
             ]
-      | otherwise ->
-          HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-            [ HH.div [ HP.class_ (HH.ClassName "card-body gap-2") ]
-                [ HH.p [ HP.class_ (HH.ClassName "text-sm") ]
-                    [ HH.text (pluralize (length rows) "profile" <> " in this wallet.") ]
-                , HH.div [ HP.class_ (HH.ClassName "flex flex-col gap-2") ] (map (ownedRow st) rows)
-                ]
-            ]
-
-  ownedRow st (ProfileRow r) =
-    HH.div [ HP.class_ (HH.ClassName "flex flex-wrap items-center gap-2") ]
-      [ HH.a
-          [ HP.href (profileDetailHrefFor r.id)
-          , HP.class_ (HH.ClassName "link link-hover text-sm")
-          ]
-          [ HH.text r.name ]
-      , HH.span [ HP.class_ (HH.ClassName "font-mono text-xs opacity-60") ] [ HH.text (shortId r.id) ]
-      -- Butonul apare numai pe fluxurile care AU un cîmp „profilul tău". Pe celelalte lista rămîne
-      -- informativă: un buton care n-ar completa nimic e mai rău decît niciun buton.
-      , if null (ownProfileKeysFor (fromMaybe "" st.filters.flow)) then HH.text ""
-        else
-          HH.button
-            [ HP.class_ (HH.ClassName "btn btn-xs")
-            , HP.type_ HP.ButtonButton
-            , HE.onClick (const (UseProfile r.id))
-            ]
-            [ HH.text "Use this one" ]
-      ]
+        ]
+    -- Deține profiluri și niciunul activ: imposibil prin reducer (primul deținut devine activ), dar
+    -- un `case` incomplet ar fi o promisiune pe care tipul nu o ține.
+    Success _, Nothing -> HH.text ""
 
   -- Cele trei forme de detecție, una lîngă alta. Se arată toate pentru că se CONTRAZIC în
   -- practică, iar un wallet refuzat deși „scrie pe cutie" că suportă extensia e exact cazul în
@@ -915,3 +902,9 @@ walletAddresses api = do
                 _ -> [ changeAddress ]
             }
         )
+
+-- | Id-ul unui profil, cînd există unul. Comparația dintre identități se face pe id, nu pe rîndul
+-- | întreg: rîndul se reîncarcă după fiecare scriere confirmată, deci ar fi „altul" fără ca
+-- | identitatea să se fi schimbat.
+idOf :: Maybe ProfileRow -> Maybe String
+idOf = map (\(ProfileRow r) -> r.id)

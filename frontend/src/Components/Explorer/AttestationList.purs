@@ -36,7 +36,7 @@ import Data.Either (Either(..))
 import Data.Tuple (Tuple(..))
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), isJust, isNothing)
+import Data.Maybe (Maybe(..), isNothing)
 import Format (enumLabel, formatDay, formatInt, humanize, matchLine)
 import Halogen as H
 import AppEnv as AppEnv

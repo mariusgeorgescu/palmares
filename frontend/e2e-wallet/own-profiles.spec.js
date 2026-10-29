@@ -123,3 +123,80 @@ test.describe('a wallet that holds one', () => {
     await expect(issuer).toHaveValue(profileId);
   });
 });
+
+test.describe('a wallet that holds two', () => {
+  // Ce lipsea după prima trecere, și ce a cerut owner-ul: nu o listă per formular, ci o identitate a
+  // SESIUNII — alegi o dată, sus, și aplicația știe contextul. Exact forma pe care o are `bjj-belts`.
+  const A = { token: '000de140aaaa', id: POLICY + '.000643b0aaaa', name: 'Alpha profile' };
+  const B = { token: '000de140bbbb', id: POLICY + '.000643b0bbbb', name: 'Beta profile' };
+
+  test.use({
+    walletOptions: {
+      name: WALLET,
+      networkId: 0,
+      utxos: [{ lovelace: 10_000_000, assets: { [POLICY + A.token]: 1, [POLICY + B.token]: 1 } }],
+    },
+  });
+
+  test('switches identity from the top bar, and the whole app follows', async ({ page }) => {
+    await withCip142(page);
+
+    // Profilurile fabricate nu există pe lanț, deci ruta lor e singurul lucru oprit aici — un
+    // handler pentru ambele forme: clasa de activ (jumătatea de utilizator) și pagina de detaliu
+    // (tokenul de referință).
+    await page.route('**/api/query/profiles/**', (route) => {
+      const url = route.request().url();
+      const p = url.includes(A.token) || url.includes('000643b0aaaa') ? A : B;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: p.id,
+          name: p.name,
+          description: 'held by this wallet',
+          image_uri: 'ipfs://own-profile-probe',
+          kind: 'person_d_rep',
+          credential: null,
+          credential_is_script: null,
+          claimant_count: null,
+        }),
+      });
+    });
+
+    await page.goto('/write?flow=issue-attestation');
+    await connectFromNavbar(page, WALLET);
+    await expect(page.getByText('ready', { exact: true })).toBeVisible();
+
+    // Prima identitate e activă din oficiu: cu un singur profil n-ar fi nicio alegere de făcut, iar
+    // a cere una ar fi un clic cerut degeaba.
+    await expect(page.locator('.card', { hasText: 'Acting as' })).toContainText(A.name, {
+      timeout: 30_000,
+    });
+    const issuer = page.getByLabel('Issuer', { exact: false }).first();
+    await expect(issuer).toHaveValue(A.id);
+
+    // `focus`, nu `click`: dropdown-ul daisyUI se deschide pe focus (`tabindex=0`), iar conținutul
+    // lui deschis acoperă declanșatorul — un click primește „intercepts pointer events".
+    await page.locator('[role="button"].avatar').first().focus();
+    await page.getByRole('listitem').filter({ hasText: B.name }).first().click();
+
+    // Contextul s-a schimbat peste tot: cardul ȘI câmpul care înseamnă „profilul tău". Comutarea e o
+    // acțiune deliberată, deci suprascrie — un câmp rămas pe identitatea de dinainte ar face
+    // comutatorul o minciună.
+    await expect(page.locator('.card', { hasText: 'Acting as' })).toContainText(B.name);
+    await expect(issuer).toHaveValue(B.id);
+
+    // Iar pagina profilului știe acum că e a ta. Navigare ÎN APLICAȚIE, prin linkul din card: un
+    // `goto` reîncarcă pagina, iar identitatea trăiește în memorie — după o reîncărcare portofelul
+    // trebuie reconectat oricum.
+    await page
+      .locator('.card', { hasText: 'Acting as' })
+      .getByRole('link', { name: B.name })
+      .click();
+    await expect(page.getByText('this is you')).toBeVisible({ timeout: 30_000 });
+    // Și butonul care ducea la un refuz GARANTAT a dispărut: regula `Mr` interzice auto-girarea, iar
+    // refuzul venea după ce omul completase formularul și semnase.
+    await expect(page.getByRole('link', { name: 'Vouch for this profile' })).toHaveCount(0);
+    await expect(page.getByText('nobody can vouch for themselves')).toBeVisible();
+  });
+});

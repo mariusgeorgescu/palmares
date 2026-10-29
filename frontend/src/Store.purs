@@ -11,8 +11,11 @@ module Store
 
 import Prelude
 
+import Capabilities.Query.Gov.Types (ProfileRow)
 import Capabilities.Wallet.Governance (GateVerdict)
+import Data.Array (head)
 import Data.Maybe (Maybe(..))
+import Network.RemoteData (RemoteData(..))
 import Data.Newtype (class Newtype)
 
 newtype Username = Username String
@@ -49,6 +52,17 @@ type Store =
   -- „s-a schimbat un profil" ar rata exact cazurile compuse, iar unul care ar reinteroga la fiecare
   -- schimbare de `Store` ar bate la ușă și la conectarea wallet-ului.
   , refreshKey :: Int
+  -- Profilurile pe care le deține portofelul conectat, și cel cu care lucrezi ACUM.
+  --
+  -- Stau aici, nu în ecranul de scriere, fiindcă „cu ce identitate lucrez" nu e o întrebare a unui
+  -- formular: pagina unui profil trebuie să știe că e a ta, iar butonul care te-ar trimite să te
+  -- girezi pe tine însuți trebuie să dispară — regula `Mr` refuză auto-girarea, deci un buton care
+  -- o oferă duce la un refuz garantat, după semnătură.
+  --
+  -- `RemoteData` și nu o listă: „încă se citește", „n-am putut citi" și „nu deține niciunul" sînt
+  -- trei lucruri diferite, iar al treilea e o informație utilă — înseamnă „revendică unul întîi".
+  , owned :: RemoteData String (Array ProfileRow)
+  , active :: Maybe ProfileRow
   }
 
 initialStore :: Store
@@ -56,6 +70,8 @@ initialStore =
   { wallet: Nothing
   , user: Nothing
   , refreshKey: 0
+  , owned: NotAsked
+  , active: Nothing
   }
 
 -- | Store actions. Add more cases as your dApp grows.
@@ -66,12 +82,29 @@ data Action
   | ClearUser
   -- | O scriere s-a confirmat pe lanț. Ridicat de înveliș, citit de ecrane.
   | Refresh
+  -- | Ce profiluri deține portofelul. Învelișul le citește o dată, la conectare.
+  | SetOwned (RemoteData String (Array ProfileRow))
+  -- | Cu ce profil lucrezi. Ales din bara de sus, sau implicit primul deținut.
+  | SetActive ProfileRow
 
 -- | Pure reducer for store actions.
 reduce :: Store -> Action -> Store
 reduce store = case _ of
   Connect verdict -> store { wallet = Just verdict }
   Refresh -> store { refreshKey = store.refreshKey + 1 }
-  Disconnect -> store { wallet = Nothing, user = Nothing }
+  -- Primul deținut devine activ, ca la `bjj-belts`: cu un singur profil — cazul obișnuit — nu există
+  -- nicio alegere de făcut, iar a cere una ar fi un clic cerut degeaba. Alegerea existentă NU se
+  -- suprascrie: lista se recitește și după o scriere confirmată.
+  SetOwned owned -> store
+    { owned = owned
+    , active = case store.active, owned of
+        Just a, _ -> Just a
+        Nothing, Success rows -> head rows
+        Nothing, _ -> Nothing
+    }
+  SetActive row -> store { active = Just row }
+  -- La deconectare se uită TOT ce era legat de portofel. Un profil activ rămas în urmă ar
+  -- precompleta un formular cu o identitate pe care nimeni nu mai poate semna.
+  Disconnect -> store { wallet = Nothing, user = Nothing, owned = NotAsked, active = Nothing }
   SetUser name -> store { user = Just name }
   ClearUser -> store { user = Nothing }

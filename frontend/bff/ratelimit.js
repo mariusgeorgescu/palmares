@@ -7,11 +7,20 @@
  *
  * Două praguri, și al doilea nu e redundant:
  *
- *   1. **per client.** Cheia e primul salt din `x-forwarded-for`, nu adresa soclului. MĂSURAT pe
- *      deploy: pod-ul vede `10.42.2.1` pentru TOATE cererile, adică IP-ul nodului — deci un
- *      limitator pe adresa soclului ar fi global fără să scrie nimeni asta, și un singur scraper ar
- *      închide situl pentru toți. Dacă gateway-ul nu pune `x-forwarded-for`, cheia devine aceeași
- *      pentru toți și pragul ăsta se comportă ca al doilea — de aceea e generos.
+ *   1. **per client.** Cheia e primul salt din `x-forwarded-for`, nu adresa soclului.
+ *
+ *      __MĂSURAT PE DEPLOY, și rezultatul contează:__ 600 de cereri într-o rafală au produs 420 de
+ *      refuzuri, deci pragul funcționează — dar cheia a fost `10.42.1.0` și `10.42.1.1`, adică
+ *      adresele nodului, NU adresa clientului. Cauza e în amonte de BFF: traficul intră printr-un
+ *      LoadBalancer care face SNAT, deci nici Traefik nu vede IP-ul real, iar `x-forwarded-for` fie
+ *      lipsește, fie poartă tot adresa nodului.
+ *
+ *      Consecința, scrisă ca să nu fie descoperită la nevoie: __ca deployat, pragul ăsta e per-nod
+ *      (două găleți), nu per-client__ — deci un client abuziv poate refuza serviciul celorlalți
+ *      până la capătul ferestrei. Ce l-ar face per-client e `externalTrafficPolicy: Local` pe
+ *      serviciul Traefik, care e infrastructură PARTAJATĂ de toate aplicațiile din cluster, deci
+ *      nu se schimbă din acest repo. Până atunci pragul e generos tocmai pentru că e, de fapt, un
+ *      al doilea plafon global.
  *   2. **global.** Plafonul pe care îl suportă baza, oricâți clienți ar fi. Un singur prag per
  *      client nu-l dă: zece clienți cinstiți pot depăși împreună ce un singur abuziv n-ar putea.
  *
