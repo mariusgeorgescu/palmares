@@ -1,4 +1,4 @@
-# Palmares API → Screen Map
+# Testatum API → Screen Map
 
 **The wire contract.** Every route both backends serve, organised by the screen that consumes it, plus
 everything a client has to get right to call them. Written for a React/TypeScript developer who has

@@ -1,4 +1,4 @@
-# Palmares architecture documentation
+# Testatum architecture documentation
 
 This set was written against `main` @ `4eb9117` and last **fully** reconciled against `main` @
 `2bf5bde` (2026-10-23). It has not been reconciled since, and `main` has moved a long way: **52

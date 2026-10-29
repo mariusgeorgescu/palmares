@@ -1,6 +1,6 @@
 # The governance read surface — what a visitor can find out, and how
 
-**Scope.** This file documents the half of Palmares that is *derived from the chain*: the public,
+**Scope.** This file documents the half of Testatum that is *derived from the chain*: the public,
 unauthenticated read API over Cardano governance data. It is written for a designer and a React
 developer who have not read the Haskell or the SQL. Every number, field name, parameter bound and
 JSON fragment below was taken from the running service or from the code it is served by; where

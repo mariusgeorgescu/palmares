@@ -1,8 +1,16 @@
-# Palmares
+# Testatum
 
 Cardano governance reputation and track-record registry. Four libraries with strict layering; three HTTP
 services + admin CLI. Governance facts come from `cardano-db-sync` through read-only SQL views; only the
 attestation protocol has state of our own.
+
+**The name.** The brand is **Testatum**. The identifiers stay `palmares`: the module namespace
+(`Palmares.*`), the SQL schemas (`palmares`, `palmares_attest`), the roles, the image names, the
+`PALMARES_*` environment variables and the repository directory. This is a separation, not a
+half-finished rename — renaming those would touch live SQL, deployed images and the on-chain
+aliases for no gain. The on-chain prefix is already decoupled (new rows are written `attest:`,
+`palmares:` is still read). The served API titles (`"Palmares Query API"`) are the only place the
+old name still reaches a consumer; they change with the next backend image.
 
 ## Environment
 

@@ -1,6 +1,6 @@
-# Palmares on-chain protocol reference
+# Testatum on-chain protocol reference
 
-The structural view of the Palmares attestation protocol as deployed on chain: the six scripts, what
+The structural view of the Testatum attestation protocol as deployed on chain: the six scripts, what
 each one is parameterised by, the state it locks (datums), the actions it accepts (redeemers), and the
 tokens that tie the scripts together. Written against commit `2bf5bde` on `main` (2026-10-23); every
 rule below is cited to a source line and should be re-verified against the code when that commit moves.

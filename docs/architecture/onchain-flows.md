@@ -1,4 +1,4 @@
-# Palmares — on-chain transaction flows and lifecycles
+# Testatum — on-chain transaction flows and lifecycles
 
 Status: static reading of branch `main` at `2bf5bde` (2026-10-23); nothing was built or run. Every transaction
 shape cites the off-chain builder (`src/lib/offchain-lib/Palmares/TxBuilding/`) and the on-chain rule that checks

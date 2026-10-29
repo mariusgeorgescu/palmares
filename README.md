@@ -1,8 +1,11 @@
-# Palmares
+# Testatum
 
 **A public, verifiable track record for Cardano governance.**
 
-Palmares derives every DRep's complete governance history — votes, vote delegations, rationale anchors,
+<sub>The brand is Testatum. The code namespace, SQL schemas, roles, image names and `PALMARES_*`
+variables stay `palmares` on purpose — see `CLAUDE.md`.</sub>
+
+Testatum derives every DRep's complete governance history — votes, vote delegations, rationale anchors,
 per-epoch voting power, committee and treasury activity — directly from the chain, publishes it through a
 free public API and explorer, and lets organizations issue **countersigned attestations** (a claim is only
 recorded once its subject accepts it) about delivery, audits and affiliations.
@@ -11,7 +14,7 @@ Built for the Cardano community. No token, no protocol fees, no paywall.
 
 ## 1. Why you can trust the numbers
 
-Every figure Palmares shows is **re-derivable by anyone, from genesis, using open-source software only**:
+Every figure Testatum shows is **re-derivable by anyone, from genesis, using open-source software only**:
 `cardano-node` + `cardano-db-sync` + this repository. We add no ledger math of our own — the governance
 state comes from db-sync's replay of the Haskell ledger rules, and our layer is a set of read-only SQL
 views over it. Koios is used as an independent cross-check, never as a source.
@@ -24,7 +27,7 @@ Two rules follow from that, and they are not negotiable:
   metrics are served from a materialized view that computes the same arithmetic for every DRep at once,
   and its agreement with the published statements is asserted by a test rather than claimed — see
   `docs/metrics.md`.
-- **No opaque scores.** Palmares reports facts with pinned denominators. It does not rank DReps by a
+- **No opaque scores.** Testatum reports facts with pinned denominators. It does not rank DReps by a
   composite rating, does not infer intent, and does not tell you who to delegate to.
 
 ## 2. Two doors, honestly labelled

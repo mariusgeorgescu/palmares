@@ -1,4 +1,4 @@
-# Palmares — System Overview
+# Testatum — System Overview
 
 Status: architecture reference, written from the source tree at `main` @ `4eb9117` (2026-10-22) and
 reconciled against `main` @ `2bf5bde` (2026-10-23); every `path:line` below is the later tree's.
@@ -18,7 +18,7 @@ behaviour is stated and the document is flagged in a one-line "docs say" note; a
 
 ## 1. Purpose, reading guide, and the two data paths
 
-Palmares is a public, verifiable governance track record for Cardano: every DRep's votes, delegations,
+Testatum is a public, verifiable governance track record for Cardano: every DRep's votes, delegations,
 rationale anchors, per-epoch voting power, committee and treasury activity, derived from the chain and
 served through a free read API, plus a countersigned attestation protocol in which an organisation's
 claim about a subject is recorded only once the subject accepts it (`README.md:3-10`).
@@ -26,7 +26,7 @@ claim about a subject is recorded only once the subject accepts it (`README.md:3
 There are exactly two data paths and they must not be confused (`CLAUDE.md:20-27`). **Governance is
 read-only and holds no state of ours**: `cardano-node` feeds `cardano-db-sync` (`preset: only_governance`,
 ledger enabled, synced from genesis), which writes its own `public` schema into the `cexplorer` database;
-Palmares adds the `palmares` schema — plain views, two materialized views and SQL functions, as declared
+Testatum adds the `palmares` schema — plain views, two materialized views and SQL functions, as declared
 by `sql/` and no longer counted here (the matview count was published as one in four documents while the
 schema had two) —
 applied by `query-api` at boot and dropped and re-created on every start, so a wrong number is fixed by
@@ -57,7 +57,7 @@ flowchart LR
     client["Explorer or API client"]
     operator["Operator with admin CLI and operation.prv"]
   end
-  subgraph svc["Palmares services (Haskell, static musl images)"]
+  subgraph svc["Testatum services (Haskell, static musl images)"]
     qapi["query-api :8083 public read, JSON and CSV"]
     iapi["interaction-api :8082 Basic-auth write routes"]
     async["attest-sync :8084 projector with probe server"]
