@@ -15,6 +15,8 @@ module Capabilities.Interaction.Types
   , SubmitParams
   , encodeSubmit
   , profileKinds
+  , explainRefusal
+  , traceCodeMeaning
   , attestationKinds
   , disputeVerdicts
   , OracleParams(..)
@@ -28,7 +30,9 @@ import Prelude
 import Data.Argonaut.Core (Json, jsonEmptyObject)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), (.:?))
 import Data.Argonaut.Encode ((:=), (~>))
+import Data.Array (filter, mapMaybe, null)
 import Data.Maybe (Maybe(..))
+import Data.String as String
 import Data.Tuple (Tuple(..), fst, snd)
 import Capabilities.Query.Gov.Types (Lovelace)
 
@@ -330,3 +334,87 @@ oracleGate (InteractionStatus s)
       Nothing -> OracleUnknown
       Just true -> OraclePaused
       Just false -> OracleOpen
+
+-- | Ce a refuzat lanțul, spus în cuvinte.
+-- |
+-- | Serverul întoarce `ScriptRefused` cu un mesaj care numește codurile de trace emise de validator
+-- | și trimite la `docs/architecture/onchain-flows.md` — un document din depozit, pe care serviciul
+-- | NU îl servește. Deci omul primea, după ce completase formularul și ceruse semnătura, un cod de
+-- | două litere și o cale moartă. Asta e cel mai prost moment posibil pentru un drum închis.
+-- |
+-- | Formatul mesajului e fixat în `TxBuilding/Exceptions.hs:387-389`; dacă se schimbă acolo, parsarea
+-- | de aici întoarce `Nothing` și se afișează mesajul serverului ca înainte — degradează, nu minte.
+explainRefusal :: { code :: String, message :: String } -> Maybe { codes :: Array String, meanings :: Array String }
+explainRefusal r
+  | r.code /= "ScriptRefused" = Nothing
+  | otherwise =
+      case String.stripPrefix (String.Pattern refusalPrefix) r.message of
+        Nothing -> Nothing
+        Just rest ->
+          let
+            codes = filter (_ /= "") (String.split (String.Pattern " ") (takeUpToDot rest))
+          in
+            if null codes then Nothing
+            else Just { codes, meanings: mapMaybe traceCodeMeaning codes }
+      where
+      refusalPrefix = "A validator refused this transaction: "
+      takeUpToDot t = case String.indexOf (String.Pattern ".") t of
+        Nothing -> t
+        Just i -> String.take i t
+
+-- | Codurile pe care un om le poate CHIAR atinge, fiecare cu ce să facă în loc.
+-- |
+-- | **Lista nu e a mea.** E §4.2 din `docs/usecases/attestation-protocol.md`, „On-chain refusals a
+-- | user can actually reach", care are deja o coloană „What the UI should say" per cod — și, mai
+-- | important, analiza pe care un dicționar derivat din comentariile validatorului nu o are: CUM
+-- | ajunge omul acolo. Prima variantă a acestui dicționar a fost derivată din validator și greșea
+-- | cauza în două locuri: `Mq`/`Md6` nu înseamnă „a stat nesemnată prea mult", ci că portofelul a
+-- | lărgit intervalul de validitate peste 14,4 ore; iar `D9` e un decalaj de ceas între client și
+-- | lanț, nu un termen pe care omul l-ar putea grăbi.
+-- |
+-- | Același document cere exact traducerea asta, la `attestation-protocol.md:812`: „**never show
+-- | this raw.** Map the first code or fall back to «The protocol refused this transaction
+-- | (<codes>)»." Era o obligație scrisă și neîndeplinită.
+-- |
+-- | Deliberat parțial, și nu din lene. Din cele 54 de coduri ale protocolului, restul sunt fie
+-- | invariante interne — cheltuirea sămânței pentru unicitate, blocarea la adresa validatorului —
+-- | fie prinse înainte de lanț de verificările off-chain din §4.1, care întorc un cod propriu. Un
+-- | mesaj pentru un cod care nu ajunge niciodată e cod mort; o propoziție care i-ar sugera omului ce
+-- | să schimbe pentru o regulă internă e un sfat inventat. Pentru alea se arată codul, care e
+-- | lucrul verificabil.
+traceCodeMeaning :: String -> Maybe String
+traceCodeMeaning = case _ of
+  -- O pauză care a aterizat între construire și trimitere.
+  "M0" -> Just pausedMsg
+  "A7" -> Just pausedMsg
+  "D7" -> Just pausedMsg
+  "P6" -> Just pausedMsg
+
+  -- Cine ești și despre cine vorbești.
+  "Mr" -> Just "A profile cannot vouch for itself. The subject and the issuer are the same profile here."
+  "Mg" -> Just "A vouch can only be about a profile — not about another vouch, a challenge, or a user token."
+
+  -- Credențiale.
+  "Mc2" -> Just "Use the credential-binding flow rather than the vouch form: a credential record has to name the credential it binds."
+  "Mc3" -> Just "The credential's own signature — or, for a script credential, its proving input — is missing from this transaction."
+
+  -- Depozitul, la deschiderea unei provocări.
+  "Md8" -> Just "Use a funded address for the refund, or leave the field empty and let us choose one: the refund address has to put an input into this transaction."
+  "Mda" -> Just "The refund address has to be an ordinary wallet address. A script address cannot receive the deposit back."
+
+  -- Timp.
+  "Mq" -> Just widenedWindowMsg
+  "Md6" -> Just widenedWindowMsg
+  "D9" -> Just "Not yet — the chain does not agree the deadline has passed. Try again shortly; this is usually a clock difference between your browser and the chain."
+
+  -- Curse: altcineva, sau alt tab, a ajuns primul.
+  "A3" -> Just "Already countersigned. Acceptance happens once and cannot be repeated."
+  "D3" -> Just "Already decided. A verdict is written once."
+  "D1" -> Just "Only the arbiter can sign a verdict, and this transaction was signed by another key."
+
+  _ -> Nothing
+  where
+  pausedMsg = "The registry was paused while you were signing. Nothing can be written until whoever holds that authority resumes it."
+  widenedWindowMsg =
+    "Your wallet widened the transaction's validity window past what the protocol accepts. Build it \
+    \again, or try a different wallet."

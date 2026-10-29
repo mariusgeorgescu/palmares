@@ -19,10 +19,10 @@ import Prelude
 
 import AppEnv (Env)
 import Capabilities.Interaction.MonadInteract (class MonadInteract, buildFlow, interactionStatus, submitSigned, txStatus)
-import Capabilities.Query.Gov.Http (renderApiError)
+import Capabilities.Query.Gov.Http (ApiError(..), renderApiError)
 import Capabilities.Wallet.Governance (class MonadGovWallet, GateVerdict(..), blockMessage, connectGovernance, hasExtension)
 import AppEnv as AppEnv
-import Capabilities.Interaction.Types (InteractionStatus(..), OracleGate(..), OracleParams(..), UserAddresses, oracleGate)
+import Capabilities.Interaction.Types (InteractionStatus(..), OracleGate(..), OracleParams(..), UserAddresses, explainRefusal, oracleGate)
 import Components.Shared.OnchainId as OnchainId
 import Components.Shared.DRepIdentity (shortId)
 import Components.Write.Flows (FieldKind(..), WriteGate(..), buildRequest, flowSpecs, missingFields, specFor, writeGate)
@@ -98,6 +98,28 @@ data Action
   | SetField String String
   | Submit
   | SignAndSubmit String
+
+-- | Textul unui eșec, cu refuzul lanțului tradus când se poate.
+-- |
+-- | Înainte, un refuz de validator ajungea la om exact cum îl scrie serverul: „A validator refused
+-- | this transaction: Mr. These are on-chain trace codes; see docs/architecture/onchain-flows.md" —
+-- | un cod de două litere și o cale către un document pe care serviciul nu îl servește. Și ajungea
+-- | acolo în cel mai prost moment posibil: după ce omul completase formularul și ceruse semnătura.
+-- |
+-- | Codurile rămân în mesaj, fiindcă ele sunt lucrul verificabil; ce se adaugă e ce să faci.
+failureText :: ApiError -> String
+failureText e = case e of
+  Api r -> case explainRefusal r of
+    Nothing -> renderApiError e
+    Just x
+      | null x.meanings ->
+          "The chain refused this transaction with rule " <> String.joinWith " " x.codes
+            <>
+              ". That is an internal protocol rule rather than something you typed, so the codes \
+              \are what to quote if you report it."
+      | otherwise ->
+          String.joinWith " " x.meanings <> " (refused with " <> String.joinWith " " x.codes <> ")"
+  _ -> renderApiError e
 
 component
   :: forall q m
@@ -179,7 +201,7 @@ component =
               H.modify_ _ { step = Submitting }
               res <- submitSigned { txUnsigned: tx, txWit: witness }
               case res of
-                Left e -> H.modify_ _ { step = Failed (renderApiError e) }
+                Left e -> H.modify_ _ { step = Failed (failureText e) }
                 Right txId -> do
                   H.modify_ _ { step = Submitted txId }
                   -- O singură verificare, nu o buclă: confirmarea vine în minute, iar un ecran
@@ -213,7 +235,7 @@ component =
             res <- buildFlow req
             H.modify_ _
               { step = case res of
-                  Left e -> Failed (renderApiError e)
+                  Left e -> Failed (failureText e)
                   Right tx -> Built tx
               }
     _, _ -> pure unit

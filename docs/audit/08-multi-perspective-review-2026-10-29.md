@@ -55,20 +55,20 @@ every row in it was written by this project's own smoke scripts.
 | 1 | **`/profiles/by-credential/{cip129}` has no screen.** The route the docs call "the verify direction", measured returning `total: 6`, with **zero** frontend call sites. `DRepDetail` — the screen a delegator actually lands on — never mentions a credential outside a raw hex label | half a day | Deferred by owner decision, to be taken separately. This is the single change that makes the relationship legible from both sides |
 | 2 | **Nothing resolves the connected wallet to its own profile.** `/profiles/by-user-token/{asset-class}` works and the project's own docs call it "the entry point to the entire wallet-side product"; zero call sites. So three write fields must be hand-pasted | days | Needs the policy id from `/status` plus a filter over the wallet's assets |
 | 3 | **The register is unfindable from the search box on every screen.** `Query/Gov.hs` returns a literal empty array for the `profiles` and `attestations` groups — four CTEs exist for the governance groups, none for the two object types the product is about | days | `?q=` on `/profiles` already returns 12; the client half is cheap, the `/search` CTEs are not |
-| 4 | **Validator refusals reach the user as a two-letter trace code** and a path to a file the service does not serve | afternoon | The off-chain `subject /= issuer` check beside `SubjectProfileNotFound` is the cheapest half |
+| ~~4~~ | ✅ **FIXED.** Validator refusals reached the user as a two-letter trace code and a path to a file the service does not serve | afternoon | The off-chain `subject /= issuer` check beside `SubjectProfileNotFound` is the cheapest half |
 | 5 | **The script half of the lead promise cannot be done from the UI** at all — the witness field does not exist in `claim-credential` | afternoon to qualify, days to build | The copy is now honest about it; the capability is still missing |
 | 6 | **`image_uri` is collected six times and rendered nowhere.** Required on `claim-profile`, costs min-ADA in every datum, appears in exactly one component file: the form that asks for it | afternoon | And it duplicates CIP-119's `image`, which carries a `sha256` where this carries none. See §CIP-119 below |
-| 7 | **Four components reimplement an id→name directory** with `limit=200` into component-local state. The challenge page pulls both full registers to print two names, with a silent cap | afternoon | `getProfile`/`getAttestation` are already class members |
+| ~~7~~ | ✅ **FIXED on the two detail pages.** Four components reimplemented an id→name directory with `limit=200` into component-local state. The challenge page pulls both full registers to print two names, with a silent cap | afternoon | `getProfile`/`getAttestation` are already class members |
 | 8 | **The registry lists have no filter or sort controls** — zero `select`, zero `input`, no sortable header — while `order_by`/`sort_order`/`kind`/`subject`/`issuer` all travel through the codec | afternoon | Half-wired in four directions; none of it bites today |
 | 9 | **Eighteen byte-identical loading cards and twelve identical retry alerts**, three of each added by the detail-page block | days | Against the project's own precedent: `Shared/Pager.purs` exists because nine copies of one function were nine places to fix a sentence |
-| 10 | **`sameSection` exists twice** — `NavBar` maps routes to strings, `Sidebar` matches pairwise. Both had to be edited for each of the three new routes | afternoon | One `section :: Route -> String` in `Route.purs` serves both |
-| 11 | **Test debt sits on the half the detail-page block shipped.** The mocks discard their filter arguments, so the fixture suite is structurally unable to catch a filter that does not reach the API — which is exactly the defect that shipped | afternoon | A unit assertion on the built href is the fix; the suite already does this for DRep filters |
-| 12 | **A sixth order-dependence**: `all-flows-sign.spec.js:88` picks the attestation to challenge with `items[0]`, and `/attestations` is ordered by slot descending | afternoon | The guard for exactly this was added two commits earlier, elsewhere |
-| 13 | **`PALMARES_M2_SUBMIT` is undocumented** — the README's submit tier names `PALMARES_FLOWS_SUBMIT`, which only two of the three files read | minutes | |
-| 14 | **The frontend blocks `expire-dispute` while the oracle is paused**, though the chain deliberately leaves that one write unlockable | afternoon | It is the only write that must not depend on anyone |
-| 15 | **"Anyone can state… anyone can challenge"** is false: the chain requires a minted profile and its user token | minutes | Eight words |
-| 16 | **Empty states assert the whole register is empty from a filtered page** | afternoon | They take no argument |
-| 17 | **The frontend's own four docs are the untouched scaffold template**, titled "Cardano dApp Frontend Template" | afternoon | Deleting the stale sections beats rewriting them |
+| ~~10~~ | ✅ **FIXED.** `sameSection` existed twice — `NavBar` maps routes to strings, `Sidebar` matches pairwise. Both had to be edited for each of the three new routes | afternoon | One `section :: Route -> String` in `Route.purs` serves both |
+| ~~11~~ | ✅ **FIXED.** Test debt sat on the half the detail-page block shipped. The mocks discard their filter arguments, so the fixture suite is structurally unable to catch a filter that does not reach the API — which is exactly the defect that shipped | afternoon | A unit assertion on the built href is the fix; the suite already does this for DRep filters |
+| ~~12~~ | ✅ **FIXED.** A sixth order-dependence: `all-flows-sign.spec.js:88` picks the attestation to challenge with `items[0]`, and `/attestations` is ordered by slot descending | afternoon | The guard for exactly this was added two commits earlier, elsewhere |
+| ~~13~~ | ✅ **FIXED.** `PALMARES_M2_SUBMIT` was undocumented — the README's submit tier names `PALMARES_FLOWS_SUBMIT`, which only two of the three files read | minutes | |
+| ~~14~~ | ✅ **FIXED.** The frontend blocked `expire-dispute` while the oracle is paused, though the chain deliberately leaves that one write unlockable | afternoon | It is the only write that must not depend on anyone |
+| ~~15~~ | ✅ **FIXED.** "Anyone can state… anyone can challenge" was false: the chain requires a minted profile and its user token | minutes | Eight words |
+| ~~16~~ | ✅ **FIXED.** Empty states asserted the whole register is empty from a filtered page | afternoon | They take no argument |
+| ~~17~~ | ✅ **FIXED for the two that were stale.** The frontend's own docs were the untouched scaffold template, titled "Cardano dApp Frontend Template" | afternoon | Deleting the stale sections beats rewriting them |
 | 18 | **No Prometheus `/metrics`**, and note the collision: `/metrics/formulas` already exists and is something else | days | Known before this review |
 | 19 | **No rate limiting.** By query-api's own design note it is the BFF's job, and the BFF now exists | days | Known before this review |
 
@@ -118,3 +118,23 @@ So, honestly:
   segment leaked.
 - **The decoder discipline the project was burned by once is holding**: every nullable field the API
   actually sends `null` for uses `.:?`.
+
+## Status, 2026-10-29 end of day
+
+Eleven of the nineteen open rows are closed, marked above. The deploy caught up too: all four
+images now run the same commit, and the swagger served at `/api/query/swagger-api.json` reports
+`1.12.1` with the false sentence gone — verified live, not inferred.
+
+What is left is the three that are features rather than defects — the `by-credential` screen
+(deferred by the owner, to be taken separately), resolving the connected wallet to its own profile,
+and the two `/search` CTEs — plus the cheap tail: the eighteen loading cards, filter controls on the
+lists, the `docs/` rename (22 files), rate limiting, and a Prometheus endpoint.
+
+One correction to this report's own framing, recorded because it changes how to read row 4. The
+trace-code translation it asks for was **already specified**: `docs/usecases/attestation-protocol.md`
+§4.2 holds a thirteen-row table of "On-chain refusals a user can actually reach", each with a "What
+the UI should say" column, and line 812 of the same document says in as many words "**never show
+this raw.**" So that row was not a reviewer's opinion about polish — it was a written obligation the
+interface had never met. The dictionary now in `Capabilities/Interaction/Types.purs` is that table,
+not a fresh derivation: a first attempt derived from the validators' own comments got the *cause*
+wrong in two places, which the specification had already reasoned out.

@@ -8,7 +8,7 @@ module Test.Capabilities.WriteSpec (spec) where
 import Prelude
 
 import AppEnv (NetworkMagic(..), mainnetMagic, preprodMagic, previewMagic)
-import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams(..), encodeFlow, flowPath, oracleGate)
+import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams(..), encodeFlow, explainRefusal, flowPath, oracleGate, traceCodeMeaning)
 import Capabilities.Wallet.Governance (BlockReason(..), WalletCapabilities, blockMessage, impliedMagic, verdictOf)
 import Components.Write.Flows (WriteGate(..), buildRequest, flowSpecs, missingFields, specFor, writeGate)
 import Components.Write.TxSummary (summariseJson)
@@ -16,6 +16,7 @@ import Data.Argonaut.Core (stringify)
 import Data.Array (head, length, nub)
 import Data.Map as Map
 import Data.Tuple.Nested ((/\))
+import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.String as String
 import Test.Spec (Spec, describe, it)
@@ -125,6 +126,42 @@ spec = do
       String.contains (String.Pattern "nine actions") (blockMessage NoGovernanceKeys) `shouldEqual` true
       String.contains (String.Pattern "preprod") (blockMessage (WrongNetwork preprodMagic (NetworkMagic 2)))
         `shouldEqual` false
+
+  describe "what the chain refused, in words" do
+    let
+      refusal cs = { code: "ScriptRefused", message: "A validator refused this transaction: " <> cs <> ". These are on-chain trace codes; see docs/architecture/onchain-flows.md for what each one requires." }
+
+    it "pulls the codes out of the server's sentence" do
+      map _.codes (explainRefusal (refusal "Mr")) `shouldEqual` Just [ "Mr" ]
+      map _.codes (explainRefusal (refusal "Mg Md4")) `shouldEqual` Just [ "Mg", "Md4" ]
+
+    it "translates the rules a person can actually trigger from a form" do
+      -- Fiecare propoziție e derivată din comentariul codului din validator. `Mr` e cea pe care am
+      -- lovit-o chiar noi: ai numit propriul profil ca subiect.
+      map (length <<< _.meanings) (explainRefusal (refusal "Mr")) `shouldEqual` Just 1
+      map (length <<< _.meanings) (explainRefusal (refusal "D9")) `shouldEqual` Just 1
+      -- Setul e cel din §4.2 a specificației, nu unul derivat de noi din validator: acolo e deja
+      -- analizat CUM ajunge omul la fiecare cod. Cele treisprezece intrări ale ei, toate acoperite.
+      for_ [ "M0", "A7", "D7", "P6", "Mr", "Mg", "Mc2", "Mc3", "Md8", "Mda", "Mq", "Md6", "D9", "A3", "D3", "D1" ] \c ->
+        isJust (traceCodeMeaning c) `shouldEqual` true
+
+    it "says nothing about an internal invariant rather than inventing advice" do
+      -- `Mh` e cheltuirea sămânței pentru unicitate; un om nu o poate declanșa completând un
+      -- formular, iar o propoziție care i-ar sugera ce să schimbe ar fi un sfat inventat.
+      traceCodeMeaning "Mh" `shouldEqual` Nothing
+      traceCodeMeaning "Mk" `shouldEqual` Nothing
+      -- Și cele prinse off-chain înaintea lanțului (§4.1), care deci nu ajung aici niciodată.
+      traceCodeMeaning "Mf" `shouldEqual` Nothing
+      traceCodeMeaning "A5" `shouldEqual` Nothing
+      map _.meanings (explainRefusal (refusal "Mh")) `shouldEqual` Just []
+      -- dar codul rămâne, fiindcă el e lucrul verificabil
+      map _.codes (explainRefusal (refusal "Mh")) `shouldEqual` Just [ "Mh" ]
+
+    it "degrades instead of lying when it does not recognise the shape" do
+      -- Dacă formatul din `Exceptions.hs` se schimbă, parsarea întoarce `Nothing` și ecranul arată
+      -- mesajul serverului ca înainte. Asta e singurul mod în care are voie să cedeze.
+      explainRefusal { code: "ScriptRefused", message: "something else entirely" } `shouldEqual` Nothing
+      explainRefusal { code: "InsufficientFunds", message: "A validator refused this transaction: Mr." } `shouldEqual` Nothing
 
   describe "the write gate" do
     it "needs a wallet for every flow, because without one there is no signature" do
