@@ -11,7 +11,7 @@ module Store
 
 import Prelude
 
-import Cardano.Wallet.Cip30 (Api)
+import Capabilities.Wallet.Governance (GateVerdict)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 
@@ -26,20 +26,31 @@ unUsername (Username s) = s
 
 -- | Global application store. Add fields as your dApp grows — e.g.
 -- | active profile, pending transactions, network mismatch, refresh keys.
+-- |
+-- | __Wallet-ul stă AICI, și e singura stare de wallet din aplicație.__ Înainte erau două: bara de
+-- | sus ținea conexiunea în componenta de wallet, iar ecranul de scriere își conecta una a lui,
+-- | cu `getAvailableWallets` direct. Cele două nu se vedeau între ele, deci un om care conecta în
+-- | bară găsea „Connect a wallet" pe „Actions", iar unul care conecta pe „Actions" vedea bara
+-- | neconectată. Nu era o scăpare de sincronizare, erau două surse de adevăr.
+-- |
+-- | Ce se ține e VERDICTUL, nu doar API-ul: poarta de guvernanță cere extensiile la `enable`
+-- | (CIP-95/142), deci se poate constata o singură dată, la conectare, și nu la fiecare intrare pe
+-- | ecranul de scriere. Un `Api` fără extensii nu e bun de scris, iar unul cu ele nu trebuie
+-- | re-negociat.
 type Store =
-  { walletApi :: Maybe Api
+  { wallet :: Maybe GateVerdict
   , user :: Maybe Username
   }
 
 initialStore :: Store
 initialStore =
-  { walletApi: Nothing
+  { wallet: Nothing
   , user: Nothing
   }
 
 -- | Store actions. Add more cases as your dApp grows.
 data Action
-  = Connect Api
+  = Connect GateVerdict
   | Disconnect
   | SetUser Username
   | ClearUser
@@ -47,7 +58,7 @@ data Action
 -- | Pure reducer for store actions.
 reduce :: Store -> Action -> Store
 reduce store = case _ of
-  Connect api -> store { walletApi = Just api }
-  Disconnect -> store { walletApi = Nothing, user = Nothing }
+  Connect verdict -> store { wallet = Just verdict }
+  Disconnect -> store { wallet = Nothing, user = Nothing }
   SetUser name -> store { user = Just name }
   ClearUser -> store { user = Nothing }

@@ -24,6 +24,7 @@
 // expire nu au pe ce lucra. Asta nu e o lipsă de acoperire din neglijență, e o dependență: ultimele
 // trei rânduri cer, în ordine, o trimitere, cheia ownerului, și treizeci de zile.
 import { expect, test } from 'cip30-test-wallet/playwright';
+import { connectFromNavbar } from './connect.js';
 
 const FUNDED = process.env.PALMARES_WALLET_FUNDED === '1';
 const WALLET = 'palmaresFlows';
@@ -141,7 +142,7 @@ test.describe('every buildable write flow, signed but not submitted', () => {
 
     await withCip142(page);
     await page.goto(`/write?flow=${flow}`);
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
 
     const signsBefore = (await wallet.calls('signTx')).length;
@@ -266,7 +267,7 @@ test.describe('every buildable write flow, signed but not submitted', () => {
 
     await withCip142(page);
     await page.goto('/write?flow=resolve-dispute');
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
 
     await set(page, 'Challenge', disputeId);
@@ -291,7 +292,7 @@ test.describe('every buildable write flow, signed but not submitted', () => {
 
     await withCip142(page);
     await page.goto('/write?flow=expire-dispute');
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
 
     await set(page, 'Challenge', disputeId);

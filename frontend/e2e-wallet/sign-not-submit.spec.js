@@ -13,6 +13,7 @@
 //   PALMARES_WALLET_URL=https://gov.cardano.vip PALMARES_WALLET_FUNDED=1 \
 //   npx playwright test --config playwright.wallet.config.js e2e-wallet/sign-not-submit.spec.js
 import { expect, test } from 'cip30-test-wallet/playwright';
+import { connectFromNavbar } from './connect.js';
 
 const FUNDED = process.env.PALMARES_WALLET_FUNDED === '1';
 const WALLET = 'palmaresFunded';
@@ -96,7 +97,7 @@ test.describe('the wallet really signs, and the bytes stop at the last edge', ()
     );
 
     await page.goto('/write?flow=claim-profile');
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
 
     await page.getByLabel('Kind', { exact: false }).first().selectOption('person_d_rep');

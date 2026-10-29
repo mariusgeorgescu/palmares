@@ -13,6 +13,7 @@
 //   PALMARES_WALLET_FUNDED=1 PALMARES_WALLET_MNEMONIC="..." \
 //   npx playwright test --config playwright.wallet.config.js e2e-wallet/build-and-summarise.spec.js
 import { expect, test } from 'cip30-test-wallet/playwright';
+import { connectFromNavbar } from './connect.js';
 
 const FUNDED = process.env.PALMARES_WALLET_FUNDED === '1';
 const WALLET = 'palmaresFunded';
@@ -68,7 +69,7 @@ test.describe('a real transaction, built and read back', () => {
   test('builds a profile claim and decodes what it does, without signing', async ({ page, wallet }) => {
     await withCip142(page);
     await page.goto('/write?flow=claim-profile');
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
 
     await page.getByLabel('Kind', { exact: false }).first().selectOption('person_d_rep');

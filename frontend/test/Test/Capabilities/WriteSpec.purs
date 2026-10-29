@@ -8,15 +8,16 @@ module Test.Capabilities.WriteSpec (spec) where
 import Prelude
 
 import AppEnv (NetworkMagic(..), mainnetMagic, preprodMagic, previewMagic)
-import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams(..), encodeFlow, explainRefusal, flowPath, oracleGate, traceCodeMeaning)
+import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams(..), confirmPollDelayMs, confirmPollMax, encodeFlow, explainRefusal, flowPath, oracleGate, traceCodeMeaning)
 import Capabilities.Wallet.Governance (BlockReason(..), WalletCapabilities, blockMessage, impliedMagic, verdictOf)
+import Components.Shared.Toast as Toast
 import Components.Write.Flows (WriteGate(..), buildRequest, flowSpecs, missingFields, specFor, writeGate)
 import Components.Write.TxSummary (summariseJson)
 import Data.Argonaut.Core (stringify)
-import Data.Array (head, length, nub)
+import Data.Array (head, length, nub, (..))
 import Data.Map as Map
 import Data.Tuple.Nested ((/\))
-import Data.Foldable (for_)
+import Data.Foldable (for_, sum)
 import Data.Maybe (Maybe(..), isJust, isNothing)
 import Data.String as String
 import Test.Spec (Spec, describe, it)
@@ -185,6 +186,31 @@ spec = do
       writeGate OraclePaused true "open-dispute" `shouldEqual` OracleNote OraclePaused
       writeGate OracleUnknown true "issue-attestation" `shouldEqual` OracleNote OracleUnknown
 
+  -- Confirmarea vine în minute, iar omul pleacă de pe ecranul de scriere între timp. Ce se
+  -- întîmplă după plecare e singurul lucru care nu poate fi testat pe ecran: aici se testează
+  -- bucățile pure din el — cît trăiește un mesaj, și cît timp se așteaptă lanțul.
+  describe "notifications outlive the screen that produced them" do
+    it "counts a toast down and drops it on the tick that empties it" do
+      let t = Toast.toast Toast.Success "it landed"
+      t.secondsLeft `shouldEqual` 6
+      map _.secondsLeft (Toast.tick [ t ]) `shouldEqual` [ 5 ]
+      -- Al șaselea tic e cel care o scoate, nu al cincilea: ceasul rădăcinii se oprește cînd lista
+      -- se golește, iar dacă golirea ar veni cu un tic mai devreme mesajul s-ar vedea cinci
+      -- secunde, nu șase.
+      length (tickN 5 [ t ]) `shouldEqual` 1
+      length (tickN 6 [ t ]) `shouldEqual` 0
+
+    it "waits about three minutes for the chain, in a rhythm that matches a block" do
+      confirmPollMax `shouldEqual` 24
+      confirmPollDelayMs 0 `shouldEqual` 10_000.0
+      confirmPollDelayMs 5 `shouldEqual` 10_000.0
+      confirmPollDelayMs 6 `shouldEqual` 5_000.0
+      confirmPollDelayMs 17 `shouldEqual` 5_000.0
+      confirmPollDelayMs 18 `shouldEqual` 10_000.0
+      -- Suma e lucrul care contează cu adevărat: dacă cineva schimbă o treaptă, bugetul total nu
+      -- trebuie să plece pe nesimțite la o jumătate de oră de interogări în fundal.
+      sum (map confirmPollDelayMs (0 .. (confirmPollMax - 1))) `shouldEqual` 180_000.0
+
   describe "the nine flows" do
     it "are nine, with distinct ids and distinct server paths" do
       length flowSpecs `shouldEqual` 9
@@ -313,6 +339,10 @@ spec = do
       -- Un sumar cu „fee 0" pe o tranzactie necitita ar fi exact minciuna pe care R8 o interzice.
       isNothing (summariseJson "{\"outputs\":[]}") `shouldEqual` true
       isNothing (summariseJson "not json") `shouldEqual` true
+
+-- | `n` tic-uri de ceas, aplicate pe rînd.
+tickN :: Int -> Array Toast.Toast -> Array Toast.Toast
+tickN n ts = if n <= 0 then ts else tickN (n - 1) (Toast.tick ts)
 
 -- | Un `/status` de pornire, peste care testele schimbă doar cîmpul care contează.
 baseStatus :: { provider :: String, network :: String, deployedScripts :: Boolean, oraclePaused :: Maybe Boolean, oracle :: Maybe OracleParams }

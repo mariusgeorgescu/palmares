@@ -23,6 +23,8 @@ module Capabilities.Interaction.Types
   , InteractionStatus(..)
   , oracleGate
   , OracleGate(..)
+  , confirmPollMax
+  , confirmPollDelayMs
   ) where
 
 import Prelude
@@ -418,3 +420,25 @@ traceCodeMeaning = case _ of
   widenedWindowMsg =
     "Your wallet widened the transaction's validity window past what the protocol accepts. Build it \
     \again, or try a different wallet."
+
+-- | Cît timp se așteaptă confirmarea, și cu ce ritm.
+-- |
+-- | Programul nu e uniform pentru că nici așteptarea nu e: primele secunde după trimitere nu pot
+-- | aduce nimic — tranzacția abia se propagă — deci o interogare pe secundă acolo e trafic pur. Pe
+-- | preprod un bloc vine la ~20s, iar confirmarea se vede de obicei în primul minut, deci acolo se
+-- | întreabă des. După două minute, dacă încă nu s-a văzut, probabil nu e o chestiune de răbdare.
+-- |
+-- |   * interogările 0–5:   10s fiecare (primul minut);
+-- |   * interogările 6–17:   5s fiecare (minutul în care se vede de obicei);
+-- |   * interogările 18–23: 10s fiecare (ultimul minut).
+-- |
+-- | În total 24 de interogări, ~3 minute. Pe urmă se spune că n-a fost văzută, NU că a eșuat —
+-- | tranzacția e trimisă, iar singurul lucru care s-a terminat e răbdarea noastră.
+confirmPollMax :: Int
+confirmPollMax = 24
+
+confirmPollDelayMs :: Int -> Number
+confirmPollDelayMs n
+  | n < 6 = 10_000.0
+  | n < 18 = 5_000.0
+  | otherwise = 10_000.0

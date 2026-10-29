@@ -17,6 +17,7 @@
 // Testul verifică ÎNTÂI că disputa e chiar expirabilă și se oprește cu un mesaj care spune data,
 // nu cu un eșec obscur: rulat prea devreme, trebuie să explice de ce, nu să pară rupt.
 import { expect, test } from 'cip30-test-wallet/playwright';
+import { connectFromNavbar } from './connect.js';
 
 const SUBMIT = process.env.PALMARES_FLOWS_SUBMIT === '1';
 const WALLET = 'palmaresFlows';
@@ -128,7 +129,7 @@ test.describe('expire-dispute, on chain from the browser', () => {
 
     await withCip142(page);
     await page.goto(`/write?flow=expire-dispute&subject=${encodeURIComponent(undecided.id)}`);
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
 
     await page.getByLabel('Challenge', { exact: false }).first().fill(undecided.id);

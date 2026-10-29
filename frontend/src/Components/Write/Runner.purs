@@ -10,7 +10,8 @@
 -- | de la început, cu motivul, și formularul nici nu se desenează.
 module Components.Write.Runner
   ( Slot
-  , Output
+  , Query(..)
+  , Output(..)
   , _writeRunner
   , component
   ) where
@@ -18,9 +19,9 @@ module Components.Write.Runner
 import Prelude
 
 import AppEnv (Env)
-import Capabilities.Interaction.MonadInteract (class MonadInteract, buildFlow, interactionStatus, submitSigned, txStatus)
+import Capabilities.Interaction.MonadInteract (class MonadInteract, buildFlow, interactionStatus, submitSigned)
 import Capabilities.Query.Gov.Http (ApiError(..), renderApiError)
-import Capabilities.Wallet.Governance (class MonadGovWallet, GateVerdict(..), blockMessage, connectGovernance, hasExtension)
+import Capabilities.Wallet.Governance (class MonadGovWallet, GateVerdict(..), blockMessage, capabilitiesOf, connectGovernance, hasExtension)
 import AppEnv as AppEnv
 import Capabilities.Interaction.Types (InteractionStatus(..), OracleGate(..), OracleParams(..), UserAddresses, explainRefusal, oracleGate)
 import Components.Shared.OnchainId as OnchainId
@@ -31,7 +32,6 @@ import Format (enumLabel, formatAda, pluralize)
 import Control.Monad.Reader (class MonadAsk)
 import Cardano.Wallet.Cip30 (Api, getAvailableWallets, getChangeAddress, getUsedAddresses, signTx)
 import Data.Array (length, null)
-import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Map (Map)
 import Data.Map as Map
@@ -47,13 +47,28 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
+import Halogen.Store.Monad (class MonadStore, emitSelected, getStore, updateStore)
+import Halogen.Store.Select (selectAll)
 import Route (Route)
 import Route.GovQueries (WriteFilters, writeHrefFor)
+import Store as Store
 import Type.Proxy (Proxy(..))
 
-type Slot = H.Slot (Const Void) Output Unit
+type Slot = H.Slot Query Output Unit
 
-type Output = Void
+-- | Ce raportează ecranul în sus.
+data Output
+  -- | Tranzacția e trimisă și așteaptă confirmarea. De aici încolo o urmărește învelișul, nu
+  -- | ecranul: confirmarea vine în minute, iar omul pleacă între timp — se uită la profilul pe
+  -- | care tocmai l-a atestat. Starea de aici moare la demontare, deci un ecran care și-ar
+  -- | urmări singur tranzacția ar pierde chiar răspunsul pentru care a așteptat.
+  = TxSubmitted { txId :: String, label :: String }
+
+-- | Ce poate întreba învelișul.
+data Query a
+  -- | Învelișul a văzut confirmarea. Dacă ecranul mai e montat, o arată — altfel rămîne
+  -- | notificarea, care e tot ce trebuia.
+  = MarkConfirmed String a
 
 _writeRunner :: Proxy "writeRunner"
 _writeRunner = Proxy
@@ -79,6 +94,10 @@ data Step
 type State =
   { filters :: WriteFilters
   , values :: Map String String
+  -- Oglinda wallet-ului din `Store`, care e SINGURA stare de wallet din aplicație. Ecranul ăsta
+  -- nu conectează nimic: înainte o făcea, cu `getAvailableWallets` și butoanele lui, iar rezultatul
+  -- erau două conexiuni care nu se vedeau între ele — bara de sus arăta conectat și ecranul cerea
+  -- un wallet, sau invers. `render` nu poate citi din `Store` (e pur), deci oglinda stă în stare.
   , gate :: Maybe GateVerdict
   -- Starea protocolului, citită o dată la intrarea pe ecran.
   , oracle :: Maybe InteractionStatus
@@ -87,6 +106,9 @@ type State =
   -- oprit") la fiecare încărcare, timp de o clipă, înainte să se liniștească. Un avertisment care
   -- apare și dispare singur învață omul să nu citească avertismentele.
   , oracleAsked :: Boolean
+  -- Lista se citește tot aici, dar numai pentru PROPOZIȚIE: „niciun wallet instalat" și „conectează
+  -- din bara de sus" sînt două situații diferite, iar un singur mesaj pentru amîndouă ar trimite pe
+  -- cineva să caute un buton care n-are ce să deschidă.
   , wallets :: Array String
   , step :: Step
   }
@@ -94,7 +116,8 @@ type State =
 data Action
   = Initialize
   | Receive Input
-  | Connect String
+  | StoreChanged Store.Store
+  | Retry
   | SetField String String
   | Submit
   | SignAndSubmit String
@@ -121,21 +144,40 @@ failureText e = case e of
           String.joinWith " " x.meanings <> " (refused with " <> String.joinWith " " x.codes <> ")"
   _ -> renderApiError e
 
+-- | Confirmarea nu se vede de aici, se AFLĂ de la înveliș. Ecranul doar o arată, și numai dacă
+-- | încă e pe tranzacția aceea: cine a trimis între timp alta nu vrea să i se schimbe cardul sub
+-- | ochi.
+-- |
+-- | Stă la nivel de modul, nu în `where`-ul componentei: o funcție care trebuie să fie
+-- | poliformică în `a` nu se poate adnota acolo — PureScript n-are variabile de tip cu domeniu
+-- | lexical — iar fără adnotare `a` scapă din domeniu.
+handleQuery :: forall m a. Query a -> H.HalogenM State Action () Output m (Maybe a)
+handleQuery = case _ of
+  MarkConfirmed txId next -> do
+    H.modify_ \st -> st
+      { step = case st.step of
+          Submitted t | t == txId -> Confirmed t
+          other -> other
+      }
+    pure (Just next)
+
 component
-  :: forall q m
+  :: forall m
    . MonadInteract m
   => MonadAff m
   => MonadEffect m
   => MonadGovWallet m
   => MonadAsk Env m
   => MonadRouter Route m
-  => H.Component q Input Output m
+  => MonadStore Store.Action Store.Store m
+  => H.Component Query Input Output m
 component =
   H.mkComponent
     { initialState: \filters -> { filters, values: seedFrom filters, gate: Nothing, oracle: Nothing, oracleAsked: false, wallets: [], step: Idle }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
+        , handleQuery = handleQuery
         , initialize = Just Initialize
         , receive = Just <<< Receive
         }
@@ -152,9 +194,13 @@ component =
     -- Starea oracolului se cere ÎNAINTE de orice: dacă protocolul e oprit, nu are rost nici
     -- măcar să conectezi wallet-ul.
     Initialize -> do
-      -- Wallet-urile din browser se citesc, nu se presupun: un buton „Connect Lace" pe o mașină
-      -- fără Lace e un buton care nu face nimic, iar unul care spune „Connect wallet" fără să
-      -- zică pe care nu dă omului nicio informație despre ce i se va deschide.
+      -- Întîi abonarea, pe urmă cererile: un răspuns de la `Store` cît timp se aștepta HTTP-ul
+      -- s-ar pierde, iar conectarea din bara de sus e exact lucrul care se întîmplă în acele
+      -- secunde.
+      store <- getStore
+      H.modify_ _ { gate = store.wallet }
+      emitter <- emitSelected selectAll
+      void (H.subscribe (StoreChanged <$> emitter))
       names <- liftEffect getAvailableWallets
       H.modify_ _ { wallets = names }
       res <- interactionStatus
@@ -168,10 +214,24 @@ component =
       st <- H.get
       when (filters /= st.filters) do
         H.modify_ _ { filters = filters, values = seedFrom filters, step = Idle }
-    Connect walletName -> do
-      H.modify_ _ { step = Connecting }
-      verdict <- connectGovernance walletName
-      H.modify_ _ { gate = Just verdict, step = Idle }
+    -- Conectarea și deconectarea se întîmplă în bara de sus, pentru toată aplicația. Aici se
+    -- citește doar rezultatul. Pasul NU se resetează: o tranzacție trimisă rămîne un fapt pe ecran
+    -- chiar dacă wallet-ul s-a deconectat după.
+    StoreChanged store -> H.modify_ _ { gate = store.wallet }
+
+    -- Un refuz fără cale de întoarcere e un fund de sac: cineva care a apăsat „Decline" din
+    -- greșeală, sau care tocmai a schimbat rețeaua în wallet, trebuie să poată reîncerca fără să
+    -- reîncarce pagina. Se reia pe aceeași cheie și se scrie în `Store`, deci bara de sus și
+    -- ecranul ajung în aceeași stare dintr-o singură apăsare.
+    Retry -> do
+      st <- H.get
+      case st.gate of
+        Nothing -> pure unit
+        Just verdict -> do
+          H.modify_ _ { step = Connecting }
+          again <- connectGovernance (capabilitiesOf verdict).walletName
+          updateStore (Store.Connect again)
+          H.modify_ _ { step = Idle }
     SetField k v -> H.modify_ \st -> st { values = Map.insert k v st.values }
     Submit -> do
       st <- H.get
@@ -204,13 +264,9 @@ component =
                 Left e -> H.modify_ _ { step = Failed (failureText e) }
                 Right txId -> do
                   H.modify_ _ { step = Submitted txId }
-                  -- O singură verificare, nu o buclă: confirmarea vine în minute, iar un ecran
-                  -- care ar bate la ușă în fundal ar cheltui bateria cuiva ca să afle un lucru
-                  -- pe care tx-ul îl spune oricum. `Submitted` e deja starea ireversibilă.
-                  confirmed <- txStatus txId
-                  case confirmed of
-                    Right true -> H.modify_ _ { step = Confirmed txId }
-                    _ -> pure unit
+                  -- Urmărirea se predă învelișului, cu un nume citibil: ce se întoarce peste
+                  -- minute e o notificare pe orice ecran, nu o stare pe ăsta.
+                  H.raise (TxSubmitted { txId, label: labelFor st })
         _ -> pure unit
 
   -- Se construiește cu adresele wallet-ului. Nu se semnează aici: semnătura e a wallet-ului, iar
@@ -239,6 +295,12 @@ component =
                   Right tx -> Built tx
               }
     _, _ -> pure unit
+
+  -- Numele fluxului, pentru notificarea care se vede pe alt ecran. „Tranzacția" singur n-ar
+  -- spune CARE, iar cineva poate trimite două în aceeași sesiune.
+  labelFor st = case st.filters.flow >>= specFor of
+    Just spec -> spec.title
+    Nothing -> "The transaction"
 
   -- `OracleUnknown` cît timp n-a răspuns încă: ecranul nu promite nimic pe baza unui răspuns care
   -- n-a venit. Când vine, devine ce spune serverul.
@@ -306,8 +368,14 @@ component =
                 HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
                   [ HH.text "No Cardano wallet is installed in this browser." ]
               else
-                HH.div [ HP.class_ (HH.ClassName "flex flex-wrap gap-2") ]
-                  (map (walletButton st) st.wallets)
+                -- UN SINGUR loc de conectare, și e cel din bara de sus. Ecranul ăsta avea propriile
+                -- butoane, deci aplicația avea două conexiuni care nu se vedeau între ele.
+                HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ]
+                  [ HH.text
+                      "Use the wallet button in the top bar. It is the same connection everywhere \
+                      \on the site, and this screen then says what that wallet can and cannot do \
+                      \here."
+                  ]
             ]
         ]
     Just (Allowed w) ->
@@ -337,20 +405,12 @@ component =
                 [ HH.button
                     [ HP.class_ (HH.ClassName "btn btn-sm")
                     , HP.type_ HP.ButtonButton
-                    , HE.onClick (const (Connect caps.walletName))
+                    , HE.onClick (const Retry)
                     ]
-                    [ HH.text (if st.step == Connecting then "Connecting…" else "Connect " <> caps.walletName) ]
+                    [ HH.text (if st.step == Connecting then "Connecting…" else "Try " <> caps.walletName <> " again") ]
                 ]
             ]
         ]
-
-  walletButton st name =
-    HH.button
-      [ HP.class_ (HH.ClassName "btn btn-sm btn-primary")
-      , HP.type_ HP.ButtonButton
-      , HE.onClick (const (Connect name))
-      ]
-      [ HH.text (if st.step == Connecting then "Connecting…" else "Connect " <> name) ]
 
   -- Cele trei forme de detecție, una lîngă alta. Se arată toate pentru că se CONTRAZIC în
   -- practică, iar un wallet refuzat deși „scrie pe cutie" că suportă extensia e exact cazul în

@@ -18,6 +18,7 @@
 // Fiecare pas e reluabil, fiindcă fiecare pas costă o tranzacție ireversibilă. Vezi
 // `docs/deployment/m2-1-browser-attestation.md`.
 import { expect, test } from 'cip30-test-wallet/playwright';
+import { connectFromNavbar } from './connect.js';
 
 const SUBMIT = process.env.PALMARES_FLOWS_SUBMIT === '1';
 const WALLET = 'palmaresFlows';
@@ -123,7 +124,7 @@ test.describe('the remaining write flows, on chain from the browser', () => {
   const connect = async (page, flow) => {
     await withCip142(page);
     await page.goto(`/write?flow=${flow}`);
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
   };
 

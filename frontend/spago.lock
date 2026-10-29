@@ -832,7 +832,7 @@
       },
       "halogen-cardano-wallet-connect-component": {
         "git": "https://github.com/mariusgeorgescu/halogen-cardano-wallet-connect-component.git",
-        "ref": "fbbb9e2"
+        "ref": "1d0ed37"
       },
       "halogen-daisyui": {
         "git": "https://github.com/mariusgeorgescu/purescript-halogen-daisyui.git",
@@ -1520,7 +1520,7 @@
     "halogen-cardano-wallet-connect-component": {
       "type": "git",
       "url": "https://github.com/mariusgeorgescu/halogen-cardano-wallet-connect-component.git",
-      "rev": "fbbb9e20f457bb82aa30f0c6ec52ed48f2878488",
+      "rev": "1d0ed3700666848ec6289e9f3716e150ae78e60d",
       "dependencies": [
         "aff",
         "aff-promise",

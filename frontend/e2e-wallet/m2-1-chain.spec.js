@@ -20,6 +20,7 @@
 //
 // Vezi `docs/deployment/m2-1-browser-attestation.md`.
 import { expect, test } from 'cip30-test-wallet/playwright';
+import { connectFromNavbar } from './connect.js';
 
 const SUBMIT = process.env.PALMARES_M2_SUBMIT === '1';
 // Reluare. Fiecare pas costă o tranzacție ireversibilă, deci un eșec la pasul 2 nu trebuie să
@@ -96,7 +97,7 @@ test.describe('M2-1: the write path, end to end on preprod', () => {
     await addCip142(page);
     const qs = subject ? `?flow=${flow}&subject=${encodeURIComponent(subject)}` : `?flow=${flow}`;
     await page.goto(`/write${qs}`);
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
   };
 

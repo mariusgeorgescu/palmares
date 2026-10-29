@@ -1,7 +1,9 @@
 -- | Sticky top navbar: brand + route links + wallet connect.
 -- |
--- | Slots `Components.WalletConnectComponent` and mirrors connect/disconnect
--- | events into the global Store so any component can read `walletApi`.
+-- | Slotuiește `Components.WalletConnectComponent` și RAPORTEAZĂ conectarea mai sus, cu cheia
+-- | wallet-ului. Nu decide nimic despre ea: ce poate face un wallet pe lanțul ăsta e politica
+-- | învelișului, iar o bară de navigare care ar negocia extensii de guvernanță ar fi al doilea loc
+-- | din aplicație care știe ce înseamnă „poate scrie".
 module Components.Layout.NavBar
   ( Slot
   , _navbar
@@ -23,6 +25,7 @@ import Cardano.Capabilities.Wallet.MonadCIP30 (class MonadCIP30)
 import Components.Layout.SearchBox as SearchBox
 import Components.WalletConnectComponent as WC
 import Components.WalletConnectComponent (FiatOnrampBehavior(..), RenderMode(..))
+import Cardano.Wallet.Cip30 (WalletName)
 import Data.Const (Const)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
@@ -31,7 +34,6 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter, navigate)
-import Halogen.Store.Monad (class MonadStore, updateStore)
 import Route (Route(..), section)
 import Route.Codec (printRoute)
 import Route.GovQueries
@@ -47,7 +49,6 @@ import Route.GovQueries
   , emptyGraphFilters
   , emptyWriteFilters
   )
-import Store as Store
 import Type.Proxy (Proxy(..))
 import Web.UIEvent.MouseEvent (MouseEvent, toEvent)
 
@@ -62,8 +63,12 @@ type Query :: forall k. k -> Type
 type Query = Const Void
 
 data Output
-  = WalletConnected
+  -- | Cheia CIP-30 a wallet-ului conectat — `lace`, `eternl` —, nu numele afișat.
+  = WalletConnected WalletName
   | WalletDisconnected
+  -- | `enable` a eșuat, cel mai des pentru că omul a închis prompt-ul wallet-ului. E un
+  -- | rezultat, nu o eroare, și trebuie SPUS: altfel butonul arată ca unul mort.
+  | WalletConnectFailed String
 
 type Slots =
   ( walletConnectComponent :: WC.Slot
@@ -92,7 +97,6 @@ component
   => MonadDelay m
   => MonadQueryGov m
   => MonadRouter Route m
-  => MonadStore Store.Action Store.Store m
   => H.Component Query Input Output m
 component =
   H.mkComponent
@@ -289,17 +293,16 @@ component =
     Receive route -> H.modify_ _ { route = route }
     ToggleMenu -> H.modify_ \st -> st { menuOpen = not st.menuOpen }
     HandleWalletConnect WC.WalletConnectedEvent -> do
-      -- Pull the API out of the child component and stash it in the Store so any
-      -- consumer can call CIP-30 operations against it.
-      mApi <- H.request WC._walletConnect unit WC.GetWalletApi
-      case mApi >>= identity of
-        Just api -> do
-          updateStore (Store.Connect api)
-          H.raise WalletConnected
+      -- Cheia, nu numele afișat: învelișul reia `enable` cu extensiile de guvernanță, iar
+      -- `enable` cere cheia. Componenta o păstrează de acum (`GetConnectedWalletKey`); înainte
+      -- dădea doar ce întorsese `getName`, iar inversarea acelei funcții era o ghicitoare cînd
+      -- două extensii raportau același nume.
+      mKey <- H.request WC._walletConnect unit WC.GetConnectedWalletKey
+      case mKey >>= identity of
+        Just key -> H.raise (WalletConnected key)
         Nothing -> pure unit
-    HandleWalletConnect WC.WalletDisconnectedEvent -> do
-      updateStore Store.Disconnect
-      H.raise WalletDisconnected
+    HandleWalletConnect WC.WalletDisconnectedEvent -> H.raise WalletDisconnected
+    HandleWalletConnect (WC.WalletConnectFailedEvent detail) -> H.raise (WalletConnectFailed detail)
     -- Other WC outputs (custom buttons, profile/action events, fiat on-ramp,
     -- copy address) are no-ops in the template — extend as your dApp grows.
     HandleWalletConnect _ -> pure unit

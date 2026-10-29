@@ -10,6 +10,7 @@
 // VIITOR. Asta nu e o limitare a uneltei, e starea lumii — și e exact motivul pentru care poarta
 // noastră are o matrice în loc de un „da/nu".
 import { expect, test } from 'cip30-test-wallet/playwright';
+import { connectFromNavbar } from './connect.js';
 
 const WALLET = 'palmaresTestWallet';
 
@@ -22,7 +23,7 @@ test.describe('a real CIP-30 wallet without CIP-142', () => {
     // Niciun cîmp pînă nu trece poarta.
     await expect(page.getByRole('textbox')).toHaveCount(0);
 
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
 
     await expect(page.getByText('cannot write')).toBeVisible();
     await expect(page.getByText(/unless the wallet supports the CIP-142/)).toBeVisible();
@@ -49,12 +50,16 @@ test.describe('the user declines the connection', () => {
 
   test('leaves the screen usable, not stuck on Connecting', async ({ page }) => {
     await page.goto('/write?flow=claim-profile');
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
 
+    // Mesajul vine ca notificare, din înveliș. Până la patch-ul din bibliotecă nu venea deloc:
+    // `enable` arunca înăuntrul componentei de wallet, handler-ul murea acolo, și apăsarea pe
+    // „Connect" n-avea NICIUN efect vizibil — exact forma pe care comentariile din acest proiect o
+    // numesc fund de sac.
     await expect(page.getByText(/did not connect/)).toBeVisible();
-    // Butonul redevine apăsabil: cineva care a apăsat „Decline" din greșeală trebuie să poată
+    // Și butonul rămâne apăsabil: cineva care a apăsat „Decline" din greșeală trebuie să poată
     // încerca din nou fără să reîncarce pagina.
-    await expect(page.getByRole('button', { name: `Connect ${WALLET}` })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /Connect/ }).first()).toBeEnabled();
   });
 });
 
@@ -93,7 +98,7 @@ test.describe('the same wallet, with the CIP-142 namespace the CIP defines', () 
   test('opens the gate on the expected network, and the form appears', async ({ page }) => {
     await withCip142(1)(page); // 1 = preprod, per CIP-142
     await page.goto('/write?flow=claim-profile');
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
 
     await expect(page.getByText('ready')).toBeVisible();
     // Abia acum apar cîmpurile — asta e tot ce afirmă poarta.
@@ -104,7 +109,7 @@ test.describe('the same wallet, with the CIP-142 namespace the CIP defines', () 
   test('refuses a wallet on another network, naming both', async ({ page }) => {
     await withCip142(764824073)(page); // mainnet
     await page.goto('/write?flow=claim-profile');
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
 
     await expect(page.getByText('cannot write')).toBeVisible();
     await expect(page.getByText(/764824073/)).toBeVisible();
@@ -115,7 +120,7 @@ test.describe('the same wallet, with the CIP-142 namespace the CIP defines', () 
   test('will not build while a required field is empty', async ({ page }) => {
     await withCip142(1)(page);
     await page.goto('/write?flow=claim-profile');
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
     await expect(page.getByText('ready')).toBeVisible();
 
     await expect(page.getByRole('button', { name: /Build the transaction/ })).toBeDisabled();
@@ -172,7 +177,7 @@ test.describe('what the build request actually carries', () => {
     });
 
     await page.goto('/write?flow=claim-profile');
-    await page.getByRole('button', { name: `Connect ${WALLET}` }).click();
+    await connectFromNavbar(page, WALLET);
     await expect(page.getByText('ready', { exact: true })).toBeVisible();
 
     // „Kind" e un <select>, nu un <input>: `fill` pe el dă „Element is not an <input>". Varianta

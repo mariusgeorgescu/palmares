@@ -75,7 +75,7 @@ workspace:
 
     halogen-cardano-wallet-connect-component:
       git: https://github.com/mariusgeorgescu/halogen-cardano-wallet-connect-component.git
-      ref: fbbb9e2
+      ref: 1d0ed37
 
     halogen-router:
       # SHA, nu `main`: F1 check 16 cere un deploy reproductibil, iar o ramură mobilă face
