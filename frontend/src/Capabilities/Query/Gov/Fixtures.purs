@@ -1789,6 +1789,7 @@ attestationListFixture =
       "kind": "credential_claim",
       "date": "2026-10-24T20:57:02Z",
       "accepted": false,
+      "credential": "drep1yfdqa29j3hhsf9lsj490j59t7cgf0k5la5q8nqgkqkahpwq5hl35n",
       "name": "credential claim for smoke-20261024T205314Z",
       "description": "binds the subject profile to its DRep credential",
       "dispute_count": 0,

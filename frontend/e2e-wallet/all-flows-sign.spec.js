@@ -79,13 +79,37 @@ test.describe('every buildable write flow, signed but not submitted', () => {
   // Ce deține portofelul, citit din registru. O constantă ar expira la prima rulare pe alt lanț.
   const stateFrom = async (request) => {
     const profiles = await (await request.get('/api/query/profiles?limit=200')).json();
-    const attestations = await (await request.get('/api/query/attestations?limit=200')).json();
     const mine = profiles.items.filter((p) => (p.name || '').startsWith('m2-1-'));
     expect(
       mine.length,
       'this wallet owns no profile here; run m2-1-chain.spec.js first'
     ).toBeGreaterThan(0);
-    return { profileId: mine[0].id, attestationId: attestations.items[0].id };
+    // `mine[0]` rămâne, și nu e aceeași greșeală ca selecția de mai jos: profilurile `m2-1-*` sînt
+    // toate ale aceluiași portofel, iar cele trei fluxuri de aici cer „un profil deținut", nu unul
+    // anume. Proprietatea cerută e chiar cea pe care filtrul o stabilește, deci poziția nu decide
+    // nimic.
+    return { profileId: mine[0].id };
+  };
+
+  // Atestarea de provocat se alege după proprietatea de care testul are nevoie, nu după poziție.
+  // `items[0]` însemna „ultima scrisă de oricine": `/attestations` e ordonat după slot
+  // descrescător, deci rândul se schimba sub test la fiecare scriere în registru.
+  //
+  // Proprietatea cerută: să nu aibă DEJA o dispută deschisă. Serverul refuză a doua provocare
+  // împotriva aceleiași atestări, iar refuzul vine ÎNAINTE de construire — deci un rând ocupat nu
+  // dădea „refuzat", ci lipsa cardului de sumar, adică un eșec care nu-și spune motivul.
+  // `open_dispute_count` e chiar câmpul pe care query-api îl întoarce pentru asta, deci întrebarea
+  // se pune datelor. Același selector e în `remaining-flows-chain.spec.js`, scris acolo după exact
+  // acest eșec.
+  const disputableOrSkip = async (request) => {
+    const a = await (await request.get('/api/query/attestations?limit=200')).json();
+    const free = a.items.find((x) => (x.open_dispute_count ?? 0) === 0);
+    test.skip(
+      !free,
+      `No vouch left to challenge: examined ${a.items.length} of ${a.total} and every one ` +
+        'already has an open challenge. Resolve or expire one before running this.'
+    );
+    return free.id;
   };
 
   // Construiește prin serverul adevărat, cere sumarul decodat, semnează, și oprește trimiterea.
@@ -185,7 +209,8 @@ test.describe('every buildable write flow, signed but not submitted', () => {
   });
 
   test('open-dispute', async ({ page, request, wallet }) => {
-    const { profileId, attestationId } = await stateFrom(request);
+    const { profileId } = await stateFrom(request);
+    const attestationId = await disputableOrSkip(request);
     const { build } = await signButDoNotSubmit(page, wallet, 'open-dispute', async () => {
       // Ce face fluxul ăsta diferit de celelalte opt: blochează bani. Consecința trebuie să fie pe
       // ecran ÎNAINTE de construire, în cuvinte, nu doar în sumarul de după.

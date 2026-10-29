@@ -17,7 +17,17 @@ import Data.Tuple (snd)
 import Effect.Aff (Aff)
 import Route (Route(..))
 import Route.Codec (parseRoute, printRoute)
-import Route.GovQueries (emptyDRepFilters, renderDRepFilters, toggleIn)
+import Data.Array (sort) as Array
+import Data.String as String
+import Route.GovQueries
+  ( attestationListHrefFor
+  , disputeListHrefFor
+  , emptyDRepFilters
+  , emptyRegistryFilters
+  , profileListHrefFor
+  , renderDRepFilters
+  , toggleIn
+  )
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
 
@@ -82,6 +92,55 @@ spec = do
     it "percent-encodes a search term" do
       renderDRepFilters (emptyDRepFilters { q = Just "a&b c#d" })
         `shouldEqual` "?q=a%26b%20c%23d"
+
+  -- Testul care lipsea când a plecat defectul, și singurul care îl prinde structural.
+  --
+  -- `RegistryFilters` are DOUĂ consumatori care trebuie să spună același lucru: codecul rutei, care
+  -- produce adresa din browser, și `registryPairs`, care produce interogarea trimisă serverului.
+  -- `kind` fusese adăugat numai în primul: URL-ul îl purta, titlul paginii se schimba corect, și
+  -- cererea pleca NEFILTRATĂ — un titlu „Verified credentials" peste toate cele 22 de rânduri.
+  --
+  -- Aserțiunile pe câmpuri individuale n-ar fi prins-o, fiindcă un câmp nou n-ar avea aserțiune.
+  -- Comparația dintre cele două ieșiri o prinde: dacă un câmp intră în codec și nu în
+  -- `registryPairs`, mulțimile de parametri diverg și testul cade singur.
+  describe "the registry filters reach BOTH the URL and the request" do
+    let
+      -- Parametrii, ca mulțime sortată: ordinea lor nu e un contract, prezența lor este.
+      paramsOf href = case String.indexOf (String.Pattern "?") href of
+        Nothing -> []
+        Just i -> Array.sort (String.split (String.Pattern "&") (String.drop (i + 1) href))
+
+      allSet =
+        emptyRegistryFilters
+          { order_by = Just "date"
+          , sort_order = Just "desc"
+          , limit = Just "25"
+          , offset = Just "50"
+          , kind = Just "credential_claim"
+          , subject = Just "abc.def"
+          , issuer = Just "ghi.jkl"
+          }
+
+    it "the route codec and the query builder agree on every field" do
+      paramsOf (printRoute (AttestationList allSet)) `shouldEqual` paramsOf (attestationListHrefFor allSet)
+      paramsOf (printRoute (ProfileList allSet)) `shouldEqual` paramsOf (profileListHrefFor allSet)
+      paramsOf (printRoute (DisputeList allSet)) `shouldEqual` paramsOf (disputeListHrefFor allSet)
+
+    it "and what they agree on is all seven fields, not an agreed silence" do
+      -- Fără asta, două constructori care amândoi uită un câmp ar trece testul de deasupra.
+      paramsOf (attestationListHrefFor allSet)
+        `shouldEqual`
+          [ "issuer=ghi.jkl"
+          , "kind=credential_claim"
+          , "limit=25"
+          , "offset=50"
+          , "order_by=date"
+          , "sort_order=desc"
+          , "subject=abc.def"
+          ]
+
+    it "emits nothing when nothing is set" do
+      attestationListHrefFor emptyRegistryFilters `shouldEqual` "/attestations"
 
     it "emits nothing at all when nothing is filtered" do
       renderDRepFilters emptyDRepFilters `shouldEqual` ""

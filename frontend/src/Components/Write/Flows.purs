@@ -15,11 +15,13 @@ module Components.Write.Flows
   , specFor
   , buildRequest
   , missingFields
+  , WriteGate(..)
+  , writeGate
   ) where
 
 import Prelude
 
-import Capabilities.Interaction.Types (FlowRequest(..), UserAddresses, attestationKinds, disputeVerdicts, profileKinds)
+import Capabilities.Interaction.Types (FlowRequest(..), OracleGate(..), UserAddresses, attestationKinds, disputeVerdicts, profileKinds)
 import Data.Array (filter, find, null)
 import Data.Map (Map)
 import Data.Map as Map
@@ -259,3 +261,41 @@ buildRequest flowId values addresses = do
       v = get k
     in
       if v == "" then Nothing else Just v
+
+-- | Ce arată ecranul de scriere: formularul, nota de wallet, sau nota de oracol.
+data WriteGate
+  = ShowForm
+  | WalletNote
+  | OracleNote OracleGate
+
+derive instance Eq WriteGate
+
+-- | `Show` e pentru mesajele de test, ca la `OracleGate`: „expected ShowForm but got
+-- | (OracleNote OraclePaused)" spune ce s-a întîmplat fără să deschizi fișierul.
+instance Show WriteGate where
+  show = case _ of
+    ShowForm -> "ShowForm"
+    WalletNote -> "WalletNote"
+    OracleNote g -> "OracleNote " <> show g
+
+-- | Decizia porții, ca funcție pură, ca să poată fi fixată de un test.
+-- |
+-- | **`expire-dispute` e scutită de pauza oracolului, și asta nu e o slăbire.** Arma
+-- | `ExpireDispute` din validator verifică doar `D3` (nu e deja rezolvată) și `D9` (termenul a
+-- | trecut); `D7`, garda de pauză, stă numai pe arma de rezolvare
+-- | (`DisputesValidator.hs:145`). E deliberat: expirarea e ieșirea permisionless, cea care nu
+-- | trebuie să depindă de nimeni — iar cel care pauzează protocolul e exact operatorul. O poartă de
+-- | UI care o închide o face inaccesibilă tocmai cînd e singurul lucru care mai poate închide o
+-- | dispută.
+-- |
+-- | Wallet-ul rămâne obligatoriu pe toate: fără el nu există semnătură, deci nu există tranzacție.
+writeGate :: OracleGate -> Boolean -> String -> WriteGate
+writeGate og walletOk flowId = case og, walletOk of
+  OracleOpen, true -> ShowForm
+  OracleOpen, false -> WalletNote
+  _, true | flowId == "expire-dispute" -> ShowForm
+  -- Și aici ordinea e o afirmație: pentru expirare oracolul NU blochează, deci cu protocolul oprit
+  -- și fără wallet motivul real e wallet-ul. Nota de oracol i-ar spune că nu se poate scrie nimic,
+  -- exact cînd singurul lucru care se poate e ăsta.
+  _, false | flowId == "expire-dispute" -> WalletNote
+  g, _ -> OracleNote g

@@ -682,6 +682,30 @@ test('the home page answers why this is not just a website, and says what it doe
   await expect(page.getByText('It does not make claims true')).toBeVisible();
 });
 
+test('a filter that does not reach the request is now visible, because the mocks honour it', async ({ page }) => {
+  // Testul care lipsea cînd a plecat defectul. `kind` fusese adăugat în codecul rutei și nu în
+  // constructorul interogării: adresa îl purta, `<h1>` se schimba, și cererea pleca NEFILTRATĂ —
+  // un titlu „Verified credentials" peste toate rândurile. Suita asta nu putea s-o vadă, fiindcă
+  // mock-urile își ignorau argumentele și întorceau mereu fixture-ul întreg.
+  //
+  // Acum îl respectă, deci numărătoarea devine o aserțiune. Fixture-ul are exact UN rând cu
+  // `kind=credential_claim` din șase, iar diferența dintre 1 și 6 e chiar defectul.
+  await page.goto('/attestations?kind=credential_claim');
+  await expect(page.getByRole('heading', { name: 'Verified credentials', level: 1 })).toBeVisible();
+  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await expect(page.getByText('1 vouch match, showing 1–1')).toBeVisible();
+
+  // Și coloana care e tot rostul ecranului arată credențiala, nu o insignă „not yet" care pe
+  // felul ăsta de atestare e structural mereu falsă.
+  await expect(page.getByRole('columnheader', { name: 'Credential proved' })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Accepted' })).toHaveCount(0);
+
+  // Contraproba: fără filtru, aceeași pagină arată toate cele șase.
+  await page.goto('/attestations');
+  await expect(page.locator('tbody tr')).toHaveCount(6);
+  await expect(page.getByRole('columnheader', { name: 'Accepted' })).toBeVisible();
+});
+
 test('a profile page shows the two halves of a track record, not just the identity', async ({ page }) => {
   // Pînă acum registrul avea doar liste, iar palmaresul unei identități — teza produsului — nu se
   // vedea nicăieri per persoană. Cele DOUĂ jumătăți sînt tot rostul paginii: ruta dedicată

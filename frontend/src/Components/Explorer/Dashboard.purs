@@ -266,7 +266,8 @@ component =
       , HH.div [ HP.class_ (HH.ClassName "space-y-4 pt-10") ]
           [ HH.p [ HP.class_ (HH.ClassName "opacity-80 max-w-3xl scroll-reveal") ]
               [ HH.text
-                  "Anyone can state something about someone else here: that they delivered a \
+                  "Anyone with a profile can state something about someone else here: that they \
+                  \delivered a \
                   \milestone, passed an audit, hold a role. The claim is written on chain, the \
                   \subject can accept it, and anyone who thinks it is false can challenge it by \
                   \putting money behind the challenge."

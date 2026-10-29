@@ -25,7 +25,7 @@ import AppEnv as AppEnv
 import Capabilities.Interaction.Types (InteractionStatus(..), OracleGate(..), OracleParams(..), UserAddresses, oracleGate)
 import Components.Shared.OnchainId as OnchainId
 import Components.Shared.DRepIdentity (shortId)
-import Components.Write.Flows (FieldKind(..), buildRequest, flowSpecs, missingFields, specFor)
+import Components.Write.Flows (FieldKind(..), WriteGate(..), buildRequest, flowSpecs, missingFields, specFor, writeGate)
 import Components.Write.TxSummaryDecode (summarise)
 import Format (enumLabel, formatAda, pluralize)
 import Control.Monad.Reader (class MonadAsk)
@@ -374,16 +374,20 @@ component =
           , if not st.oracleAsked then
               -- Încă se întreabă. Nu se promite nimic și nu se sperie nimeni.
               HH.p [ HP.class_ (HH.ClassName "text-sm opacity-70") ] [ HH.text "Checking the protocol…" ]
-            else case protocolGate st, st.gate of
-              OracleOpen, Just (Allowed _) -> form st spec
-              OracleOpen, _ -> gateNote
-              g, _ -> oracleNote g
+            else case writeGate (protocolGate st) (walletAllowed st.gate) spec.id of
+              ShowForm -> form st spec
+              WalletNote -> gateNote
+              OracleNote g -> oracleNote g
           ]
       ]
 
   -- Oracolul e o poartă diferită de wallet, și se spune ca atare: „protocolul e oprit" nu e
   -- aceeași problemă cu „wallet-ul tău nu poate", iar un singur mesaj pentru amândouă ar trimite
   -- omul să-și schimbe wallet-ul degeaba.
+  walletAllowed = case _ of
+    Just (Allowed _) -> true
+    _ -> false
+
   oracleNote = case _ of
     OracleOpen -> HH.text ""
     OraclePaused ->
@@ -391,7 +395,9 @@ component =
         [ HH.span_
             [ HH.text
                 "The oracle has paused this protocol. Nothing can be written until whoever holds \
-                \that authority resumes it. Reading is unaffected."
+                \that authority resumes it — except expiring an undecided challenge past its \
+                \deadline, which the chain deliberately leaves open to anyone, because it is the \
+                \one exit that must not depend on the operator. Reading is unaffected."
             ]
         ]
     OracleUnknown ->

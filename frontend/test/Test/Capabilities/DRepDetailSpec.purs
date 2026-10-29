@@ -27,7 +27,8 @@ import Data.String as String
 import Data.Tuple (fst)
 import Effect.Aff (Aff)
 import Route as R
-import Route.Codec (parseRoute, printRoute)
+import Route.Codec (parseRoute, printRoute, routeCodec)
+import Routing.Duplex (parse)
 import Route.GovQueries (drepDetailHrefFor, emptyDRepFilters, emptyGovActionFilters, emptyRegistryFilters)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (fail, shouldEqual)
@@ -175,6 +176,18 @@ spec = do
       parseRoute "/disputes/" `shouldEqual` R.DisputeList emptyRegistryFilters
       parseRoute "/dreps/" `shouldEqual` R.DRepList emptyDRepFilters
       parseRoute "/gov-actions/" `shouldEqual` R.ActionList emptyGovActionFilters
+
+    it "but the codec itself still refuses it, which is why Main normalises before the router" do
+      -- Aserțiunea de deasupra trece prin `parseRoute`, care NU e pe drumul de rulare:
+      -- `AppBase.purs` cheamă `mkRouter routeCodec`, deci routerul parsează cu CODECUL. Prima
+      -- variantă a reparației a pus normalizarea numai în `parseRoute`, testul a trecut, și
+      -- `/profiles/` dădea tot „Not found" în browser — verificat pe bundle-ul de producție.
+      -- Reparația vie e `normaliseTrailingSlash` din `App.SpaLinkInterceptor`, chemată din `Main`.
+      -- Testul ăsta fixează motivul: dacă vreodată codecul începe să accepte segmentul gol, cade
+      -- singur, și atunci FFI-ul poate dispărea.
+      case parse routeCodec "/profiles/" of
+        Left _ -> pure unit
+        Right _ -> fail "the codec accepted a trailing slash, so Main's normalisation is now dead code"
 
     it "percent-encodes an id that would otherwise cut the request short" do
       -- Un ID de acțiune de guvernanță conține `#` prin construcție; același codor îl deservește.

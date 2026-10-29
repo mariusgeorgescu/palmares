@@ -10,7 +10,7 @@ import Prelude
 import AppEnv (NetworkMagic(..), mainnetMagic, preprodMagic, previewMagic)
 import Capabilities.Interaction.Types (FlowRequest(..), InteractionStatus(..), OracleGate(..), OracleParams(..), encodeFlow, flowPath, oracleGate)
 import Capabilities.Wallet.Governance (BlockReason(..), WalletCapabilities, blockMessage, impliedMagic, verdictOf)
-import Components.Write.Flows (buildRequest, flowSpecs, missingFields, specFor)
+import Components.Write.Flows (WriteGate(..), buildRequest, flowSpecs, missingFields, specFor, writeGate)
 import Components.Write.TxSummary (summariseJson)
 import Data.Argonaut.Core (stringify)
 import Data.Array (head, length, nub)
@@ -125,6 +125,28 @@ spec = do
       String.contains (String.Pattern "nine actions") (blockMessage NoGovernanceKeys) `shouldEqual` true
       String.contains (String.Pattern "preprod") (blockMessage (WrongNetwork preprodMagic (NetworkMagic 2)))
         `shouldEqual` false
+
+  describe "the write gate" do
+    it "needs a wallet for every flow, because without one there is no signature" do
+      writeGate OracleOpen false "issue-attestation" `shouldEqual` WalletNote
+      writeGate OracleOpen false "expire-dispute" `shouldEqual` WalletNote
+      writeGate OraclePaused false "expire-dispute" `shouldEqual` WalletNote
+
+    it "opens every flow when the oracle is open and the wallet passed" do
+      writeGate OracleOpen true "issue-attestation" `shouldEqual` ShowForm
+      writeGate OracleOpen true "resolve-dispute" `shouldEqual` ShowForm
+
+    it "keeps expire-dispute reachable while the protocol is paused, and only that one" do
+      -- Derivat din validator, nu din preferință: arma `ExpireDispute` verifică doar `D3` și `D9`,
+      -- iar `D7` — garda de pauză — stă numai pe arma de rezolvare. Expirarea e ieșirea
+      -- permisionless, iar cel care pauzează protocolul e exact operatorul; o poartă de UI care o
+      -- închide o face inaccesibilă tocmai cînd e singurul lucru care mai poate închide o dispută.
+      writeGate OraclePaused true "expire-dispute" `shouldEqual` ShowForm
+      writeGate OracleUnknown true "expire-dispute" `shouldEqual` ShowForm
+      writeGate ScriptsMissing true "expire-dispute" `shouldEqual` ShowForm
+      writeGate OraclePaused true "resolve-dispute" `shouldEqual` OracleNote OraclePaused
+      writeGate OraclePaused true "open-dispute" `shouldEqual` OracleNote OraclePaused
+      writeGate OracleUnknown true "issue-attestation" `shouldEqual` OracleNote OracleUnknown
 
   describe "the nine flows" do
     it "are nine, with distinct ids and distinct server paths" do
