@@ -4,7 +4,8 @@ import staticFiles from '@fastify/static';
 import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { services } from './config.js';
+import { rateLimits, services } from './config.js';
+import { registerRateLimit } from './ratelimit.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,6 +19,9 @@ await fastify.register(import('@fastify/cors'), {
   origin: true,
   credentials: true
 });
+
+// Limitarea debitului, înaintea oricărui proxy: ce apără e baza din spate, nu BFF-ul.
+registerRateLimit(fastify, rateLimits);
 
 /**
  * Create Basic Auth header from username and password

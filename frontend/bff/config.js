@@ -30,6 +30,23 @@ function requireEnv(name) {
   return value;
 }
 
+// Pragurile de debit au valori implicite, și NU trec prin `requireEnv`: un BFF care refuză să
+// pornească fără ele ar face limitarea o condiție de disponibilitate, adică exact invers. Un număr
+// neplauzibil (zero, negativ, text) e tratat ca „nesetat" — altfel o greșeală de tastare ar putea
+// închide API-ul pentru toți.
+function rateFromEnv(name, fallback) {
+  const raw = process.env[name];
+  const n = raw === undefined ? NaN : Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
+}
+
+export const rateLimits = {
+  // Generos pentru un om: o încărcare de ecran face între două și șase cereri, iar graful face mai
+  // multe. Strâns pentru un scraper, care face mii.
+  perClient: rateFromEnv('PALMARES_RATE_LIMIT_PER_CLIENT', 240),
+  global: rateFromEnv('PALMARES_RATE_LIMIT_GLOBAL', 1200),
+};
+
 const envVars = {
   PALMARES_QUERY_API_URL: requireEnv('PALMARES_QUERY_API_URL'),
   PALMARES_INTERACTION_API_URL: requireEnv('PALMARES_INTERACTION_API_URL'),
