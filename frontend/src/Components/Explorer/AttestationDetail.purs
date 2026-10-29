@@ -18,7 +18,7 @@ module Components.Explorer.AttestationDetail
 import Prelude
 
 import AppEnv as AppEnv
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestation, getProfile)
 import Capabilities.Query.Gov.Types
   ( AttestationDetail(..)
@@ -28,6 +28,7 @@ import Capabilities.Query.Gov.Types
   )
 import Components.Explorer.DisputeList (verdictClass)
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Remote as Remote
 import Components.Shared.Refresh (subscribeRefresh)
 import Components.Shared.OnchainId as OnchainId
 import Data.Array (null)
@@ -37,7 +38,6 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Format (formatAda, formatDay, humanize)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
 import Halogen.Store.Monad (class MonadStore)
@@ -133,24 +133,9 @@ component =
           Success d -> HH.div [ HP.class_ (HH.ClassName "space-y-4") ] [ header st d, challenges d ]
       ]
 
-  loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
-          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading the vouch…" ]
-          ]
-      ]
+  loading = Remote.loadingCard "Loading the vouch…"
 
-  failure msg e =
-    HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text msg ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
-          , HH.button
-              [ HP.class_ (HH.ClassName "btn btn-sm"), HP.type_ HP.ButtonButton, HE.onClick (const Retry) ]
-              [ HH.text "Try again" ]
-          ]
-      ]
+  failure msg e = Remote.errorCard msg e Retry
 
   header st (AttestationDetail d) =
     let

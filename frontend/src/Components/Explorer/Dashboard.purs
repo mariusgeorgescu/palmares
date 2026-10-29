@@ -25,11 +25,12 @@ module Components.Explorer.Dashboard
 
 import Prelude
 
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getDashboard, getRegistrySummary)
 import Capabilities.Query.Gov.Types (DRepSummary(..), DashboardPage(..), EpochPoint(..), GovActionSummary(..), Lovelace, RegistrySummary)
 import Components.Chart.Series as Series
 import Components.Shared.DRepIdentity as DRepIdentity
+import Components.Shared.Remote as Remote
 import Components.Shared.Refresh (subscribeRefresh)
 import Data.Array (mapMaybe, null)
 import Data.FunctorWithIndex (mapWithIndex)
@@ -63,7 +64,6 @@ import Route.GovQueries
   )
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Network.RemoteData (RemoteData(..))
@@ -495,23 +495,7 @@ component =
           ]
       ]
 
-  failure e =
-    HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ]
-              [ HH.text "The governance figures could not be loaded." ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
-          -- Un ecran de eroare fără nimic de apăsat e un fund de sac: singura ieșire rămâne
-          -- reîncărcarea din browser, care pe ruta asta costă încă o dată cele ~30 de secunde de
-          -- așteptare. `isRetryable` există deja în transport, dar nu-l folosea nimeni.
-          , HH.button
-              [ HP.class_ (HH.ClassName "btn btn-sm")
-              , HP.type_ HP.ButtonButton
-              , HE.onClick (const Retry)
-              ]
-              [ HH.text "Try again" ]
-          ]
-      ]
+  failure e = Remote.errorCard "The governance figures could not be loaded." e Retry
 
   renderPage page@(DashboardPage p) =
     HH.div [ HP.class_ (HH.ClassName "space-y-6") ]

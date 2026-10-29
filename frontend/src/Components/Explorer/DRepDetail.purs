@@ -18,7 +18,7 @@ module Components.Explorer.DRepDetail
 
 import Prelude
 
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getDRepDetail)
 import Capabilities.Query.Gov.Types
   ( AnchorContent(..)
@@ -35,6 +35,7 @@ import Capabilities.Query.Gov.Types
   )
 import Components.Chart.Series as Series
 import Components.Shared.Anchor as Anchor
+import Components.Shared.Remote as Remote
 import Components.Shared.DRepIdentity as DRepIdentity
 import Components.Shared.MetricInfo as MetricInfo
 import Data.Array (concatMap, last, null, uncons)
@@ -52,7 +53,6 @@ import Web.HTML (window)
 import Web.HTML.Location (origin)
 import Web.HTML.Window (location)
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.RemoteData (RemoteData(..))
 import Route.GovQueries (embedPreviewHref, drepListHrefFor, emptyDRepFilters, methodologyHrefFor, votesForDRepHref)
@@ -152,31 +152,9 @@ component =
           Success p -> renderDetail st.origin p
       ]
 
-  loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
-          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading this DRep…" ]
-          ]
-      ]
+  loading = Remote.loadingCard "Loading this DRep…"
 
-  failure drepId e =
-    HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "This DRep could not be loaded." ]
-          , HH.p [ HP.class_ (HH.ClassName "font-mono text-xs break-all") ] [ HH.text drepId ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
-          -- Un ecran de eroare fără nimic de apăsat e un fund de sac: singura ieșire rămâne
-          -- reîncărcarea din browser, care pe ruta asta costă încă o dată cele ~30 de secunde de
-          -- așteptare. `isRetryable` există deja în transport, dar nu-l folosea nimeni.
-          , HH.button
-              [ HP.class_ (HH.ClassName "btn btn-sm")
-              , HP.type_ HP.ButtonButton
-              , HE.onClick (const Retry)
-              ]
-              [ HH.text "Try again" ]
-          ]
-      ]
+  failure drepId e = Remote.errorCardAbout "This DRep could not be loaded." drepId e Retry
 
   renderDetail origin' (DRepDetail d) =
     HH.div [ HP.class_ (HH.ClassName "space-y-4") ]

@@ -16,7 +16,7 @@ module Components.Explorer.DisputeDetail
 
 import Prelude
 
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov
   ( class MonadQueryGov
   , getAttestation
@@ -31,6 +31,7 @@ import Capabilities.Query.Gov.Types
   )
 import Components.Explorer.DisputeList (verdictClass)
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Remote as Remote
 import Components.Shared.Refresh (subscribeRefresh)
 import Data.Const (Const)
 import Data.Either (Either(..), either)
@@ -38,7 +39,6 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Format (formatAda, formatDay)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
 import Halogen.Store.Monad (class MonadStore)
@@ -140,24 +140,9 @@ component =
           Success d -> body st d
       ]
 
-  loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
-          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading the challenge…" ]
-          ]
-      ]
+  loading = Remote.loadingCard "Loading the challenge…"
 
-  failure e =
-    HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The challenge could not be loaded." ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
-          , HH.button
-              [ HP.class_ (HH.ClassName "btn btn-sm"), HP.type_ HP.ButtonButton, HE.onClick (const Retry) ]
-              [ HH.text "Try again" ]
-          ]
-      ]
+  failure e = Remote.errorCard "The challenge could not be loaded." e Retry
 
   body st (DisputeRow d) =
     HH.div [ HP.class_ (HH.ClassName "space-y-3") ]

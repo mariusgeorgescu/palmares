@@ -17,7 +17,7 @@ module Components.Explorer.ActionList
 
 import Prelude
 
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getGovActions)
 import Capabilities.Query.Gov.Types (ChainPoint(..), GovActionPage(..), GovActionSummary(..), Lifecycle(..))
 import Data.Array (elem, length, null)
@@ -27,6 +27,7 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Format (formatAda, formatInt, humanize, matchLine)
 import Halogen as H
 import Components.Shared.Pager as Pager
+import Components.Shared.Remote as Remote
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -192,30 +193,9 @@ component =
           ]
       ]
 
-  loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
-          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading proposals…" ]
-          ]
-      ]
+  loading = Remote.loadingCard "Loading proposals…"
 
-  failure e =
-    HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The proposals could not be loaded." ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
-          -- Un ecran de eroare fără nimic de apăsat e un fund de sac: singura ieșire rămâne
-          -- reîncărcarea din browser, care pe ruta asta costă încă o dată cele ~30 de secunde de
-          -- așteptare. `isRetryable` există deja în transport, dar nu-l folosea nimeni.
-          , HH.button
-              [ HP.class_ (HH.ClassName "btn btn-sm")
-              , HP.type_ HP.ButtonButton
-              , HE.onClick (const Retry)
-              ]
-              [ HH.text "Try again" ]
-          ]
-      ]
+  failure e = Remote.errorCard "The proposals could not be loaded." e Retry
 
   body st page@(GovActionPage p) =
     HH.div [ HP.class_ (HH.ClassName "grid gap-4 lg:grid-cols-4") ]

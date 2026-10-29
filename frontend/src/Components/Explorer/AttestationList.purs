@@ -22,10 +22,11 @@ module Components.Explorer.AttestationList
 
 import Prelude
 
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestations, getProfiles)
 import Capabilities.Query.Gov.Types (AttestationPage(..), AttestationRow(..), ProfilePage(..), ProfileRow(..))
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Remote as Remote
 import Components.Shared.Refresh (subscribeRefresh)
 import Data.Array (length, null)
 import Data.Const (Const)
@@ -40,7 +41,6 @@ import AppEnv as AppEnv
 import Components.Shared.OnchainId as OnchainId
 import Components.Shared.Pager as Pager
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
 import Halogen.Store.Monad (class MonadStore)
@@ -168,24 +168,9 @@ component =
           Success p -> body st p
       ]
 
-  loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
-          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading vouches…" ]
-          ]
-      ]
+  loading = Remote.loadingCard "Loading vouches…"
 
-  failure e =
-    HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The vouches could not be loaded." ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
-          , HH.button
-              [ HP.class_ (HH.ClassName "btn btn-sm"), HP.type_ HP.ButtonButton, HE.onClick (const Retry) ]
-              [ HH.text "Try again" ]
-          ]
-      ]
+  failure e = Remote.errorCard "The vouches could not be loaded." e Retry
 
   body st page@(AttestationPage p) =
     HH.div [ HP.class_ (HH.ClassName "space-y-3") ]

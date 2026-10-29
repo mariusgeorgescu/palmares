@@ -19,10 +19,11 @@ module Components.Explorer.DelegationList
 
 import Prelude
 
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getDelegations)
 import Capabilities.Query.Gov.Types (ChainPoint(..), DelegationPage(..), DelegationRow(..))
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Remote as Remote
 import Data.Array (length, null)
 import Data.Const (Const)
 import Data.Either (Either(..))
@@ -32,7 +33,6 @@ import Format (formatAda, formatDay, matchLine)
 import Halogen as H
 import Components.Shared.Pager as Pager
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
 import Network.RemoteData (RemoteData(..))
@@ -172,24 +172,9 @@ component =
         ]
         [ HH.text (if on then "Current delegations only" else "Show current only") ]
 
-  loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
-          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading delegations…" ]
-          ]
-      ]
+  loading = Remote.loadingCard "Loading delegations…"
 
-  failure e =
-    HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The delegations could not be loaded." ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
-          , HH.button
-              [ HP.class_ (HH.ClassName "btn btn-sm"), HP.type_ HP.ButtonButton, HE.onClick (const Retry) ]
-              [ HH.text "Try again" ]
-          ]
-      ]
+  failure e = Remote.errorCard "The delegations could not be loaded." e Retry
 
   body st page@(DelegationPage p) =
     HH.div [ HP.class_ (HH.ClassName "space-y-3") ]

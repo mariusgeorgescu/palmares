@@ -20,10 +20,11 @@ module Components.Explorer.ProfileDetail
 import Prelude
 
 import AppEnv as AppEnv
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getAttestations, getProfile)
 import Capabilities.Query.Gov.Types (AttestationPage(..), AttestationRow(..), ProfileRow(..))
 import Components.Shared.DRepIdentity (shortId)
+import Components.Shared.Remote as Remote
 import Components.Shared.Refresh (subscribeRefresh)
 import Components.Shared.OnchainId as OnchainId
 import Data.Array (filter, length, null, take)
@@ -34,7 +35,6 @@ import Data.String (Pattern(..), stripPrefix)
 import Format (enumLabel, formatDay, humanize, pluralize)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Router.Class (class MonadRouter)
 import Halogen.Store.Monad (class MonadStore)
@@ -170,16 +170,7 @@ component =
           ]
       ]
 
-  failure msg e =
-    HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text msg ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
-          , HH.button
-              [ HP.class_ (HH.ClassName "btn btn-sm"), HP.type_ HP.ButtonButton, HE.onClick (const Retry) ]
-              [ HH.text "Try again" ]
-          ]
-      ]
+  failure msg e = Remote.errorCard msg e Retry
 
   header st (ProfileRow r) =
     HH.div [ HP.class_ (HH.ClassName "space-y-2") ]

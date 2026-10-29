@@ -15,7 +15,7 @@ module Components.Explorer.ActionDetail
 
 import Prelude
 
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getGovActionDetail)
 import Capabilities.Query.Gov.Types
   ( ActionAnchor(..)
@@ -30,6 +30,7 @@ import Capabilities.Query.Gov.Types
   )
 import Components.Explorer.ActionList (stateClass)
 import Components.Shared.Anchor as Anchor
+import Components.Shared.Remote as Remote
 import Components.Shared.MetricInfo as MetricInfo
 import Data.Array (catMaybes, null)
 import Data.Const (Const)
@@ -39,7 +40,6 @@ import Data.String as String
 import Format (formatAda, formatDay, formatInt, formatPercent, humanize, pluralize, roleLabel)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.RemoteData (RemoteData(..))
 import Route.GovQueries (actionListHrefFor, emptyGovActionFilters, votesForActionHref)
@@ -142,31 +142,9 @@ component =
           Success p -> renderDetail p
       ]
 
-  loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
-          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading this proposal…" ]
-          ]
-      ]
+  loading = Remote.loadingCard "Loading this proposal…"
 
-  failure actionId e =
-    HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "This proposal could not be loaded." ]
-          , HH.p [ HP.class_ (HH.ClassName "font-mono text-xs break-all") ] [ HH.text actionId ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
-          -- Un ecran de eroare fără nimic de apăsat e un fund de sac: singura ieșire rămâne
-          -- reîncărcarea din browser, care pe ruta asta costă încă o dată cele ~30 de secunde de
-          -- așteptare. `isRetryable` există deja în transport, dar nu-l folosea nimeni.
-          , HH.button
-              [ HP.class_ (HH.ClassName "btn btn-sm")
-              , HP.type_ HP.ButtonButton
-              , HE.onClick (const Retry)
-              ]
-              [ HH.text "Try again" ]
-          ]
-      ]
+  failure actionId e = Remote.errorCardAbout "This proposal could not be loaded." actionId e Retry
 
   renderDetail (GovActionDetail d) =
     HH.div [ HP.class_ (HH.ClassName "space-y-4") ]

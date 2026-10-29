@@ -14,7 +14,7 @@ module Components.Explorer.Methodology
 
 import Prelude
 
-import Capabilities.Query.Gov.Http (ApiError, renderApiError)
+import Capabilities.Query.Gov.Http (ApiError)
 import Capabilities.Query.Gov.MonadQueryGov (class MonadQueryGov, getFormulas)
 import Capabilities.Query.Gov.Types (Formula(..))
 import Data.Array (length, null)
@@ -22,9 +22,9 @@ import Data.Const (Const)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
 import Format (formatInt, pluralize)
+import Components.Shared.Remote as Remote
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Network.RemoteData (RemoteData(..))
 import Route.GovQueries (MethodologyFilters)
@@ -113,30 +113,9 @@ component =
                 )
       ]
 
-  loading =
-    HH.div [ HP.class_ (HH.ClassName "card bg-base-200 explorer-card") ]
-      [ HH.div [ HP.class_ (HH.ClassName "card-body") ]
-          [ HH.span [ HP.class_ (HH.ClassName "loading loading-dots loading-md") ] []
-          , HH.p [ HP.class_ (HH.ClassName "opacity-70") ] [ HH.text "Loading the formulas…" ]
-          ]
-      ]
+  loading = Remote.loadingCard "Loading the formulas…"
 
-  failure e =
-    HH.div [ HP.class_ (HH.ClassName "alert alert-error") ]
-      [ HH.div [ HP.class_ (HH.ClassName "space-y-1") ]
-          [ HH.p [ HP.class_ (HH.ClassName "font-medium") ] [ HH.text "The formulas could not be loaded." ]
-          , HH.p [ HP.class_ (HH.ClassName "text-sm") ] [ HH.text (renderApiError e) ]
-          -- Un ecran de eroare fără nimic de apăsat e un fund de sac: singura ieșire rămâne
-          -- reîncărcarea din browser, care pe ruta asta costă încă o dată cele ~30 de secunde de
-          -- așteptare. `isRetryable` există deja în transport, dar nu-l folosea nimeni.
-          , HH.button
-              [ HP.class_ (HH.ClassName "btn btn-sm")
-              , HP.type_ HP.ButtonButton
-              , HE.onClick (const Retry)
-              ]
-              [ HH.text "Try again" ]
-          ]
-      ]
+  failure e = Remote.errorCard "The formulas could not be loaded." e Retry
 
   formulaCard focus (Formula f) =
     let
